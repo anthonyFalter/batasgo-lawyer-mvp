@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
+import "@fontsource-variable/inter";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "BatasGo",
-  description: "A Next.js web application",
+  description: "A focused workspace for legal practitioners.",
 };
 
 export default function RootLayout({
