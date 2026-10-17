@@ -21,9 +21,9 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: #fff;
-  border: 1px solid #e0e5ee;
-  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
 }
 
 .conversation-panel {
@@ -40,7 +40,7 @@
 
 .conversation-panel-heading h2 {
   margin: 0;
-  color: #293243;
+  color: var(--heading);
   font-size: 14px;
   font-weight: 700;
 }
@@ -54,9 +54,9 @@
   margin: 0 14px 11px;
   padding: 0 9px;
   color: #66758c;
-  background: #f2f3f5;
+  background: var(--surface-muted);
   border: 1px solid transparent;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
 }
 
 .conversation-search:focus-within {
@@ -69,7 +69,7 @@
   width: 100%;
   min-width: 0;
   padding: 0;
-  color: #293243;
+  color: var(--ink);
   background: transparent;
   border: 0;
   outline: 0;
@@ -77,7 +77,7 @@
 }
 
 .conversation-search input::placeholder {
-  color: #758198;
+  color: var(--muted);
   opacity: 1;
 }
 
@@ -90,7 +90,7 @@
   min-height: 0;
   flex: 1;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   padding: 0 14px 14px;
   overflow-y: auto;
 }
@@ -101,24 +101,24 @@
   flex-direction: column;
   gap: 4px;
   padding: 9px 10px;
-  color: #293243 !important;
-  background: #fff;
-  border: 1px solid #e0e5ee;
-  border-radius: 6px;
+  color: var(--ink) !important;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
   cursor: pointer;
   text-align: left;
   transition: background-color 130ms ease, border-color 130ms ease;
 }
 
 .conversation-item:hover {
-  background: #f7f8fa;
+  background: var(--surface-subtle);
   border-color: #d2d8e2;
 }
 
 .conversation-item--selected,
 .conversation-item--selected:hover {
-  background: #e6e7e9;
-  border-color: #e6e7e9;
+  background: var(--blue-selected);
+  border-color: #cbd7f0;
 }
 
 .conversation-item-copy {
@@ -138,7 +138,7 @@
 
 .conversation-item-top strong {
   overflow: hidden;
-  color: #293243;
+  color: var(--heading);
   font-size: 12px;
   font-weight: 680;
   text-overflow: ellipsis;
@@ -147,7 +147,7 @@
 
 .conversation-item-top time {
   flex: 0 0 auto;
-  color: #8a95a7;
+  color: var(--muted);
   font-size: 10px;
   font-variant-numeric: tabular-nums;
 }
@@ -174,7 +174,7 @@
   justify-content: center;
   gap: 7px;
   padding: 22px;
-  color: #758198;
+  color: var(--muted);
   text-align: center;
 }
 
@@ -196,7 +196,7 @@
   align-items: center;
   gap: 8px;
   padding: 7px 15px;
-  border-bottom: 1px solid #e8ebf0;
+  border-bottom: 1px solid var(--line-soft);
 }
 
 .thread-contact {
@@ -207,7 +207,7 @@
 .thread-contact h2 {
   overflow: hidden;
   margin: 0;
-  color: #293243;
+  color: var(--heading);
   font-size: 14px;
   font-weight: 700;
   text-overflow: ellipsis;
@@ -217,7 +217,7 @@
 .thread-contact p {
   overflow: hidden;
   margin: 3px 0 0;
-  color: #758198;
+  color: var(--muted);
   font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -242,7 +242,7 @@
   gap: 12px;
   padding: 18px 8% 16px;
   overflow-y: auto;
-  background: #fff;
+  background: var(--surface);
 }
 
 .thread-message {
@@ -262,16 +262,16 @@
   width: fit-content;
   max-width: 100%;
   padding: 9px 10px 6px;
-  color: #30343b;
-  background: #f2f3f5;
+  color: var(--ink);
+  background: var(--surface-muted);
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-panel);
 }
 
 .thread-message--outbound .thread-message-bubble {
-  color: #fff;
-  background: #4b78ff;
-  border-radius: 10px 10px 4px 10px;
+  color: var(--surface);
+  background: var(--blue);
+  border-radius: var(--radius-panel) var(--radius-panel) var(--radius-small) var(--radius-panel);
 }
 
 .thread-message-bubble > p {
@@ -300,9 +300,9 @@
   align-self: center;
   margin: auto;
   padding: 10px 14px;
-  color: #758198;
-  background: #f7f8fa;
-  border-radius: 6px;
+  color: var(--muted);
+  background: var(--surface-subtle);
+  border-radius: var(--radius-control);
   font-size: 11px;
 }
 
@@ -323,13 +323,13 @@
   height: 42px;
   place-items: center;
   color: #5376cb;
-  background: #edf2ff;
+  background: var(--blue-pale);
   border-radius: 50%;
 }
 
 .thread-empty h2 {
   margin: 13px 0 0;
-  color: #30343b;
+  color: var(--heading);
   font-size: 14px;
   font-weight: 700;
 }
@@ -337,7 +337,7 @@
 .thread-empty p {
   max-width: 270px;
   margin: 6px 0 0;
-  color: #758198;
+  color: var(--muted);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -345,24 +345,24 @@
 .thread-empty button {
   margin-top: 12px;
   padding: 7px 10px;
-  color: #285ed9 !important;
+  color: var(--blue-ink) !important;
   background: #f1f5ff;
   border: 1px solid #dce7ff;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   cursor: pointer;
   font-size: 12px !important;
   font-weight: 650;
 }
 
 .thread-empty button:hover {
-  background: #e9f0ff;
+  background: var(--blue-selected);
 }
 
 .message-composer {
   flex: 0 0 auto;
   padding: 10px 11px 7px;
-  background: #fff;
-  border-top: 1px solid #e8ebf0;
+  background: var(--surface);
+  border-top: 1px solid var(--line-soft);
 }
 
 .composer-input-wrap {
@@ -371,8 +371,8 @@
   align-items: center;
   gap: 5px;
   padding: 0 5px;
-  border: 1px solid #cfd4dc;
-  border-radius: 24px;
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-pill);
   transition: border-color 140ms ease, box-shadow 140ms ease;
 }
 
@@ -387,7 +387,7 @@
   height: 28px;
   flex: 0 0 auto;
   place-items: center;
-  color: #343b47 !important;
+  color: var(--heading) !important;
   background: transparent;
   border: 0;
   border-radius: 50%;
@@ -396,8 +396,8 @@
 }
 
 .messages-icon-button:hover {
-  color: #285ed9 !important;
-  background: #edf2ff;
+  color: var(--blue-ink) !important;
+  background: var(--blue-pale);
 }
 
 .composer-input-wrap input {
@@ -405,7 +405,7 @@
   min-width: 0;
   height: 32px;
   padding: 0 4px;
-  color: #293243;
+  color: var(--ink);
   background: transparent;
   border: 0;
   outline: 0;
@@ -413,7 +413,7 @@
 }
 
 .composer-input-wrap input::placeholder {
-  color: #8a95a7;
+  color: var(--muted);
   opacity: 1;
 }
 
@@ -440,7 +440,7 @@
 }
 
 .composer-send:disabled {
-  color: #30343b !important;
+  color: var(--heading) !important;
   cursor: not-allowed;
   opacity: 1;
 }
