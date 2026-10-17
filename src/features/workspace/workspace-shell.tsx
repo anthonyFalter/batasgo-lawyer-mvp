@@ -2,11 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { UserButton } from "@clerk/nextjs";
 import {
   Bell,
   Bot,
   CalendarDays,
-  ChevronDown,
   Clock3,
   FilePenLine,
   Inbox,
@@ -14,7 +14,6 @@ import {
   Menu,
   Search,
   Settings,
-  UserRound,
   ListChecks,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -34,7 +33,7 @@ const navItems = [
 ];
 
 type WorkspacePage = "Case Overview" | "BatasBot" | "Document Assembly" | "Calendar" | "Messages" | "Tasks" | "Settings";
-type Popover = "notifications" | "profile" | null;
+type Popover = "notifications" | null;
 
 export default function WorkspaceShell({
   activePage,
@@ -168,27 +167,7 @@ export default function WorkspaceShell({
                 </div>
               )}
             </div>
-            <div className="popover-anchor">
-              <button
-                className="profile-button"
-                type="button"
-                aria-expanded={popover === "profile"}
-                onClick={() => setPopover(popover === "profile" ? null : "profile")}
-              >
-                <span className="profile-avatar"><UserRound size={11.39} /></span>
-                <span>Atty. Juan Dela Cruz</span>
-                <ChevronDown aria-hidden="true" size={10.05} />
-              </button>
-              {popover === "profile" && (
-                <div className="popover profile-popover" role="region" aria-label="Account menu">
-                  <strong>Atty. Juan Dela Cruz</strong>
-                  <span>Sample lawyer account</span>
-                  <button type="button" onClick={() => { setPopover(null); window.location.assign("/settings"); }}>
-                    <Settings size={10.05} /> Account settings
-                  </button>
-                </div>
-              )}
-            </div>
+            <UserButton />
           </div>
         </header>
         {children}
