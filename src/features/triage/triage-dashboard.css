@@ -238,8 +238,10 @@
 }
 
 .global-search {
+  position: absolute;
+  left: 50%;
   display: flex;
-  width: min(100%, 740px);
+  width: min(740px, calc(100% - 636px));
   height: 46px;
   align-items: center;
   gap: 10px;
@@ -249,6 +251,7 @@
   border: 1px solid #d4d9e2;
   border-radius: 24px;
   box-shadow: 0 1px 2px rgb(20 30 50 / 3%);
+  transform: translateX(-50%);
   transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
@@ -288,10 +291,11 @@
 }
 
 .topbar-actions {
+  position: absolute;
+  right: 26px;
   display: flex;
   align-items: center;
   gap: 13px;
-  margin-left: auto;
 }
 
 .icon-button,
@@ -953,6 +957,10 @@
 }
 
 .insights-rail .triage-ai-panel {
+  margin-top: var(--triage-recommendation-offset, 0px);
+}
+
+.insights-rail .triage-ai-panel {
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -1556,6 +1564,26 @@
     padding: 0 18px;
   }
 
+  .global-search {
+    width: min(740px, calc(100% - 230px));
+  }
+
+  .topbar-actions {
+    right: 18px;
+  }
+
+  .profile-button {
+    width: 42px;
+    min-height: 42px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .profile-button > span:nth-child(2),
+  .profile-button > svg:last-child {
+    display: none;
+  }
+
   .sidebar {
     width: 230px;
     transform: translateX(-100%);
@@ -1601,6 +1629,10 @@
     align-items: start;
   }
 
+  .insights-rail .triage-ai-panel {
+    margin-top: 0;
+  }
+
   .messages-panel {
     grid-column: span 2;
   }
@@ -1614,10 +1646,12 @@
   }
 
   .topbar-actions {
+    right: 12px;
     gap: 7px;
   }
 
   .global-search {
+    width: calc(100% - 186px);
     height: 40px;
     gap: 7px;
     padding: 0 10px;

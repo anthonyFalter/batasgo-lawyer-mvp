@@ -12,7 +12,7 @@ import {
   ShieldAlert,
   X,
 } from "lucide-react";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useId, useMemo, useRef, useState } from "react";
 import WorkspaceShell from "../workspace/workspace-shell";
 
 type Risk = "Critical" | "High" | "Medium";
@@ -260,7 +260,25 @@ export default function TriageDashboard() {
   const [search, setSearch] = useState("");
   const [toast, setToast] = useState("");
   const [toastUndoable, setToastUndoable] = useState(false);
+  const [recommendationOffset, setRecommendationOffset] = useState(0);
+  const queueToolbarRef = useRef<HTMLDivElement>(null);
   const recommendedCardRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const toolbar = queueToolbarRef.current;
+    if (!toolbar) return;
+
+    const updateOffset = () => {
+      const toolbarHeight = toolbar.getBoundingClientRect().height;
+      const toolbarMargin = Number.parseFloat(window.getComputedStyle(toolbar).marginBottom) || 0;
+      setRecommendationOffset(toolbarHeight + toolbarMargin);
+    };
+
+    updateOffset();
+    const observer = new ResizeObserver(updateOffset);
+    observer.observe(toolbar);
+    return () => observer.disconnect();
+  }, []);
 
   const visibleIntakes = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -340,7 +358,7 @@ export default function TriageDashboard() {
 
           <div className="dashboard-grid">
             <section className="queue-section" aria-labelledby="queue-heading">
-              <div className="queue-toolbar">
+              <div className="queue-toolbar" ref={queueToolbarRef}>
                 <h2 id="queue-heading" className="sr-only">Incoming intake requests</h2>
                 <div className="filters">
                   <FilterSelect
@@ -454,7 +472,11 @@ export default function TriageDashboard() {
               <div className="sample-note">Showing sample records for interface preview. No client data is connected.</div>
             </section>
 
-            <aside className="insights-rail" aria-label="Practice overview">
+            <aside
+              className="insights-rail"
+              aria-label="Practice overview"
+              style={{ "--triage-recommendation-offset": `${recommendationOffset}px` } as CSSProperties}
+            >
               <section className="rail-panel triage-ai-panel" aria-labelledby="triage-ai-title">
                 <div className="triage-ai-heading">
                   <span className="triage-ai-icon"><Sparkles aria-hidden="true" size={20} fill="currentColor" strokeWidth={1.7} /></span>
