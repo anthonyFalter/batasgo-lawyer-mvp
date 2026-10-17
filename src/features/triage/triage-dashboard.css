@@ -1086,21 +1086,83 @@
   border-radius: 5px;
 }
 
-.sample-ai-summary strong {
+.sample-ai-summary-details > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.sample-ai-summary-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.sample-ai-summary-details > summary:focus-visible {
+  outline: 2px solid #315fca;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.sample-ai-summary-details > summary svg {
+  flex: 0 0 auto;
+  color: #425886;
+  transition: transform 150ms ease-out;
+}
+
+.sample-ai-summary-details:not([open]) > summary svg {
+  transform: rotate(-90deg);
+}
+
+.sample-ai-summary-details > summary strong {
   color: #425886;
   font-size: 9.38px;
 }
 
-.sample-ai-summary p {
-  margin: 3px 0 0;
+.sample-ai-summary-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #425886;
+}
+
+.sample-ai-summary-content {
+  display: grid;
+  gap: 7px;
+  margin-top: 6px;
+}
+
+.sample-ai-summary-section {
+  display: grid;
+  gap: 2px;
+}
+
+.sample-ai-summary-section h4 {
+  margin: 0;
+  color: #425886;
+  font-size: 9.38px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.sample-ai-summary-section p,
+.sample-ai-summary-section ul {
+  margin: 0;
   color: #5f6d83;
   font-size: 9.38px;
   line-height: 1.5;
 }
 
+.sample-ai-summary-section ul {
+  display: grid;
+  gap: 2px;
+  padding-left: 14px;
+}
+
 .sample-ai-summary small {
   display: block;
-  margin-top: 3px;
+  margin-top: 7px;
   color: #7c879a;
   font-size: 8.71px;
   line-height: 1.4;

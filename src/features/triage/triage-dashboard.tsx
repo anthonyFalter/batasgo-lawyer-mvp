@@ -34,6 +34,59 @@ type Decision = { intake: Intake; result: "accepted" | "declined" };
 type IntakeReview = { intake: Intake; summary: string; signals: string[] };
 type DecisionFilter = "all" | Decision["result"];
 type RankedIntake = { intake: Intake; score: number; reasons: string[]; specialtyMatch: boolean };
+type AiSummaryBlock = { type: "paragraph"; text: string } | { type: "list"; items: string[] };
+type AiSummarySection = { heading: string; blocks: AiSummaryBlock[] };
+
+const aiSummaryHeadings = [
+  "Reported issue",
+  "Time-sensitive facts",
+  "Key unknowns",
+  "Triage note",
+] as const;
+
+function parseAiSummary(summary: string): AiSummarySection[] {
+  const sections: AiSummarySection[] = [];
+
+  for (const line of summary.split(/\r?\n/)) {
+    const headingMatch = line.match(
+      /^\s*\**\s*(Reported issue|Time-sensitive facts|Key unknowns|Triage note)\s*\**\s*:?\s*(.*)$/i,
+    );
+
+    if (headingMatch) {
+      const heading = aiSummaryHeadings.find(
+        (item) => item.toLowerCase() === headingMatch[1].toLowerCase(),
+      );
+      if (!heading) continue;
+      sections.push({ heading, blocks: [] });
+      if (headingMatch[2]) {
+        sections[sections.length - 1].blocks.push({ type: "paragraph", text: headingMatch[2] });
+      }
+      continue;
+    }
+
+    const text = line.trim();
+    if (!text) continue;
+
+    const section = sections[sections.length - 1];
+    if (!section) {
+      sections.push({ heading: "", blocks: [{ type: "paragraph", text }] });
+      continue;
+    }
+
+    const bulletMatch = text.match(/^(?:[-*•]|\d+[.)])\s+(.+)$/);
+    if (bulletMatch) {
+      const lastBlock = section.blocks[section.blocks.length - 1];
+      if (lastBlock?.type === "list") lastBlock.items.push(bulletMatch[1]);
+      else section.blocks.push({ type: "list", items: [bulletMatch[1]] });
+    } else {
+      const lastBlock = section.blocks[section.blocks.length - 1];
+      if (lastBlock?.type === "paragraph") lastBlock.text += ` ${text}`;
+      else section.blocks.push({ type: "paragraph", text });
+    }
+  }
+
+  return sections;
+}
 
 async function getResponseError(response: Response, fallback: string) {
   const payload: unknown = await response.json().catch(() => null);
@@ -755,11 +808,30 @@ export default function TriageDashboard() {
                     {intake.isSample && (
                       <section className="sample-ai-summary" aria-label="Synthetic sample AI summary">
                         {intake.aiSummary ? (
-                          <>
-                            <strong>Gemini summary · synthetic example</strong>
-                            <p>{intake.aiSummary}</p>
+                          <details className="sample-ai-summary-details" open>
+                            <summary>
+                              <span className="sample-ai-summary-title">
+                                <Sparkles aria-hidden="true" size={13.4} fill="currentColor" strokeWidth={1.7} />
+                                <strong>AI Summary</strong>
+                              </span>
+                              <ChevronDown aria-hidden="true" size={12} />
+                            </summary>
+                            <div className="sample-ai-summary-content">
+                              {parseAiSummary(intake.aiSummary).map((section, sectionIndex) => (
+                                <section className="sample-ai-summary-section" key={`${section.heading}-${sectionIndex}`}>
+                                  {section.heading && <h4>{section.heading}</h4>}
+                                  {section.blocks.map((block, blockIndex) => block.type === "list" ? (
+                                    <ul key={blockIndex}>
+                                      {block.items.map((item, itemIndex) => <li key={itemIndex}>{item}</li>)}
+                                    </ul>
+                                  ) : (
+                                    <p key={blockIndex}>{block.text}</p>
+                                  ))}
+                                </section>
+                              ))}
+                            </div>
                             <small>AI-generated from synthetic text only. Verify all facts.</small>
-                          </>
+                          </details>
                         ) : (
                           <button
                             type="button"
