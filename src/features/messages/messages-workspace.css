@@ -610,4 +610,195 @@
   body .workspace .thread-contact h2 {
     font-size: 16px !important;
   }
+
+  body .workspace .messages-page {
+    padding: 12px;
+  }
+
+  body .workspace .conversation-panel-heading {
+    min-height: 56px;
+    padding: 0 14px;
+  }
+
+  body .workspace .conversation-panel-heading h2 {
+    font-size: 18px !important;
+    letter-spacing: -0.02em;
+  }
+
+  body .workspace .conversation-search {
+    height: 44px;
+    gap: 8px;
+    margin: 0 14px 12px;
+    padding: 0 12px;
+    border: 1px solid #e0e5ed;
+    border-radius: 8px;
+  }
+
+  body .workspace .conversation-search svg {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+  }
+
+  body .workspace .conversation-list {
+    gap: 6px;
+    padding: 0 10px 12px;
+  }
+
+  body .workspace .conversation-item {
+    min-height: 76px;
+    justify-content: center;
+    gap: 4px;
+    padding: 10px 12px;
+    border-radius: 8px;
+  }
+
+  body .workspace .conversation-item-copy {
+    gap: 4px;
+  }
+
+  body .workspace .conversation-item-top {
+    align-items: center;
+    gap: 8px;
+  }
+
+  body .workspace .conversation-item-top strong {
+    font-size: 14px !important;
+  }
+
+  body .workspace .conversation-item-top time {
+    font-size: 12px !important;
+  }
+
+  body .workspace .conversation-matter {
+    display: block;
+    overflow: hidden;
+    color: #697991;
+    font-size: 12px !important;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  body .workspace .conversation-preview {
+    color: #59677d;
+    font-size: 13px !important;
+    line-height: 1.4;
+    -webkit-line-clamp: 2;
+  }
+
+  body .workspace .thread-header {
+    min-height: 64px;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+
+  body .workspace .messages-icon-button.thread-back-button {
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+  }
+
+  body .workspace .thread-contact h2 {
+    font-size: 16px !important;
+  }
+
+  body .workspace .thread-contact p,
+  body .workspace .thread-retention {
+    font-size: 12px !important;
+  }
+
+  body .workspace .thread-messages {
+    gap: 12px;
+    padding: 20px 16px;
+    background: #f8f9fb;
+  }
+
+  body .workspace .thread-message {
+    max-width: 88%;
+  }
+
+  body .workspace .thread-message-bubble {
+    padding: 10px 12px 8px;
+    border: 1px solid #e2e7ef;
+    border-radius: var(--radius-panel);
+  }
+
+  body .workspace .thread-message--outbound .thread-message-bubble {
+    border-color: #4b78ff;
+    border-radius: var(--radius-panel) var(--radius-panel) var(--radius-small) var(--radius-panel);
+  }
+
+  body .workspace .thread-message-bubble > p {
+    font-size: 14px !important;
+    line-height: 1.5;
+  }
+
+  body .workspace .thread-message-meta {
+    font-size: 11px !important;
+  }
+
+  body .workspace .message-composer {
+    padding: 10px 12px 8px;
+  }
+
+  body .workspace .composer-input-wrap {
+    min-height: 48px;
+    gap: 6px;
+    padding: 0 6px;
+    border-radius: 10px;
+  }
+
+  body .workspace .composer-input-wrap input {
+    height: 44px;
+    font-size: 16px !important;
+  }
+
+  body .workspace .messages-icon-button.composer-attachment,
+  body .workspace .composer-send {
+    width: 40px;
+    height: 40px;
+  }
+
+  body .workspace .composer-hint {
+    margin-top: 6px;
+    font-size: 12px !important;
+  }
+}
+
+@media (max-width: 380px) {
+  body .workspace .messages-page {
+    padding: 8px;
+  }
+
+  body .workspace .conversation-panel-heading {
+    min-height: 52px;
+  }
+
+  body .workspace .conversation-panel-heading h2 {
+    font-size: 16px !important;
+  }
+
+  body .workspace .conversation-search {
+    margin-right: 10px;
+    margin-left: 10px;
+  }
+
+  body .workspace .conversation-list {
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
+  body .workspace .thread-retention {
+    display: none;
+  }
+
+  body .workspace .thread-header {
+    gap: 4px;
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
+  body .workspace .thread-contact h2 {
+    font-size: 14px !important;
+  }
 }

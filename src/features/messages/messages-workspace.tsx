@@ -80,7 +80,7 @@ export default function MessagesWorkspace() {
   const [search, setSearch] = useState("");
   const [conversationSearch, setConversationSearch] = useState("");
   const [messageDraft, setMessageDraft] = useState("");
-  const [showThreadOnMobile, setShowThreadOnMobile] = useState(true);
+  const [showThreadOnMobile, setShowThreadOnMobile] = useState(false);
   const [toast, setToast] = useState("");
 
   const visibleConversations = useMemo(() => {
