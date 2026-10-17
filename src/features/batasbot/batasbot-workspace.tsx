@@ -18,6 +18,7 @@ import Link from "next/link";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { useTypingStream } from "@/hooks/use-typing-stream";
 import WorkspaceShell from "../workspace/workspace-shell";
+import ReactMarkdown from "react-markdown";
 import "./batasbot-workspace.css";
 
 type ChatLink = {
@@ -239,7 +240,7 @@ export default function BatasBotWorkspace() {
   const [input, setInput] = useState("");
   const [sessions, setSessions] = useState<ChatSession[]>(SAMPLE_SESSIONS);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  const { text: streamedReply, phase: replyPhase, startTyping, cancelTyping } = useTypingStream();
+  const { text: streamedReply, phase: replyPhase, startTyping, startStream, cancelTyping } = useTypingStream();
   const isGenerating = replyPhase !== "idle";
   const [notice, setNotice] = useState("");
   const nextMessageId = useRef(7);
@@ -320,30 +321,75 @@ export default function BatasBotWorkspace() {
     });
   }, [startTyping]);
 
-  const sendMessage = (rawMessage: string) => {
+  const sendMessage = async (rawMessage: string) => {
     const content = rawMessage.trim();
     if (!content || isGenerating) return;
 
     const sessionId = activeSessionId ?? `chat-${Date.now()}-${nextMessageId.current}`;
-    const reply = getAssistantReply(content);
     const userMessage: ChatMessage = { id: nextMessageId.current++, role: "user", content };
-    const assistantMessage: ChatMessage = { id: nextMessageId.current++, role: "assistant", ...reply };
+
+    const existingSession = sessions.find((session) => session.id === sessionId);
+    const existingMessages = existingSession?.messages ?? [];
+    const updatedMessages = [...existingMessages, userMessage];
+
+    const updatedSession: ChatSession = {
+      id: sessionId,
+      title: existingSession && existingSession.messages.length > 0 ? existingSession.title : getSessionTitle(content),
+      updatedAt: "Just now",
+      messages: updatedMessages,
+      isSample: false,
+    };
+
+    setSessions((current) =>
+      current.some((session) => session.id === sessionId)
+        ? current.map((session) => (session.id === sessionId ? updatedSession : session))
+        : [updatedSession, ...current],
+    );
+
     if (!activeSessionId) setActiveSessionId(sessionId);
-    setSessions((current) => {
-      const existing = current.find((session) => session.id === sessionId);
-      const updatedSession: ChatSession = {
-        id: sessionId,
-        title: existing && existing.messages.length > 0 ? existing.title : getSessionTitle(content),
-        updatedAt: "Just now",
-        messages: [...(existing?.messages ?? []), userMessage],
-        isSample: false,
-      };
-      return existing
-        ? current.map((session) => session.id === sessionId ? updatedSession : session)
-        : [updatedSession, ...current];
-    });
     setInput("");
-    startTyping(assistantMessage.content, () => {
+
+    let response: Response;
+    try {
+      response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: updatedMessages.map((m) => ({ role: m.role, content: m.content })),
+        }),
+      });
+    } catch {
+      const errorMessage: ChatMessage = {
+        id: nextMessageId.current++,
+        role: "assistant",
+        content: "BatasBot could not reach the server. Please check your connection and try again.",
+      };
+      setSessions((current) => current.map((session) => session.id === sessionId
+        ? { ...session, updatedAt: "Just now", messages: [...session.messages, errorMessage] }
+        : session));
+      return;
+    }
+
+    if (!response.ok) {
+      const errData = (await response.json().catch(() => ({}))) as { error?: string };
+      const errorMessage: ChatMessage = {
+        id: nextMessageId.current++,
+        role: "assistant",
+        content: errData.error || "BatasBot encountered an error. Please try again shortly.",
+      };
+      setSessions((current) => current.map((session) => session.id === sessionId
+        ? { ...session, updatedAt: "Just now", messages: [...session.messages, errorMessage] }
+        : session));
+      return;
+    }
+
+    const assistantMessageId = nextMessageId.current++;
+    startStream(response, (fullText) => {
+      const assistantMessage: ChatMessage = {
+        id: assistantMessageId,
+        role: "assistant",
+        content: fullText,
+      };
       setSessions((current) => current.map((session) => session.id === sessionId
         ? { ...session, updatedAt: "Just now", messages: [...session.messages, assistantMessage] }
         : session));
@@ -419,7 +465,13 @@ export default function BatasBotWorkspace() {
                     <article className={`batasbot-thread-message batasbot-thread-message--${message.role}`} key={message.id}>
                       {message.role === "assistant" && <span className="batasbot-thread-avatar" aria-hidden="true"><Bot size={10.05} /></span>}
                       <div className="batasbot-thread-body">
-                        <p>{message.content}</p>
+                        {message.role === "user" ? (
+                          <p>{message.content}</p>
+                        ) : (
+                          <div className="batasbot-markdown">
+                            <ReactMarkdown>{message.content}</ReactMarkdown>
+                          </div>
+                        )}
                         {message.intakeReview && <IntakeReviewGrid review={message.intakeReview} />}
                         {message.links && (
                           <div className="batasbot-thread-links">
@@ -447,7 +499,9 @@ export default function BatasBotWorkspace() {
                     <article className="batasbot-thread-message batasbot-thread-message--assistant">
                       <span className="batasbot-thread-avatar" aria-hidden="true"><Bot size={10.05} /></span>
                       <div className="batasbot-thread-body">
-                        <p className="batasbot-streaming-text" aria-live="off">{streamedReply}</p>
+                        <div className="batasbot-markdown batasbot-streaming-text" aria-live="off">
+                          <ReactMarkdown>{streamedReply}</ReactMarkdown>
+                        </div>
                         {pendingIntakeReview && <IntakeReviewGrid review={pendingIntakeReview} />}
                       </div>
                     </article>
@@ -478,7 +532,7 @@ export default function BatasBotWorkspace() {
                   <ArrowUp aria-hidden="true" size={11.39} />
                 </button>
               </form>
-              <p className="batasbot-main-disclaimer">BatasBot is a demo assistant. Replies use sample text and are not legal advice.</p>
+              <p className="batasbot-main-disclaimer">BatasBot is powered by Gemini AI. Responses are for professional reference only — not legal advice. Always verify citations.</p>
             </div>
           </div>
 
