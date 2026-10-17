@@ -2,8 +2,10 @@
 
 import {
   ArrowDownWideNarrow,
+  ArrowRight,
   Check,
   ChevronDown,
+  Sparkles,
   Clock3,
   Inbox,
   Mail,
@@ -26,6 +28,7 @@ type Intake = {
   deadlineOrder: number;
 };
 type Decision = { intake: Intake; result: "accepted" | "declined" };
+type RankedIntake = { intake: Intake; score: number; reasons: string[]; specialtyMatch: boolean };
 const initialIntakes: Intake[] = [
   {
     id: "INTAKE-2024-0847",
@@ -66,6 +69,59 @@ const initialIntakes: Intake[] = [
 ];
 
 const riskRank: Record<Risk, number> = { Critical: 3, High: 2, Medium: 1 };
+const profileSpecialty = "Labor & Employment litigation";
+
+function rankIntakesForReview(intakes: Intake[]): RankedIntake | null {
+  const needSignals = [
+    { pattern: /passport withholding|withheld passport/i, points: 28, reason: "Passport withholding reported" },
+    { pattern: /unpaid compensation|unpaid wages|wage arrears/i, points: 24, reason: "Unpaid compensation reported" },
+    { pattern: /constructive dismissal|wrongful termination|job loss/i, points: 20, reason: "Employment loss reported" },
+    { pattern: /filing deadline|approaching.{0,20}deadline|due date/i, points: 24, reason: "Filing deadline approaching" },
+    { pattern: /safety risk|threat|violence|eviction/i, points: 24, reason: "Immediate personal impact reported" },
+  ];
+  const deadlinePoints = (intake: Intake) => {
+    const deadlineCopy = `${intake.deadline} ${intake.summary}`.toLowerCase();
+    if (intake.deadlineOrder === 0 || /\b(now|immediate|overdue|due today)\b/.test(deadlineCopy)) return 35;
+    if (intake.deadlineOrder <= 1 || /(?:within|closing in)\s+(?:1|one|2|two)\s+hours?/.test(deadlineCopy)) return 28;
+    if (intake.deadlineOrder <= 3 || /filing deadline|due date|by end of day/.test(deadlineCopy)) return 15;
+    return 5;
+  };
+  const urgencyPoints = (intake: Intake) => {
+    const riskPoints = { Critical: 40, High: 28, Medium: 15 }[intake.risk];
+    const recencyPoints = Math.min(intake.receivedOrder, 3) * 2;
+    return riskPoints + deadlinePoints(intake) + recencyPoints;
+  };
+  const ranked = intakes.map((intake) => {
+    const needReasons = needSignals.filter(({ pattern }) => pattern.test(intake.summary)).map(({ reason }) => reason);
+    const needPoints = needSignals
+      .filter(({ pattern }) => pattern.test(intake.summary))
+      .reduce((total, signal) => total + signal.points, 0);
+    const specialtyMatch = intake.domain.toLowerCase().includes("labor & employment");
+    const needSummary = needReasons.length
+      ? needReasons.slice(0, 2).join(" · ")
+      : "No immediate need signals found in the summary";
+    const reasons = [
+      `${intake.risk} risk indicators`,
+      intake.deadlineOrder === 0 ? "Review deadline: now" : intake.deadlineOrder <= 1 ? intake.deadline : "Time-sensitive follow-up",
+      needSummary,
+      specialtyMatch ? `Fits ${profileSpecialty}` : `Outside profile specialty: ${profileSpecialty}`,
+    ];
+
+    return {
+      intake,
+      score: urgencyPoints(intake) + needPoints + (specialtyMatch ? 20 : 0),
+      reasons,
+      specialtyMatch,
+    };
+  });
+
+  return ranked.sort((a, b) =>
+    b.score - a.score
+    || riskRank[b.intake.risk] - riskRank[a.intake.risk]
+    || a.intake.deadlineOrder - b.intake.deadlineOrder,
+  )[0] ?? null;
+}
+
 function FilterSelect({
   label,
   value,
@@ -204,6 +260,7 @@ export default function TriageDashboard() {
   const [search, setSearch] = useState("");
   const [toast, setToast] = useState("");
   const [toastUndoable, setToastUndoable] = useState(false);
+  const recommendedCardRef = useRef<HTMLElement>(null);
 
   const visibleIntakes = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -224,6 +281,8 @@ export default function TriageDashboard() {
       return (riskRank[a.risk] - riskRank[b.risk]) * direction;
     });
   }, [domainFilter, intakes, order, riskFilter, search, sortBy]);
+
+  const recommendation = useMemo(() => rankIntakesForReview(intakes), [intakes]);
 
   const showToast = (message: string, undoable = false) => {
     setToast(message);
@@ -252,6 +311,12 @@ export default function TriageDashboard() {
     setOrder("default");
   };
 
+  const reviewRecommendedIntake = () => {
+    if (!recommendation) return;
+    if (!visibleIntakes.some(({ id }) => id === recommendation.intake.id)) resetFilters();
+    window.setTimeout(() => recommendedCardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 0);
+  };
+
   const unavailable = (label: string) => showToast(`${label} is not part of this demo yet.`);
 
   return (
@@ -275,6 +340,40 @@ export default function TriageDashboard() {
 
           <div className="dashboard-grid">
             <section className="queue-section" aria-labelledby="queue-heading">
+              <section className="rail-panel triage-ai-panel" aria-labelledby="triage-ai-title">
+                <div className="triage-ai-heading">
+                  <span className="triage-ai-icon"><Sparkles aria-hidden="true" size={20} fill="currentColor" strokeWidth={1.7} /></span>
+                  <div>
+                    <h2 id="triage-ai-title">BatasBot recommendation</h2>
+                    <span className="triage-ai-local-label">LOCAL PREVIEW</span>
+                  </div>
+                </div>
+                {recommendation ? (
+                  <>
+                    <div className="triage-ai-client">
+                      <h3>{recommendation.intake.client}</h3>
+                      <p>{recommendation.intake.id} · {recommendation.intake.domain}</p>
+                    </div>
+                    <div className="triage-ai-reasons">
+                      <h4>Why review this intake first</h4>
+                      <ul>
+                        {recommendation.reasons.map((reason) => <li key={reason}><Check aria-hidden="true" size={15} />{reason}</li>)}
+                      </ul>
+                    </div>
+                    <div className="triage-ai-footer">
+                      <p>Local preview scores risk, deadline text, urgency and need cues in the intake description, and fit with the profile specialty. It is not connected to live AI or client records.</p>
+                      <button type="button" onClick={reviewRecommendedIntake}>
+                        Review intake <ArrowRight aria-hidden="true" size={16} />
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="triage-ai-empty">
+                    <h3>No open intakes to rank</h3>
+                    <p>New requests will appear in this local priority preview.</p>
+                  </div>
+                )}
+              </section>
               <div className="queue-toolbar">
                 <h2 id="queue-heading" className="sr-only">Incoming intake requests</h2>
                 <div className="filters">
@@ -331,7 +430,12 @@ export default function TriageDashboard() {
 
               <div className="intake-list" aria-live="polite">
                 {visibleIntakes.map((intake) => (
-                  <article className="intake-card" key={intake.id}>
+                  <article
+                    className="intake-card"
+                    id={`intake-${intake.id}`}
+                    key={intake.id}
+                    ref={intake.id === recommendation?.intake.id ? recommendedCardRef : undefined}
+                  >
                     <div className="intake-card-top">
                       <div className="intake-tags">
                         <span className="intake-id">{intake.id}</span>

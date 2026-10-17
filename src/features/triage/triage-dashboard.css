@@ -941,6 +941,186 @@
   gap: 16px;
 }
 
+.rail-panel.triage-ai-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.35fr) minmax(210px, 0.85fr);
+  align-items: center;
+  column-gap: 18px;
+  background: #f7fff3;
+  border-color: #d3e9c8;
+  box-shadow: 0 3px 10px rgb(70 132 61 / 8%);
+}
+
+.triage-ai-heading {
+  display: flex;
+  align-items: center;
+  grid-column: 1 / -1;
+  gap: 11px;
+  margin-bottom: 0;
+}
+
+.triage-ai-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(45deg, #8fdda2 0%, #43b96d 100%);
+  border-radius: 50%;
+  box-shadow: 0 3px 8px rgb(52 157 105 / 20%);
+}
+
+.triage-ai-icon svg {
+  fill: currentColor;
+}
+
+.triage-ai-heading h2 {
+  margin: 0;
+  color: #3f7d32;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.triage-ai-local-label {
+  display: inline-flex;
+  margin-top: 3px;
+  color: #58864c;
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+}
+
+.triage-ai-client {
+  min-width: 0;
+  padding: 0;
+}
+
+.triage-ai-client h3 {
+  margin: 0;
+  color: #30343b;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.triage-ai-client p {
+  margin: 4px 0 0;
+  color: #66748b;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.triage-ai-reasons {
+  min-width: 0;
+  margin-top: 0;
+}
+
+.triage-ai-reasons h4 {
+  margin: 0 0 8px;
+  color: #46546a;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.triage-ai-reasons ul {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.triage-ai-reasons li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: #5e6c82;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.triage-ai-reasons li svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: #3569df;
+}
+
+.triage-ai-footer {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 11px;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.triage-ai-footer p,
+.triage-ai-empty p {
+  margin: 0;
+  color: #748198;
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.triage-ai-footer button {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 14px;
+  color: #fff;
+  background: linear-gradient(45deg, #25834d 0%, #17613c 100%);
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 650;
+  transition: background-color 140ms ease, transform 140ms ease;
+}
+
+.triage-ai-footer button:hover {
+  background: linear-gradient(45deg, #1f7444 0%, #105334 100%);
+  transform: translateY(-1px);
+}
+
+.triage-ai-empty h3 {
+  margin: 0 0 5px;
+  color: #30343b;
+  font-size: 18px;
+}
+
+@media (max-width: 1200px) {
+  .triage-ai-panel {
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+    gap: 14px;
+  }
+
+  .triage-ai-heading,
+  .triage-ai-footer {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 640px) {
+  .triage-ai-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .triage-ai-heading,
+  .triage-ai-footer {
+    grid-column: 1;
+  }
+
+  .triage-ai-footer {
+    gap: 10px;
+  }
+}
+
 .rail-panel {
   padding: 16px 16px 15px;
   background: #fff;
