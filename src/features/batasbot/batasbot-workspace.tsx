@@ -3,11 +3,15 @@
 import {
   ArrowUp,
   Bot,
+  BriefcaseBusiness,
   CalendarDays,
+  Check,
+  Clock3,
   FileText,
   MessageSquare,
   Plus,
   Search,
+  ShieldAlert,
   X,
 } from "lucide-react";
 import Link from "next/link";
@@ -27,6 +31,15 @@ type ChatMessage = {
   role: "assistant" | "user";
   content: string;
   links?: ChatLink[];
+  intakeReview?: IntakeReviewVisual;
+};
+
+type IntakeReviewVisual = {
+  risk: string;
+  deadline: string;
+  signals: string[];
+  specialty: string;
+  specialtyMatch: boolean;
 };
 
 type ChatSession = {
@@ -54,16 +67,6 @@ const STARTER_PROMPTS = [
 ];
 
 const SAMPLE_SESSIONS: ChatSession[] = [
-  {
-    id: "sample-intake-review",
-    title: "Intake review",
-    updatedAt: "Sample · Today",
-    isSample: true,
-    messages: [
-      { id: 1, role: "user", content: "Why should INTAKE-2024-0847 be reviewed now?" },
-      { id: 2, role: "assistant", content: "The local priority preview flags a review deadline now, critical risk indicators, reported passport withholding and unpaid compensation, and a Labor & Employment specialty match. Verify the underlying records before acting." },
-    ],
-  },
   {
     id: "sample-position-paper",
     title: "Position paper outline",
@@ -110,6 +113,85 @@ function explainTriageHandoff(handoff: TriageChatHandoff) {
     !/risk indicators$/.test(reason) && !/^(Fits|Outside profile specialty:)/.test(reason),
   );
   return `This intake may merit prompt review because it is marked ${handoff.risk.toLowerCase()} risk, with a deadline of ${handoff.deadline.toLowerCase()}. The intake describes: ${handoff.summary} Signals from the local preview: ${needSignals.join("; ")}. The profile lists ${handoff.specialty}; the matter is ${handoff.domain}. This is a sample-based demo explanation, not a live AI assessment. Verify the source records and deadline before deciding.`;
+}
+
+function getIntakeReviewVisual(handoff: TriageChatHandoff): IntakeReviewVisual {
+  const signals = handoff.reasons
+    .flatMap((reason) => reason.split(" · "))
+    .filter((reason) => !/risk indicators$/i.test(reason)
+      && !/^(review deadline:|closing in|time-sensitive follow-up)/i.test(reason)
+      && !/^(fits|outside profile specialty:)/i.test(reason)
+      && !/^no immediate need signals found/i.test(reason))
+    .map((reason) => reason.replace(/ reported$/i, ""));
+
+  return {
+    risk: handoff.risk,
+    deadline: handoff.deadline,
+    signals,
+    specialty: handoff.specialty,
+    specialtyMatch: handoff.reasons.some((reason) => reason.startsWith("Fits ")),
+  };
+}
+
+function IntakeReviewGrid({ review }: { review: IntakeReviewVisual }) {
+  const normalizedRisk = review.risk.toLowerCase();
+  const riskLevel = normalizedRisk === "critical" ? 3 : normalizedRisk === "high" ? 2 : 1;
+  const riskTone = normalizedRisk === "critical" ? "critical" : normalizedRisk === "high" ? "high" : "medium";
+  const normalizedDeadline = review.deadline.toLowerCase();
+  const deadlineLevel = /now|immediate|overdue/.test(normalizedDeadline)
+    ? 3
+    : /hour/.test(normalizedDeadline) ? 2 : 1;
+  const deadlineLabel = review.deadline.replace(/^Review\s+/i, "");
+
+  return (
+    <section className="batasbot-intake-review" aria-label="Intake review statistics">
+      <h3>Intake snapshot</h3>
+      <div className="batasbot-intake-review-grid">
+        <div className={`batasbot-intake-stat batasbot-intake-stat--${riskTone}`}>
+          <div className="batasbot-intake-stat-heading">
+            <span><ShieldAlert aria-hidden="true" size={10.72} /> Risk level</span>
+            <strong>{review.risk}</strong>
+          </div>
+          <div className="batasbot-intake-meter" aria-hidden="true">
+            {[0, 1, 2].map((segment) => <i className={segment < riskLevel ? "is-active" : ""} key={segment} />)}
+          </div>
+        </div>
+
+        <div className={`batasbot-intake-stat batasbot-intake-stat--deadline${deadlineLevel === 3 ? " is-immediate" : ""}`}>
+          <div className="batasbot-intake-stat-heading">
+            <span><Clock3 aria-hidden="true" size={10.72} /> Review window</span>
+            <strong>{deadlineLabel}</strong>
+          </div>
+          <div className="batasbot-intake-meter" aria-hidden="true">
+            {[0, 1, 2].map((segment) => <i className={segment < deadlineLevel ? "is-active" : ""} key={segment} />)}
+          </div>
+        </div>
+
+        <div className="batasbot-intake-stat">
+          <div className="batasbot-intake-stat-heading">
+            <span>Reported signals</span>
+            <strong>{review.signals.length}</strong>
+          </div>
+          <ul className="batasbot-intake-signals">
+            {review.signals.length > 0
+              ? review.signals.map((signal) => <li key={signal}>{signal}</li>)
+              : <li className="is-empty">No specific signals found</li>}
+          </ul>
+        </div>
+
+        <div className={`batasbot-intake-stat batasbot-intake-stat--fit${review.specialtyMatch ? " is-match" : ""}`}>
+          <div className="batasbot-intake-stat-heading">
+            <span><BriefcaseBusiness aria-hidden="true" size={10.72} /> Practice fit</span>
+          </div>
+          <div className="batasbot-intake-fit-status">
+            {review.specialtyMatch && <Check aria-hidden="true" size={10.72} />}
+            <strong>{review.specialtyMatch ? "Profile match" : "Outside profile"}</strong>
+          </div>
+          <span className="batasbot-intake-specialty">{review.specialty}</span>
+        </div>
+      </div>
+    </section>
+  );
 }
 
 function getAssistantReply(prompt: string): Pick<ChatMessage, "content" | "links"> {
@@ -161,6 +243,7 @@ export default function BatasBotWorkspace() {
   const isGenerating = replyPhase !== "idle";
   const [notice, setNotice] = useState("");
   const nextMessageId = useRef(7);
+  const triageHandoffRef = useRef<{ session: ChatSession; assistantMessage: ChatMessage } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const activeSession = sessions.find((session) => session.id === activeSessionId);
@@ -170,57 +253,70 @@ export default function BatasBotWorkspace() {
     !sessionQuery || `${session.title} ${session.messages.map((message) => message.content).join(" ")}`.toLowerCase().includes(sessionQuery),
   );
   const completedSessionCount = sessions.filter((session) => session.messages.length > 0).length;
+  const pendingIntakeReview = triageHandoffRef.current?.session.id === activeSessionId
+    ? triageHandoffRef.current.assistantMessage.intakeReview
+    : undefined;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: replyPhase === "idle" ? "smooth" : "auto", block: "end" });
   }, [activeSessionId, isGenerating, messages, replyPhase, streamedReply]);
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("source") !== "triage") return;
+    let handoffBootstrap = triageHandoffRef.current;
+    const isTriageHandoffRoute = new URLSearchParams(window.location.search).get("source") === "triage";
+    if (!handoffBootstrap && !isTriageHandoffRoute) return;
 
-    let handoff: TriageChatHandoff | null = null;
-    try {
-      const rawHandoff = window.sessionStorage.getItem("batasbot-triage-handoff");
-      const parsed: unknown = rawHandoff ? JSON.parse(rawHandoff) : null;
-      if (isTriageChatHandoff(parsed)) handoff = parsed;
-    } catch {
-      handoff = null;
-    }
+    if (!handoffBootstrap) {
+      let handoff: TriageChatHandoff | null = null;
+      try {
+        const rawHandoff = window.sessionStorage.getItem("batasbot-triage-handoff");
+        const parsed: unknown = rawHandoff ? JSON.parse(rawHandoff) : null;
+        if (isTriageChatHandoff(parsed)) handoff = parsed;
+      } catch {
+        handoff = null;
+      }
 
-    if (!handoff) {
+      if (!handoff) {
+        window.sessionStorage.removeItem("batasbot-triage-handoff");
+        window.history.replaceState(null, "", window.location.pathname);
+        return;
+      }
+
+      const sessionId = `triage-${Date.now()}`;
+      const userMessage: ChatMessage = {
+        id: nextMessageId.current++,
+        role: "user",
+        content: `Why should ${handoff.id} be reviewed now?`,
+      };
+      const assistantMessage: ChatMessage = {
+        id: nextMessageId.current++,
+        role: "assistant",
+        content: explainTriageHandoff(handoff),
+        intakeReview: getIntakeReviewVisual(handoff),
+      };
+      const triageSession: ChatSession = {
+        id: sessionId,
+        title: `Review ${handoff.id}`,
+        updatedAt: "Just now",
+        messages: [userMessage],
+        isSample: false,
+      };
+
+      handoffBootstrap = { session: triageSession, assistantMessage };
+      triageHandoffRef.current = handoffBootstrap;
       window.sessionStorage.removeItem("batasbot-triage-handoff");
       window.history.replaceState(null, "", window.location.pathname);
-      return;
+      setSessions((current) => [triageSession, ...current]);
+      setActiveSessionId(sessionId);
+      setNotice("");
     }
 
-    const sessionId = `triage-${Date.now()}`;
-    const userMessage: ChatMessage = {
-      id: nextMessageId.current++,
-      role: "user",
-      content: `Why should ${handoff.id} be reviewed now?`,
-    };
-    const assistantMessage: ChatMessage = {
-      id: nextMessageId.current++,
-      role: "assistant",
-      content: explainTriageHandoff(handoff),
-    };
-    const triageSession: ChatSession = {
-      id: sessionId,
-      title: `Review ${handoff.id}`,
-      updatedAt: "Just now",
-      messages: [userMessage],
-      isSample: false,
-    };
-
-    window.sessionStorage.removeItem("batasbot-triage-handoff");
-    window.history.replaceState(null, "", window.location.pathname);
-    setSessions((current) => [triageSession, ...current]);
-    setActiveSessionId(sessionId);
-    setNotice("");
-    startTyping(assistantMessage.content, () => {
-      setSessions((current) => current.map((session) => session.id === sessionId
-        ? { ...session, messages: [...session.messages, assistantMessage] }
+    const activeHandoff = handoffBootstrap;
+    startTyping(activeHandoff.assistantMessage.content, () => {
+      setSessions((current) => current.map((session) => session.id === activeHandoff.session.id
+        ? { ...session, messages: [...activeHandoff.session.messages, activeHandoff.assistantMessage] }
         : session));
+      triageHandoffRef.current = null;
     });
   }, [startTyping]);
 
@@ -324,6 +420,7 @@ export default function BatasBotWorkspace() {
                       {message.role === "assistant" && <span className="batasbot-thread-avatar" aria-hidden="true"><Bot size={10.05} /></span>}
                       <div className="batasbot-thread-body">
                         <p>{message.content}</p>
+                        {message.intakeReview && <IntakeReviewGrid review={message.intakeReview} />}
                         {message.links && (
                           <div className="batasbot-thread-links">
                             {message.links.map(({ label, href, icon: Icon }) => (
@@ -351,6 +448,7 @@ export default function BatasBotWorkspace() {
                       <span className="batasbot-thread-avatar" aria-hidden="true"><Bot size={10.05} /></span>
                       <div className="batasbot-thread-body">
                         <p className="batasbot-streaming-text" aria-live="off">{streamedReply}</p>
+                        {pendingIntakeReview && <IntakeReviewGrid review={pendingIntakeReview} />}
                       </div>
                     </article>
                   )}
