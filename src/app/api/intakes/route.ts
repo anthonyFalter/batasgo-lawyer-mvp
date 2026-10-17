@@ -50,11 +50,10 @@ export async function POST(request: Request) {
     const suggestions = suggestIntakeDetails(
       parsed.data.title,
       parsed.data.description,
-      parsed.data.documents,
     );
-    const client = parsed.data.title || suggestions.title;
-    const summary = parsed.data.description || suggestions.description;
-    const score = suggestions.score;
+    const client = parsed.data.title || "Untitled intake";
+    const summary = parsed.data.description || "Details pending lawyer review.";
+    const score = parsed.data.priorityScore !== undefined ? parsed.data.priorityScore : suggestions.score;
     const risk = getRiskFromScore(score);
     const [created] = await db
       .insert(intakes)
@@ -62,7 +61,9 @@ export async function POST(request: Request) {
         workspaceId,
         reference: `INTAKE-${new Date().getFullYear()}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`,
         domain: parsed.data.domain || suggestions.specialty,
-        risk: risk === "Critical" ? "critical" : risk === "High" ? "high" : "medium",
+        risk: risk === "Critical"
+          ? "critical"
+          : risk === "High" ? "high" : risk === "Unassessed" ? "unassessed" : "medium",
         client,
         summary,
         priorityScore: score,

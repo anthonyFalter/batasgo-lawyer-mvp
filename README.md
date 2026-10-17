@@ -14,14 +14,14 @@ This project uses Next.js. Clerk-authenticated intake records and accept/decline
 - Clerk authentication with protected workspace routes
 - Neon Postgres and Drizzle ORM for persistent intake and workspace data
 - Zod for server-side request validation
-- Google Gemini API with optional Groq fallback, restricted to explicitly synthetic demo intakes
+- Google Gemini API with optional Groq fallback for synthetic summaries and lawyer-triggered intake review
 
 ### Planned for a backend-enabled MVP
 
 - Citizen-app intake submission integration and APIs for matters, messages, documents, and tasks.
 - An object-storage service for attachments, with file metadata and access rules kept in Postgres.
 - A Next.js-compatible hosting provider such as Vercel, selected after reviewing data-region availability, privacy terms, and backup requirements.
-- Gemini processing of real client data only after provider data-retention/privacy review and explicit approval.
+- Broader client-data processing only after provider data-retention/privacy review and organizational approval.
 
 Hosting and file storage remain undecided. The current citizen mobile app is not available, so there is no client submission integration yet.
 
@@ -33,7 +33,7 @@ You'll need Node.js and npm installed.
 npm ci
 ```
 
-For a fresh local setup, run `npx -y clerk@latest init` to configure Clerk and create local development credentials in `.env.local`. Keep that file private and do not overwrite the generated Clerk values. Set `DATABASE_URL` in `.env.local` to your Neon connection string and `GEMINI_API_KEY` to your Gemini key. Optionally set `GROQ_API_KEY` to enable Groq as a fallback; intake summaries default to `openai/gpt-oss-20b` (overridable with `GROQ_MODEL`), and BatasBot defaults to `openai/gpt-oss-20b` (overridable with `GROQ_CHAT_MODEL`). Never commit or share `.env.local`. If you need to create `.env.local` manually, copy `.env.example` first and configure Clerk keys through your Clerk account.
+For a fresh local setup, run `npx -y clerk@latest init` to configure Clerk and create local development credentials in `.env.local`. Keep that file private and do not overwrite the generated Clerk values. Set `DATABASE_URL` in `.env.local` to your Neon connection string and `GEMINI_API_KEY` to your Gemini key. Gemini defaults to `gemini-2.5-flash`; set `GEMINI_MODEL` to override it. Optionally set `GROQ_API_KEY` to enable Groq as a fallback; intake reviews default to `openai/gpt-oss-20b` (overridable with `GROQ_MODEL`), and BatasBot defaults to `openai/gpt-oss-20b` (overridable with `GROQ_CHAT_MODEL`). Never commit or share `.env.local`. If you need to create `.env.local` manually, copy `.env.example` first and configure Clerk keys through your Clerk account.
 
 Apply the existing schema migration to your Neon database with:
 
@@ -66,16 +66,17 @@ Open [http://localhost:3000](http://localhost:3000) for the BatasGO intro and wo
 | `/sign-in` | Clerk sign-in page. |
 | `/sign-up` | Clerk sign-up page. |
 
-Case Overview intake records and decisions and BatasBot conversation sessions persist in Neon; BatasBot sessions can be deleted from the session list. Document Assembly, Messages, Calendar, and Tasks use demo data in the browser and are not saved to a server. Intake document selection currently saves file names only; file contents are not uploaded.
+Case Overview intake records and decisions and BatasBot conversation sessions persist in Neon; BatasBot sessions can be deleted from the session list. Document Assembly, Messages, Calendar, and Tasks use demo data in the browser and are not saved to a server. Intake document selection saves file names only. If a lawyer explicitly requests an AI review, supported file contents are temporarily processed and sent to configured AI providers; uploaded contents are not stored in Neon.
 
 ## Intake API
 
 - `GET /api/intakes` — list intakes for the authenticated user's workspace.
-- `POST /api/intakes` — create a workspace intake; risk and priority are calculated on the server.
+- `POST /api/intakes` — create a workspace intake; its validated local or explicitly AI-reviewed priority is saved with the matter. Unscored intakes stay unassessed rather than receiving a fabricated default score.
+- `POST /api/intakes/review` — generate title, description, practice-area suggestions, an AI-assisted summary, and an explained priority score from explicitly submitted details and supported documents.
 - `PATCH /api/intakes/:intakeId` — update an intake's status (`pending`, `accepted`, or `declined`).
 - `POST /api/intakes/:intakeId/summary` — generate and save an AI summary **only for synthetic sample records**. It tries Gemini first, then Groq when `GROQ_API_KEY` is configured and Gemini fails.
 
-The intake endpoints require Clerk authentication and resolve workspace membership server-side; callers cannot select another workspace by sending an ID. The Gemini API key stays server-side, and manually created intakes are not sent to Gemini.
+Persistent intake endpoints require Clerk authentication and resolve workspace membership server-side; callers cannot select another workspace by sending an ID. The AI review endpoint also requires Clerk authentication and a same-origin request. AI provider keys stay server-side. The sample-summary endpoint remains synthetic-only.
 
 ## Security and sensitive data
 
@@ -87,7 +88,7 @@ The citizen-app submission path is not connected. Manually entered intake detail
 - **Handle client data carefully.** Collect only what the feature needs, enforce access checks for database records and uploaded files, and avoid logging message contents, documents, credentials, or other sensitive personal information.
 - **Review third-party services.** Before sending client data to AI, hosting, storage, or other providers, review their security, privacy, retention, and data-location practices.
 
-The AI summary route checks the database `isSample` flag and does not accept intake text from the browser. It is intentionally unavailable for manually created intakes until data-processing approval is made. Configured providers receive the synthetic intake text; provider availability and free-tier quotas are not guaranteed.
+The sample-summary route checks the database `isSample` flag and does not accept intake text from the browser. The separate intake-review route accepts title, description, selected specialty, and supported PDF, DOCX, TXT, JPG, and PNG contents only when a lawyer explicitly requests an AI review. Documents are processed in memory and are not saved; the UI discloses which data and providers are involved before that action. Review providers' privacy, retention, and data-location terms before using real client information. AI-assisted triage uses temporal deadlines (0–50), case risk and impact (0–30), procedural status (0–20), and an AI-only severity bonus (0–10), capped at 100. Each component's rationale is shown for lawyer verification. A local text-only estimate never scores file names or document contents; if it finds no explicit evidence, the matter remains unassessed until AI or a lawyer reviews it. The score supports prioritization and is not legal advice. Provider availability and free-tier quotas are not guaranteed.
 
 ## Available commands
 
