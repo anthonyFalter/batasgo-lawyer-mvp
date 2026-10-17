@@ -8,7 +8,8 @@ import { getOrCreatePersonalWorkspace } from "@/lib/db/workspace";
 import { toIntakeDTO } from "@/lib/intakes/service";
 import { isSameOriginRequest } from "@/lib/intakes/validation";
 
-const providerTimeoutMs = 15_000;
+const providerTimeoutMs = 4_000;
+const geminiHttpTimeoutMs = 10_000;
 
 const summarySystemInstruction = `You are BatasBot, an intake triage assistant for Philippine legal practitioners. Summarize only the supplied intake. Do not give legal advice, research law, cite sources, or decide whether to accept a matter.
 
@@ -68,8 +69,9 @@ async function generateWithGemini(prompt: string, apiKey: string) {
         temperature: 0.2,
         maxOutputTokens: 512,
         thinkingConfig: { thinkingBudget: 0 },
+        abortSignal: AbortSignal.timeout(providerTimeoutMs),
         httpOptions: {
-          timeout: providerTimeoutMs,
+          timeout: geminiHttpTimeoutMs,
           retryOptions: { attempts: 1 },
         },
       },
@@ -83,7 +85,11 @@ async function generateWithGemini(prompt: string, apiKey: string) {
     const status = error instanceof Error && "status" in error && typeof error.status === "number"
       ? error.status
       : undefined;
-    const timedOut = status === 504 || (error instanceof Error && /timed?\s*out|timeout/i.test(error.message));
+    const timedOut = status === 504 || (error instanceof Error && (
+      error.name === "TimeoutError"
+      || error.name === "AbortError"
+      || /timed?\s*out|timeout/i.test(error.message)
+    ));
     throw new SummaryProviderError("Gemini", status, timedOut);
   }
 }

@@ -1160,6 +1160,20 @@
   margin-top: 6px;
 }
 
+.sample-ai-summary-content.is-typing::after {
+  width: 1px;
+  height: 1em;
+  background: #315fca;
+  content: "";
+  animation: sample-summary-typing-caret 800ms steps(2, start) infinite;
+}
+
+@keyframes sample-summary-typing-caret {
+  to {
+    visibility: hidden;
+  }
+}
+
 .sample-ai-summary-section {
   display: grid;
   gap: 2px;
@@ -1226,6 +1240,10 @@
         #a9c3ff 171deg,
         #e2e9ff 198deg 360deg
       ) border-box;
+  }
+
+  .sample-ai-summary-content.is-typing::after {
+    animation: none;
   }
 }
 

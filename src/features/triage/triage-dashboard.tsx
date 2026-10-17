@@ -88,6 +88,74 @@ function parseAiSummary(summary: string): AiSummarySection[] {
   return sections;
 }
 
+function AiSummaryContent({
+  id,
+  summary,
+  shouldAnimate,
+  onComplete,
+}: {
+  id: string;
+  summary: string;
+  shouldAnimate: boolean;
+  onComplete: (id: string) => void;
+}) {
+  const [visibleCharacters, setVisibleCharacters] = useState<number | null>(shouldAnimate ? 0 : null);
+  const isTyping = shouldAnimate && visibleCharacters !== null;
+  let remainingCharacters = visibleCharacters ?? Number.POSITIVE_INFINITY;
+
+  useEffect(() => {
+    if (!shouldAnimate || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setVisibleCharacters(null);
+      if (shouldAnimate) onComplete(id);
+      return;
+    }
+
+    let currentVisibleCharacters = 0;
+    setVisibleCharacters(0);
+    const interval = window.setInterval(() => {
+      currentVisibleCharacters = Math.min(currentVisibleCharacters + 4, summary.length);
+      if (currentVisibleCharacters >= summary.length) {
+        setVisibleCharacters(null);
+        window.clearInterval(interval);
+        onComplete(id);
+      } else {
+        setVisibleCharacters(currentVisibleCharacters);
+      }
+    }, 40);
+
+    return () => window.clearInterval(interval);
+  }, [id, onComplete, shouldAnimate, summary]);
+
+  const reveal = (text: string) => {
+    const visibleText = text.slice(0, remainingCharacters);
+    remainingCharacters = Math.max(0, remainingCharacters - text.length);
+    return visibleText;
+  };
+
+  return (
+    <>
+      {isTyping && <span className="sr-only">{summary}</span>}
+      <div
+        className={`sample-ai-summary-content${isTyping ? " is-typing" : ""}`}
+        aria-hidden={isTyping}
+      >
+        {parseAiSummary(summary).map((section, sectionIndex) => (
+          <section className="sample-ai-summary-section" key={`${section.heading}-${sectionIndex}`}>
+            {section.heading && <h4>{reveal(section.heading)}</h4>}
+            {section.blocks.map((block, blockIndex) => block.type === "list" ? (
+              <ul key={blockIndex}>
+                {block.items.map((item, itemIndex) => <li key={itemIndex}>{reveal(item)}</li>)}
+              </ul>
+            ) : (
+              <p key={blockIndex}>{reveal(block.text)}</p>
+            ))}
+          </section>
+        ))}
+      </div>
+    </>
+  );
+}
+
 async function getResponseError(response: Response, fallback: string) {
   const payload: unknown = await response.json().catch(() => null);
   const parsed = apiErrorResponseSchema.safeParse(payload);
@@ -292,6 +360,8 @@ export default function TriageDashboard() {
   const [intakeLoadError, setIntakeLoadError] = useState("");
   const [busyIntakeId, setBusyIntakeId] = useState<string | null>(null);
   const [generatingSummaryId, setGeneratingSummaryId] = useState<string | null>(null);
+  const [expandedAiSummaryIds, setExpandedAiSummaryIds] = useState<Set<string>>(() => new Set());
+  const [typingSummaryId, setTypingSummaryId] = useState<string | null>(null);
   const [isSavingIntake, setIsSavingIntake] = useState(false);
   const [domainFilter, setDomainFilter] = useState("all");
   const [riskFilter, setRiskFilter] = useState("all");
@@ -315,6 +385,10 @@ export default function TriageDashboard() {
   const decisionHistoryRef = useRef<HTMLDivElement>(null);
   const intakeDialogRef = useRef<HTMLDialogElement>(null);
   const documentInputRef = useRef<HTMLInputElement>(null);
+
+  const handleSummaryTypingComplete = useCallback((id: string) => {
+    setTypingSummaryId((current) => current === id ? null : current);
+  }, []);
 
   const loadIntakes = useCallback(async () => {
     setIsLoadingIntakes(true);
@@ -557,13 +631,15 @@ export default function TriageDashboard() {
     try {
       const response = await fetch(`/api/intakes/${intake.id}/summary`, {
         method: "POST",
-        signal: AbortSignal.timeout(40_000),
+        signal: AbortSignal.timeout(12_000),
       });
       if (!response.ok) throw new Error(await getResponseError(response, "Unable to generate summary."));
       const parsed = intakeResponseSchema.safeParse(await response.json());
       if (!parsed.success) throw new Error("The summary service returned an invalid response.");
       const updated = parsed.data.intake;
       setIntakes((current) => current.map((item) => item.id === updated.id ? updated : item));
+      setExpandedAiSummaryIds((current) => new Set(current).add(updated.id));
+      setTypingSummaryId(updated.id);
       showToast("AI summary generated.");
     } catch (error) {
       const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
@@ -818,7 +894,19 @@ export default function TriageDashboard() {
                         aria-busy={generatingSummaryId === intake.id}
                       >
                         {intake.aiSummary ? (
-                          <details className="sample-ai-summary-details">
+                          <details
+                            className="sample-ai-summary-details"
+                            open={expandedAiSummaryIds.has(intake.id)}
+                            onToggle={(event) => {
+                              const isOpen = event.currentTarget.open;
+                              setExpandedAiSummaryIds((current) => {
+                                const next = new Set(current);
+                                if (isOpen) next.add(intake.id);
+                                else next.delete(intake.id);
+                                return next;
+                              });
+                            }}
+                          >
                             <summary>
                               <span className="sample-ai-summary-title">
                                 <Sparkles aria-hidden="true" size={13.4} fill="currentColor" strokeWidth={1.7} />
@@ -826,20 +914,12 @@ export default function TriageDashboard() {
                               </span>
                               <ChevronDown aria-hidden="true" size={12} />
                             </summary>
-                            <div className="sample-ai-summary-content">
-                              {parseAiSummary(intake.aiSummary).map((section, sectionIndex) => (
-                                <section className="sample-ai-summary-section" key={`${section.heading}-${sectionIndex}`}>
-                                  {section.heading && <h4>{section.heading}</h4>}
-                                  {section.blocks.map((block, blockIndex) => block.type === "list" ? (
-                                    <ul key={blockIndex}>
-                                      {block.items.map((item, itemIndex) => <li key={itemIndex}>{item}</li>)}
-                                    </ul>
-                                  ) : (
-                                    <p key={blockIndex}>{block.text}</p>
-                                  ))}
-                                </section>
-                              ))}
-                            </div>
+                            <AiSummaryContent
+                              id={intake.id}
+                              summary={intake.aiSummary}
+                              shouldAnimate={typingSummaryId === intake.id}
+                              onComplete={handleSummaryTypingComplete}
+                            />
                             <small>AI-generated from synthetic text only. Verify all facts.</small>
                           </details>
                         ) : (
