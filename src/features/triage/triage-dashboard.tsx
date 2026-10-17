@@ -552,7 +552,7 @@ export default function TriageDashboard() {
   };
 
   const generateSampleSummary = async (intake: Intake) => {
-    if (!intake.isSample) return;
+    if (!intake.isSample || intake.aiSummary || generatingSummaryId === intake.id) return;
     setGeneratingSummaryId(intake.id);
     try {
       const response = await fetch(`/api/intakes/${intake.id}/summary`, { method: "POST" });
@@ -839,7 +839,7 @@ export default function TriageDashboard() {
                             onClick={() => void generateSampleSummary(intake)}
                           >
                             <Sparkles aria-hidden="true" size={9.38} />
-                            {generatingSummaryId === intake.id ? "Generating sample summary…" : "Generate sample AI summary"}
+                            {generatingSummaryId === intake.id ? "Generating summary…" : "AI Summary"}
                           </button>
                         )}
                       </section>
