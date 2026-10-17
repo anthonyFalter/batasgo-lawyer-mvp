@@ -1,0 +1,82 @@
+.launch-screen {
+  display: grid;
+  min-height: 100vh;
+  min-height: 100svh;
+  place-items: center;
+  padding: 32px 20px;
+  color: #292d35;
+  background: #f3f5f8;
+}
+
+.launch-screen-content {
+  display: flex;
+  width: min(100%, 440px);
+  flex-direction: column;
+  align-items: center;
+}
+
+.launch-screen-logo {
+  display: block;
+  width: min(100%, 420px);
+  height: auto;
+  object-fit: contain;
+}
+
+.launch-screen-status {
+  margin: 32px 0 14px;
+  color: #697991;
+  font-size: 13px;
+  font-weight: 550;
+  letter-spacing: 0.01em;
+}
+
+.launch-screen-progress {
+  width: 152px;
+  height: 3px;
+  overflow: hidden;
+  background: #dce3ef;
+  border-radius: 999px;
+}
+
+.launch-screen-progress span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #4b78ff;
+  border-radius: inherit;
+  transform: scaleX(0);
+  transform-origin: left center;
+  animation: launch-progress 720ms cubic-bezier(.16, 1, .3, 1) forwards;
+}
+
+.launch-screen-skip {
+  margin-top: 20px;
+  color: #3569ef;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  text-underline-offset: 3px;
+}
+
+.launch-screen-skip:hover {
+  text-decoration: underline;
+}
+
+.launch-screen-skip:focus-visible {
+  outline: 3px solid #86a7ff;
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
+@keyframes launch-progress {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .launch-screen-progress span {
+    animation: none;
+    transform: scaleX(1);
+  }
+}

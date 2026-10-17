@@ -26,7 +26,7 @@ Lawyers review intake information and case materials, communicate with clients, 
 
 - The Case Overview, BatasBot, Document Assembly, Calendar, Messages, and Tasks are front-end interaction demos using local sample data only.
 - Search, domain and risk filtering, sorting, and accept/decline actions operate locally on Case Overview. BatasBot provides local sample chat replies and navigation links to workspace screens; it is not connected to a language model or live matter data. Document Assembly provides a local editable draft, matter reference, exhibit attachment preview, computed-sum insertion, review checklist, HTML review-copy export, and an embedded BatasBot preview chat. The Calendar supports local month navigation, date selection, and appointment search. Messages supports local conversation search, selection, and composing local replies. Tasks supports local search, status and priority filters, sorting, creating, completing, reopening, and deleting tasks. No backend or persistence is connected.
-- Case Overview lives at `/dashboard`, BatasBot lives at `/batasbot`, Document Assembly lives at `/documents`, the Calendar lives at `/calendar`, Messages lives at `/messages`, Tasks lives at `/tasks`, and the public home page remains unchanged.
+- The root route `/` shows a brief BatasGO logo intro before opening Case Overview at `/dashboard`. BatasBot lives at `/batasbot`, Document Assembly lives at `/documents`, the Calendar lives at `/calendar`, Messages lives at `/messages`, and Tasks lives at `/tasks`.
 - The stack is Next.js App Router, React, and TypeScript.
 
 ## Brand Commitments
