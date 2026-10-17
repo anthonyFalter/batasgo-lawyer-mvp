@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   Bell,
+  Bot,
   CalendarDays,
   ChevronDown,
   Clock3,
@@ -23,6 +24,7 @@ import "../triage/triage-dashboard.css";
 
 const navItems = [
   { label: "Case Overview", icon: Inbox, href: "/dashboard" },
+  { label: "BatasBot", icon: Bot, href: "/batasbot" },
   { label: "Document Assembly", icon: FilePenLine, href: "/documents" },
   { label: "Calendar", icon: CalendarDays, href: "/calendar" },
   { label: "Messages", icon: Mail, href: "/messages" },
@@ -30,7 +32,7 @@ const navItems = [
   { label: "Settings", icon: Settings },
 ];
 
-type WorkspacePage = "Case Overview" | "Document Assembly" | "Calendar" | "Messages" | "Tasks";
+type WorkspacePage = "Case Overview" | "BatasBot" | "Document Assembly" | "Calendar" | "Messages" | "Tasks";
 type Popover = "notifications" | "profile" | null;
 
 export default function WorkspaceShell({

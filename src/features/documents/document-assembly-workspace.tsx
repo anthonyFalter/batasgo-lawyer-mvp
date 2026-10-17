@@ -5,6 +5,7 @@ import {
   AlignLeft,
   AlignRight,
   Bold,
+  Bot,
   Check,
   ChevronDown,
   ClipboardCopy,
@@ -17,17 +18,24 @@ import {
   Paperclip,
   Redo2,
   Save,
+  Send,
   Underline,
   Undo2,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import WorkspaceShell from "../workspace/workspace-shell";
 import "./document-assembly-workspace.css";
 
 type EditorTab = "File" | "Home" | "Insert" | "Format" | "Review Changes" | "View";
 type MobilePane = "reference" | "draft";
+type ReferenceMode = "matter" | "chat";
 type ReviewCheckId = "facts" | "law" | "privacy";
+type ChatMessage = {
+  id: number;
+  role: "assistant" | "user";
+  content: string;
+};
 
 type Attachment = {
   id: string;
@@ -121,7 +129,17 @@ export default function DocumentAssemblyWorkspace() {
   const [activeTab, setActiveTab] = useState<EditorTab>("Home");
   const [summaryExpanded, setSummaryExpanded] = useState(true);
   const [referenceCollapsed, setReferenceCollapsed] = useState(false);
+  const [referenceMode, setReferenceMode] = useState<ReferenceMode>("matter");
   const [mobilePane, setMobilePane] = useState<MobilePane>("draft");
+  const [chatInput, setChatInput] = useState("");
+  const [isChatGenerating, setIsChatGenerating] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
+    {
+      id: 0,
+      role: "assistant",
+      content: "Hi, I’m BatasBot. I can help you organize your review of this document. What would you like to look at?",
+    },
+  ]);
   const [pageWide, setPageWide] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [savedLabel, setSavedLabel] = useState("Draft only");
@@ -138,10 +156,23 @@ export default function DocumentAssemblyWorkspace() {
   const firstReviewCheckRef = useRef<HTMLInputElement>(null);
   const reviewTriggerRef = useRef<HTMLButtonElement>(null);
   const nextAttachmentId = useRef(0);
+  const nextChatMessageId = useRef(1);
+  const chatMessagesEndRef = useRef<HTMLDivElement>(null);
+  const chatReplyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const matterReferenceTabRef = useRef<HTMLButtonElement>(null);
+  const batasbotTabRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (reviewOpen) firstReviewCheckRef.current?.focus();
   }, [reviewOpen]);
+
+  useEffect(() => {
+    chatMessagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [chatMessages, isChatGenerating]);
+
+  useEffect(() => () => {
+    if (chatReplyTimeoutRef.current) clearTimeout(chatReplyTimeoutRef.current);
+  }, []);
 
   const filteredAttachments = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -200,6 +231,41 @@ export default function DocumentAssemblyWorkspace() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const sendChatMessage = (message: string) => {
+    const content = message.trim();
+    if (!content || chatReplyTimeoutRef.current) return;
+
+    const query = content.toLowerCase();
+    let response = "I can help you organize a review checklist. This preview is not connected to matter records or legal sources, so verify all facts, calculations, and legal authorities independently.";
+    if (query.includes("summar")) {
+      response = "For this sample document, compare the parties and employment details with the exhibits, reconcile each claim amount with its source records, and verify the legal basis before exporting. This preview is not connected to live matter records or legal sources.";
+    } else if (query.includes("claim") || query.includes("calculation") || query.includes("amount")) {
+      response = `The sample workspace shows a total claim of ${TOTAL_CLAIM}. Check each component against the original records and confirm the applicable legal basis; this demo cannot verify the calculation.`;
+    } else if (query.includes("draft") || query.includes("review")) {
+      response = "A careful review can check party names and dates against source documents, confirm each amount and citation independently, and redact sensitive information before sharing. This demo does not verify the draft.";
+    }
+
+    const userMessage = { id: nextChatMessageId.current++, role: "user" as const, content };
+    const assistantMessage = { id: nextChatMessageId.current++, role: "assistant" as const, content: response };
+    setChatMessages((current) => [...current, userMessage]);
+    setIsChatGenerating(true);
+    setChatInput("");
+    chatReplyTimeoutRef.current = setTimeout(() => {
+      setChatMessages((current) => [...current, assistantMessage]);
+      setIsChatGenerating(false);
+      chatReplyTimeoutRef.current = null;
+    }, 1100);
+  };
+
+  const handleReferenceTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+
+    event.preventDefault();
+    const nextMode: ReferenceMode = event.key === "ArrowRight" || event.key === "End" ? "chat" : "matter";
+    setReferenceMode(nextMode);
+    (nextMode === "matter" ? matterReferenceTabRef : batasbotTabRef).current?.focus();
+  };
+
   const exportDraft = () => {
     const text = editorRef.current?.innerText ?? "";
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(DOCUMENT_TITLE)}</title></head><body><article style="max-width:720px;margin:40px auto;font:16px Georgia,serif;line-height:1.65;white-space:pre-wrap">${escapeHtml(text)}</article></body></html>`;
@@ -248,28 +314,66 @@ export default function DocumentAssemblyWorkspace() {
         </div>
 
         <section className={`document-workspace${referenceCollapsed ? " document-workspace--reference-collapsed" : ""}`} aria-label="Document assembly workspace">
-          <aside className={`document-reference${mobilePane === "reference" ? " document-reference--mobile-active" : ""}`} aria-label="Document reference">
+          <aside className={`document-reference${mobilePane === "reference" ? " document-reference--mobile-active" : ""}${referenceMode === "chat" ? " document-reference--chat-active" : ""}`} aria-label="Document reference">
             <header className="document-reference-heading">
               <h2>Document Reference</h2>
-              <button type="button" className="document-text-action" onClick={() => setSummaryExpanded((expanded) => !expanded)} aria-expanded={summaryExpanded}>
-                {summaryExpanded ? "Collapse summary" : "Show summary"}
-                <ChevronDown aria-hidden="true" size={14} className={summaryExpanded ? "document-chevron--open" : ""} />
+              <div className="document-reference-heading-actions">
+                {referenceMode === "matter" && (
+                  <button type="button" className="document-text-action" onClick={() => setSummaryExpanded((expanded) => !expanded)} aria-expanded={summaryExpanded}>
+                    {summaryExpanded ? "Collapse summary" : "Show summary"}
+                    <ChevronDown aria-hidden="true" size={14} className={summaryExpanded ? "document-chevron--open" : ""} />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="document-reference-collapse"
+                  onClick={() => setReferenceCollapsed((collapsed) => !collapsed)}
+                  aria-label={referenceCollapsed ? "Expand Document Reference" : "Collapse Document Reference"}
+                  aria-controls="document-reference-content"
+                  aria-expanded={!referenceCollapsed}
+                  title={referenceCollapsed ? "Expand Document Reference" : "Collapse Document Reference"}
+                >
+                  {referenceCollapsed ? <PanelLeftOpen aria-hidden="true" size={16} /> : <PanelLeftClose aria-hidden="true" size={16} />}
+                </button>
+              </div>
+            </header>
+
+            <div className="document-reference-tabs" role="tablist" aria-label="Reference pane views">
+              <button
+                type="button"
+                id="matter-reference-tab"
+                role="tab"
+                ref={matterReferenceTabRef}
+                tabIndex={referenceMode === "matter" ? 0 : -1}
+                aria-selected={referenceMode === "matter"}
+                aria-controls="matter-reference-panel"
+                className={referenceMode === "matter" ? "document-reference-tab document-reference-tab--active" : "document-reference-tab"}
+                onKeyDown={handleReferenceTabKeyDown}
+                onClick={() => setReferenceMode("matter")}
+              >
+                Matter
               </button>
               <button
                 type="button"
-                className="document-reference-collapse"
-                onClick={() => setReferenceCollapsed((collapsed) => !collapsed)}
-                aria-label={referenceCollapsed ? "Expand Document Reference" : "Collapse Document Reference"}
-                aria-controls="document-reference-content"
-                aria-expanded={!referenceCollapsed}
-                title={referenceCollapsed ? "Expand Document Reference" : "Collapse Document Reference"}
+                id="batasbot-tab"
+                role="tab"
+                ref={batasbotTabRef}
+                tabIndex={referenceMode === "chat" ? 0 : -1}
+                aria-selected={referenceMode === "chat"}
+                aria-controls="batasbot-panel"
+                className={referenceMode === "chat" ? "document-reference-tab document-reference-tab--active" : "document-reference-tab"}
+                onKeyDown={handleReferenceTabKeyDown}
+                onClick={() => setReferenceMode("chat")}
               >
-                {referenceCollapsed ? <PanelLeftOpen aria-hidden="true" size={16} /> : <PanelLeftClose aria-hidden="true" size={16} />}
+                <Bot aria-hidden="true" size={13} />
+                BatasBot
               </button>
-            </header>
+            </div>
 
             <div className="document-reference-content" id="document-reference-content">
-              {summaryExpanded && (
+              {referenceMode === "matter" && (
+                <div className="matter-reference-panel" id="matter-reference-panel" role="tabpanel" aria-labelledby="matter-reference-tab">
+                  {summaryExpanded && (
                 <div className="matter-snapshot">
                   <div className="matter-snapshot-top">
                     <span className="matter-domain">OFW Landbased / Logistics</span>
@@ -342,6 +446,68 @@ export default function DocumentAssemblyWorkspace() {
                 <time>3 min ago · Sample</time>
               </section>
               <p className="document-reference-note">Sample matter information for interface preview. No client data or files are connected.</p>
+                </div>
+              )}
+
+              {referenceMode === "chat" && (
+                <section className="batasbot-chat" id="batasbot-panel" role="tabpanel" aria-labelledby="batasbot-tab" aria-label="Chat with BatasBot">
+                  <div className="batasbot-messages" role="log" aria-live="polite" aria-relevant="additions text" aria-label="BatasBot conversation">
+                    {chatMessages.map((message) => (
+                      <div className={`batasbot-message batasbot-message--${message.role}`} key={message.id}>
+                        {message.role === "assistant" && (
+                          <span className="batasbot-avatar" aria-hidden="true"><Bot size={15} /></span>
+                        )}
+                        <p>{message.content}</p>
+                      </div>
+                    ))}
+                    {isChatGenerating && (
+                      <div className="batasbot-message batasbot-message--assistant">
+                        <span className="batasbot-avatar" aria-hidden="true"><Bot size={15} /></span>
+                        <div className="batasbot-typing" role="status" aria-label="BatasBot is generating a reply">
+                          <span aria-hidden="true"><i /><i /><i /></span>
+                          <span className="sr-only">BatasBot is typing</span>
+                        </div>
+                      </div>
+                    )}
+                    <div ref={chatMessagesEndRef} />
+                  </div>
+
+                  {chatMessages.length === 1 && (
+                    <div className="batasbot-prompts" aria-label="Suggested messages">
+                      <button type="button" onClick={() => sendChatMessage("Help me review this draft")}>Review this draft</button>
+                      <button type="button" onClick={() => sendChatMessage("Summarize this matter")}>Summarize matter</button>
+                    </div>
+                  )}
+
+                  <form
+                    className="batasbot-composer"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      if (isChatGenerating) return;
+                      sendChatMessage(chatInput);
+                    }}
+                  >
+                    <label className="sr-only" htmlFor="batasbot-message">Message BatasBot</label>
+                    <textarea
+                      id="batasbot-message"
+                      value={chatInput}
+                      onChange={(event) => setChatInput(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" && !event.shiftKey) {
+                          event.preventDefault();
+                          if (!isChatGenerating) sendChatMessage(chatInput);
+                        }
+                      }}
+                      placeholder="Ask BatasBot..."
+                      rows={1}
+                    />
+                    <button type="submit" aria-label="Send message" disabled={!chatInput.trim() || isChatGenerating}>
+                      <Send aria-hidden="true" size={15} />
+                    </button>
+                  </form>
+                  <p className="batasbot-disclaimer">BatasBot preview · Replies are sample text, not legal advice.</p>
+                </section>
+              )}
             </div>
           </aside>
 

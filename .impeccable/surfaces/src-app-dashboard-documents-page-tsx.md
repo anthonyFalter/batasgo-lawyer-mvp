@@ -18,7 +18,7 @@ A practicing lawyer assembles a review draft using matter details, supporting ex
 
 ## Content and constraints
 
-Use clearly labeled sample matter data and local-only interactions. The editor, computed-sum insertion, file selection, review checklist, save state, and HTML export operate in the browser only. No connected client data, legal verification, signature, filing, backend, or persistence.
+Use clearly labeled sample matter data and local-only interactions. The editor, computed-sum insertion, file selection, review checklist, save state, HTML export, and BatasBot preview chat operate in the browser only. BatasBot uses delayed sample replies with a typing indicator and is not connected to client data or legal sources. No connected client data, legal verification, signature, filing, backend, or persistence.
 
 ## Direction contract
 
@@ -26,9 +26,9 @@ THESIS: Keep matter facts and evidence beside the working legal draft so practit
 
 OWN-WORLD: Extend BatasGO's pale blue-gray canvas, white outlined panels, compact Inter controls, blue actions, and 10px panel corners. The draft itself uses restrained formal document typography.
 
-STORY: Review matter context and exhibits, insert the computed total, edit the draft, verify facts and privacy, and export a local review copy.
+STORY: Review matter context and exhibits or switch the reference pane to BatasBot for a sample chat, insert the computed total, edit the draft, verify facts and privacy, and export a local review copy.
 
-FIRST VIEWPORT: A compact page heading and matter breadcrumb lead into a split assembly workspace. The reference pane holds matter facts, claim computation, exhibits, and the client statement; the larger editor pane holds the draft title, ribbon controls, and a centered paper document.
+FIRST VIEWPORT: A compact page heading and matter breadcrumb lead into a split assembly workspace. The reference pane switches between matter facts, claim computation, exhibits, and the client statement, or a BatasBot chat with suggested prompts and a message composer; the larger editor pane holds the draft title, ribbon controls, and a centered paper document.
 
 FORM: Two-pane legal document editor based on `.context/reference-images/documentsystem.png` and `.context/reference-images/documentsystem_collapsed_sidebar.png`, with verification behavior informed by `.context/reference-images/e_stamp_document.png`.
 

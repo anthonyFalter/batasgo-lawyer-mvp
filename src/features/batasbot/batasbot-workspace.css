@@ -1,0 +1,506 @@
+.batasbot-page {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: calc(100vh - 94px);
+  min-height: 440px;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.batasbot-page-header {
+  display: flex;
+  min-height: 58px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.batasbot-page-brand {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+}
+
+.batasbot-page-mark {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: var(--blue-ink);
+  background: var(--blue-pale);
+  border-radius: var(--radius-control);
+}
+
+.batasbot-page-brand h1 {
+  margin: 0;
+  color: var(--heading);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.batasbot-page-brand p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.batasbot-new-chat {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
+  color: #47566e;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.batasbot-new-chat:hover {
+  color: var(--blue-ink);
+  background: var(--blue-pale);
+  border-color: #d1ddfa;
+}
+
+.batasbot-new-chat:focus-visible,
+.batasbot-starters button:focus-visible,
+.batasbot-thread-links a:focus-visible,
+.batasbot-main-composer button:focus-visible {
+  outline: 2px solid #86a7ff;
+  outline-offset: 2px;
+}
+
+.batasbot-chat-area {
+  display: flex;
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+}
+
+.batasbot-welcome {
+  display: flex;
+  width: min(100% - 36px, 650px);
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 0;
+  text-align: center;
+}
+
+.batasbot-welcome-mark {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  color: var(--blue-ink);
+  background: var(--blue-pale);
+  border: 1px solid #dce7ff;
+  border-radius: var(--radius-panel);
+}
+
+.batasbot-welcome h2 {
+  margin: 17px 0 0;
+  color: var(--heading);
+  font-size: 21px;
+  font-weight: 680;
+  letter-spacing: -0.025em;
+}
+
+.batasbot-welcome > p {
+  max-width: 470px;
+  margin: 8px 0 0;
+  color: var(--body-ink);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.batasbot-starters {
+  display: grid;
+  width: min(100%, 540px);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 23px;
+}
+
+.batasbot-starters button {
+  display: flex;
+  min-width: 0;
+  min-height: 44px;
+  align-items: center;
+  gap: 9px;
+  padding: 0 11px;
+  color: #475166;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+
+.batasbot-starters button:hover {
+  color: var(--blue-ink);
+  background: var(--surface-subtle);
+  border-color: #cbd8f4;
+}
+
+.batasbot-starters button > svg:first-child {
+  flex: 0 0 auto;
+  color: var(--blue-ink);
+}
+
+.batasbot-starters button span {
+  min-width: 0;
+  flex: 1;
+  font-size: 10px;
+  font-weight: 560;
+  line-height: 1.4;
+}
+
+.batasbot-starter-arrow {
+  flex: 0 0 auto;
+  color: #8995a8;
+  transform: rotate(45deg);
+}
+
+.batasbot-thread {
+  display: flex;
+  width: min(100%, 800px);
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px 22px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: #c6ceda transparent;
+  scrollbar-width: thin;
+}
+
+.batasbot-thread-message {
+  display: flex;
+  max-width: 92%;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.batasbot-thread-message--user {
+  align-self: flex-end;
+  justify-content: flex-end;
+}
+
+.batasbot-thread-message--assistant {
+  align-self: flex-start;
+}
+
+.batasbot-thread-avatar {
+  display: grid;
+  width: 29px;
+  height: 29px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: var(--blue-ink);
+  background: var(--blue-pale);
+  border-radius: 50%;
+}
+
+.batasbot-thread-body {
+  min-width: 0;
+}
+
+.batasbot-thread-body > p {
+  margin: 0;
+  padding: 11px 14px;
+  color: var(--ink);
+  background: #f1f4f9;
+  border-radius: var(--radius-panel) var(--radius-panel) var(--radius-panel) var(--radius-small);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.batasbot-thread-message--user .batasbot-thread-body > p {
+  color: #fff;
+  background: var(--blue);
+  border-radius: var(--radius-panel) var(--radius-panel) var(--radius-small) var(--radius-panel);
+}
+
+.batasbot-thread-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 9px;
+}
+
+.batasbot-thread-links a {
+  display: inline-flex;
+  min-height: 31px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
+  color: var(--blue-ink);
+  background: var(--surface);
+  border: 1px solid #dce7ff;
+  border-radius: var(--radius-control);
+  font-size: 10px;
+  font-weight: 620;
+  text-decoration: none;
+}
+
+.batasbot-thread-links a:hover {
+  background: var(--blue-pale);
+}
+
+.batasbot-thread-typing {
+  display: flex;
+  min-width: 58px;
+  min-height: 37px;
+  align-items: center;
+  padding: 0 13px;
+  background: #f1f4f9;
+  border-radius: var(--radius-panel) var(--radius-panel) var(--radius-panel) var(--radius-small);
+}
+
+.batasbot-thread-typing > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.batasbot-thread-typing i {
+  width: 5px;
+  height: 5px;
+  background: #72819a;
+  border-radius: 50%;
+  animation: batasbot-main-typing 1s ease-in-out infinite;
+}
+
+.batasbot-thread-typing i:nth-child(2) {
+  animation-delay: 140ms;
+}
+
+.batasbot-thread-typing i:nth-child(3) {
+  animation-delay: 280ms;
+}
+
+@keyframes batasbot-main-typing {
+  0%,
+  60%,
+  100% {
+    opacity: 0.4;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+.batasbot-compose-area {
+  width: min(100% - 36px, 800px);
+  flex: 0 0 auto;
+  margin: 0 auto;
+  padding: 10px 0 12px;
+}
+
+.batasbot-main-composer {
+  display: flex;
+  min-height: 50px;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 7px 8px 7px 15px;
+  background: var(--surface);
+  border: 1px solid #d6dce6;
+  border-radius: var(--radius-panel);
+  box-shadow: 0 3px 12px rgb(29 40 60 / 7%);
+}
+
+.batasbot-main-composer:focus-within {
+  border-color: #99b2fb;
+  box-shadow: 0 0 0 3px rgb(75 120 255 / 10%);
+}
+
+.batasbot-main-composer textarea {
+  width: 100%;
+  min-height: 34px;
+  max-height: 140px;
+  resize: none;
+  padding: 8px 0;
+  color: var(--input-ink);
+  background: transparent;
+  border: 0;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+  outline: 0;
+}
+
+.batasbot-main-composer textarea::placeholder {
+  color: #758198;
+  opacity: 1;
+}
+
+.batasbot-main-composer > button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: #fff;
+  background: var(--blue);
+  border: 0;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+
+.batasbot-main-composer > button:hover:not(:disabled) {
+  background: var(--blue-deep);
+}
+
+.batasbot-main-composer > button:disabled {
+  color: #8793a7;
+  background: #edf0f5;
+  cursor: not-allowed;
+}
+
+.batasbot-main-disclaimer {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.batasbot-notice {
+  position: absolute;
+  right: 18px;
+  bottom: 72px;
+  display: flex;
+  max-width: min(390px, calc(100% - 36px));
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  color: #fff;
+  background: #262c37;
+  border: 1px solid #3d4656;
+  border-radius: var(--radius-control);
+  box-shadow: 0 4px 12px rgb(19 27 41 / 18%);
+  font-size: 11px;
+}
+
+.batasbot-notice > span {
+  flex: 1;
+}
+
+.batasbot-notice button {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: #fff;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-small);
+  cursor: pointer;
+}
+
+.batasbot-notice button:hover {
+  background: rgb(255 255 255 / 12%);
+}
+
+@media (max-width: 640px) {
+  .batasbot-page {
+    height: calc(100dvh - 76px);
+    min-height: 400px;
+  }
+
+  .batasbot-page-header {
+    min-height: 52px;
+    padding: 0 12px;
+  }
+
+  .batasbot-page-mark {
+    width: 31px;
+    height: 31px;
+  }
+
+  .batasbot-page-brand h1 {
+    font-size: 13px;
+  }
+
+  .batasbot-new-chat {
+    min-height: 31px;
+    padding: 0 8px;
+  }
+
+  .batasbot-welcome {
+    width: calc(100% - 28px);
+    padding: 20px 0;
+  }
+
+  .batasbot-welcome h2 {
+    margin-top: 14px;
+    font-size: 18px;
+  }
+
+  .batasbot-welcome > p {
+    max-width: 330px;
+    font-size: 11px;
+  }
+
+  .batasbot-starters {
+    width: min(100%, 390px);
+    grid-template-columns: minmax(0, 1fr);
+    gap: 7px;
+    margin-top: 18px;
+  }
+
+  .batasbot-starters button {
+    min-height: 42px;
+  }
+
+  .batasbot-thread {
+    padding: 18px 12px;
+    gap: 16px;
+  }
+
+  .batasbot-thread-message {
+    max-width: 96%;
+    gap: 7px;
+  }
+
+  .batasbot-thread-body > p {
+    padding: 9px 11px;
+    font-size: 11px;
+  }
+
+  .batasbot-compose-area {
+    width: calc(100% - 22px);
+    padding-bottom: 9px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .batasbot-starters button,
+  .batasbot-thread-typing i {
+    transition: none;
+    animation: none;
+  }
+}

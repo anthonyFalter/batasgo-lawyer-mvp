@@ -187,6 +187,62 @@
   font-weight: 680;
 }
 
+.document-reference-heading-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+}
+
+.document-reference-tabs {
+  display: flex;
+  min-height: 37px;
+  flex: 0 0 auto;
+  align-items: stretch;
+  gap: 14px;
+  padding: 0 2px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.document-reference-tab {
+  position: relative;
+  display: inline-flex;
+  min-height: 37px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 4px;
+  color: #69768b !important;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 10px !important;
+  font-weight: 600;
+}
+
+.document-reference-tab:hover {
+  color: var(--blue-ink) !important;
+}
+
+.document-reference-tab--active {
+  color: var(--blue-ink) !important;
+}
+
+.document-reference-tab--active::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  background: var(--blue);
+  content: "";
+}
+
+.document-reference-tab:focus-visible {
+  outline: 2px solid #86a7ff;
+  outline-offset: -2px;
+}
+
 .document-reference-collapse {
   display: inline-grid;
   width: 28px;
@@ -609,9 +665,234 @@
   }
 
   .document-workspace--reference-collapsed .document-reference-heading .document-text-action,
+  .document-workspace--reference-collapsed .document-reference-tabs,
   .document-workspace--reference-collapsed .document-reference-content {
     display: none;
   }
+}
+
+.document-reference--chat-active {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.document-reference--chat-active .document-reference-heading {
+  flex: 0 0 auto;
+}
+
+.document-reference--chat-active .document-reference-content {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.batasbot-chat {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  padding-top: 10px;
+}
+
+.batasbot-messages {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  padding: 5px 3px 12px 1px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: #c6ceda transparent;
+  scrollbar-width: thin;
+}
+
+.batasbot-message {
+  display: flex;
+  max-width: 92%;
+  align-items: flex-end;
+  gap: 7px;
+}
+
+.batasbot-message--user {
+  align-self: flex-end;
+}
+
+.batasbot-message--assistant {
+  align-self: flex-start;
+}
+
+.batasbot-avatar {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: var(--blue-ink);
+  background: var(--blue-pale);
+  border-radius: 50%;
+}
+
+.batasbot-message p {
+  margin: 0;
+  padding: 9px 11px;
+  color: var(--ink);
+  background: #f1f4f9;
+  border-radius: var(--radius-chip) var(--radius-chip) var(--radius-chip) 4px;
+  font-size: 10px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.batasbot-message--user p {
+  color: #fff;
+  background: var(--blue);
+  border-radius: var(--radius-chip) var(--radius-chip) 4px var(--radius-chip);
+}
+
+.batasbot-typing {
+  display: flex;
+  min-width: 57px;
+  min-height: 35px;
+  align-items: center;
+  padding: 0 12px;
+  background: #f1f4f9;
+  border-radius: var(--radius-chip) var(--radius-chip) var(--radius-chip) 4px;
+}
+
+.batasbot-typing > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.batasbot-typing i {
+  width: 5px;
+  height: 5px;
+  background: #72819a;
+  border-radius: 50%;
+  animation: batasbot-typing-pulse 1s ease-in-out infinite;
+}
+
+.batasbot-typing i:nth-child(2) {
+  animation-delay: 140ms;
+}
+
+.batasbot-typing i:nth-child(3) {
+  animation-delay: 280ms;
+}
+
+@keyframes batasbot-typing-pulse {
+  0%,
+  60%,
+  100% {
+    opacity: 0.4;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+.batasbot-prompts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 2px 0 10px 32px;
+}
+
+.batasbot-prompts button {
+  min-height: 27px;
+  padding: 0 9px;
+  color: var(--blue-ink);
+  background: var(--surface);
+  border: 1px solid #dce7ff;
+  border-radius: var(--radius-chip);
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 560;
+}
+
+.batasbot-prompts button:hover {
+  background: var(--blue-pale);
+}
+
+.batasbot-composer {
+  display: flex;
+  min-height: 43px;
+  align-items: flex-end;
+  gap: 7px;
+  padding: 5px 6px 5px 11px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-chip);
+  box-shadow: 0 2px 7px rgb(29 40 60 / 5%);
+}
+
+.batasbot-composer:focus-within {
+  border-color: #9bb7ff;
+  box-shadow: 0 0 0 2px rgb(75 120 255 / 12%);
+}
+
+.batasbot-composer textarea {
+  width: 100%;
+  min-height: 30px;
+  max-height: 96px;
+  resize: none;
+  padding: 6px 0;
+  color: var(--input-ink);
+  background: transparent;
+  border: 0;
+  font: inherit;
+  font-size: 10px;
+  line-height: 1.45;
+  outline: 0;
+}
+
+.batasbot-composer textarea::placeholder {
+  color: #758198;
+  opacity: 1;
+}
+
+.batasbot-composer > button {
+  display: grid;
+  width: 31px;
+  height: 31px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: #fff;
+  background: var(--blue);
+  border: 0;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+
+.batasbot-composer > button:hover:not(:disabled) {
+  background: var(--blue-deep);
+}
+
+.batasbot-composer > button:disabled {
+  color: #8b97aa;
+  background: #edf0f5;
+  cursor: not-allowed;
+}
+
+.batasbot-composer > button:focus-visible,
+.batasbot-prompts button:focus-visible {
+  outline: 2px solid #86a7ff;
+  outline-offset: 2px;
+}
+
+.batasbot-disclaimer {
+  margin: 7px 2px 0;
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.4;
+  text-align: center;
 }
 
 .document-editor {
@@ -1424,6 +1705,10 @@
 @media (prefers-reduced-motion: reduce) {
   .document-workspace {
     transition: none;
+  }
+  .batasbot-typing i {
+    animation: none;
+    opacity: 0.8;
   }
   .document-toast {
     animation: none;
