@@ -37,19 +37,21 @@ export const intakeAiReviewResponseSchema = z.object({
       visionUsed: z.boolean(),
     }).strict(),
     factors: z.object({
-      urgency: intakeAiReviewFactorSchema.extend({ score: z.number().int().min(0).max(35) }),
-      deadline: intakeAiReviewFactorSchema.extend({ score: z.number().int().min(0).max(30) }),
-      impact: intakeAiReviewFactorSchema.extend({ score: z.number().int().min(0).max(25) }),
-      unknowns: intakeAiReviewFactorSchema.extend({ score: z.number().int().min(0).max(10) }),
+      temporalDeadlines: intakeAiReviewFactorSchema.extend({ score: z.number().int().min(0).max(50) }),
+      caseRiskImpact: intakeAiReviewFactorSchema.extend({ score: z.number().int().min(0).max(30) }),
+      proceduralStatus: intakeAiReviewFactorSchema.extend({ score: z.number().int().min(0).max(20) }),
+      severityBonus: intakeAiReviewFactorSchema.extend({ score: z.number().int().min(0).max(10) }),
     }).strict(),
     priorityScore: z.number().int().min(0).max(100),
     risk: z.enum(["Critical", "High", "Medium"]),
   }).strict(),
 }).strict().superRefine(({ review }, context) => {
-  const total = review.factors.urgency.score
-    + review.factors.deadline.score
-    + review.factors.impact.score
-    + review.factors.unknowns.score;
+  const total = Math.min(100,
+    review.factors.temporalDeadlines.score
+      + review.factors.caseRiskImpact.score
+      + review.factors.proceduralStatus.score
+      + review.factors.severityBonus.score,
+  );
   if (review.priorityScore !== total) {
     context.addIssue({
       code: "custom",

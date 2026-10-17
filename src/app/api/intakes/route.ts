@@ -50,7 +50,6 @@ export async function POST(request: Request) {
     const suggestions = suggestIntakeDetails(
       parsed.data.title,
       parsed.data.description,
-      parsed.data.documents,
     );
     const client = parsed.data.title || "Untitled intake";
     const summary = parsed.data.description || "Details pending lawyer review.";

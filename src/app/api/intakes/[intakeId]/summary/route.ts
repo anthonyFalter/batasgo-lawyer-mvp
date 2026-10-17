@@ -45,14 +45,14 @@ class SummaryProviderError extends Error {
 function getSummaryPrompt(intake: {
   domain: string;
   risk: string;
-  priorityScore: number;
+  priorityScore: number | null;
   summary: string;
 }) {
   return `Prepare a concise intake triage brief for this synthetic example.
 
 Practice area: ${intake.domain}
 Existing heuristic risk label: ${intake.risk}
-Existing heuristic priority score: ${intake.priorityScore}/100
+Existing priority score: ${intake.priorityScore === null ? "Not assessed" : `${intake.priorityScore}/100`}
 Synthetic intake text: <intake_text>
 ${intake.summary}
 </intake_text>`;
@@ -62,7 +62,7 @@ async function generateWithGemini(prompt: string, apiKey: string) {
   const ai = new GoogleGenAI({ apiKey });
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
+      model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
       contents: prompt,
       config: {
         systemInstruction: summarySystemInstruction,

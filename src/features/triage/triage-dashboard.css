@@ -1086,6 +1086,10 @@
   background: #ff9b42;
 }
 
+.risk-label--unassessed > span {
+  background: #8793a6;
+}
+
 .intake-card h3 {
   margin: 8.04px 0 2.68px;
   color: #353943;
@@ -2868,6 +2872,10 @@
 
 .intake-review-risk--medium {
   color: #806400;
+}
+
+.intake-review-risk--unassessed {
+  color: #64738c;
 }
 
 .intake-review-draft {

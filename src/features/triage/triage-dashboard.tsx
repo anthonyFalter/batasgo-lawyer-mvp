@@ -32,6 +32,12 @@ type Risk = IntakeDTO["risk"];
 type Intake = IntakeDTO;
 type Decision = { intake: Intake; result: "accepted" | "declined" };
 type IntakeReviewFactor = { score: number; rationale: string };
+type IntakeReviewFactors = {
+  temporalDeadlines: IntakeReviewFactor;
+  caseRiskImpact: IntakeReviewFactor;
+  proceduralStatus: IntakeReviewFactor;
+  severityBonus: IntakeReviewFactor;
+};
 type IntakeReview = {
   intake: Intake;
   summary: string;
@@ -39,12 +45,7 @@ type IntakeReview = {
   source: "local" | "ai";
   provider?: "Gemini" | "Groq";
   documentReview?: { processedCount: number; truncated: boolean; visionUsed: boolean };
-  factors?: {
-    urgency: IntakeReviewFactor;
-    deadline: IntakeReviewFactor;
-    impact: IntakeReviewFactor;
-    unknowns: IntakeReviewFactor;
-  };
+  factors?: IntakeReviewFactors;
 };
 type DecisionFilter = "all" | Decision["result"];
 type RankedIntake = { intake: Intake; score: number; reasons: string[]; specialtyMatch: boolean };
@@ -178,7 +179,7 @@ async function getResponseError(response: Response, fallback: string) {
   return parsed.success ? parsed.data.error : fallback;
 }
 
-const riskRank: Record<Risk, number> = { Critical: 3, High: 2, Medium: 1 };
+const riskRank: Record<Risk, number> = { Unassessed: 4, Critical: 3, High: 2, Medium: 1 };
 const profileSpecialty = "Labor & Employment litigation";
 const specialtyOptions = [
   "Labor & Employment",
@@ -206,7 +207,7 @@ function rankIntakesForReview(intakes: Intake[]): RankedIntake | null {
     return 5;
   };
   const urgencyPoints = (intake: Intake) => {
-    const riskPoints = { Critical: 40, High: 28, Medium: 15 }[intake.risk];
+    const riskPoints = { Unassessed: 40, Critical: 40, High: 28, Medium: 15 }[intake.risk];
     const recencyPoints = Math.min(intake.receivedOrder, 3) * 2;
     return riskPoints + deadlinePoints(intake) + recencyPoints;
   };
@@ -774,11 +775,7 @@ export default function TriageDashboard() {
   };
 
   const generateIntakeSuggestions = () => {
-    const suggestions = suggestIntakeDetails(
-      intakeTitle,
-      intakeDescription,
-      selectedFiles.map((file) => file.name),
-    );
+    const suggestions = suggestIntakeDetails(intakeTitle, intakeDescription);
     setIntakeTitle(suggestions.title);
     setIntakeDescription(suggestions.description);
     setIntakeSpecialty(suggestions.specialty);
@@ -812,19 +809,15 @@ export default function TriageDashboard() {
 
   const submitManualIntake = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const suggestions = suggestIntakeDetails(
-      intakeTitle,
-      intakeDescription,
-      selectedFiles.map((file) => file.name),
-    );
+    const suggestions = suggestIntakeDetails(intakeTitle, intakeDescription);
     const specialty = intakeSpecialty || suggestions.specialty;
     const newIntake: Intake = {
       id: "00000000-0000-4000-8000-000000000000",
       reference: "Intake preview",
       domain: specialty,
       risk: getRiskFromScore(suggestions.score),
-      client: intakeTitle.trim() || suggestions.title,
-      summary: intakeDescription.trim() || suggestions.description,
+      client: intakeTitle.trim() || "Untitled intake",
+      summary: intakeDescription.trim() || "Details pending lawyer review.",
       received: "Just now",
       receivedOrder: 3,
       deadline: "No deadline set",
@@ -843,6 +836,30 @@ export default function TriageDashboard() {
       summary: suggestions.summary,
       signals: suggestions.signals,
       source: "local",
+      factors: {
+        temporalDeadlines: {
+          score: suggestions.factors.temporalDeadlines,
+          rationale: suggestions.factors.temporalDeadlines
+            ? "Based on an explicitly stated deadline or hearing in the entered details."
+            : "No supporting deadline facts found in the entered details.",
+        },
+        caseRiskImpact: {
+          score: suggestions.factors.caseRiskImpact,
+          rationale: suggestions.factors.caseRiskImpact
+            ? "Based on a concrete risk or impact stated in the entered details."
+            : "No supporting harm or impact facts found in the entered details.",
+        },
+        proceduralStatus: {
+          score: suggestions.factors.proceduralStatus,
+          rationale: suggestions.factors.proceduralStatus
+            ? "Based on a procedural stage stated in the entered details."
+            : "No procedural stage found in the entered details.",
+        },
+        severityBonus: {
+          score: 0,
+          rationale: "AI-only bonus; not included in the local estimate.",
+        },
+      },
     });
     setIntakeStage("review");
   };
@@ -899,7 +916,7 @@ export default function TriageDashboard() {
       if (!controller.signal.aborted) {
         const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
         setIntakeAiReviewError(timedOut
-          ? "AI review timed out. Your local score is still available; try again."
+          ? "AI review timed out. The uploaded documents were not scored; add matter details or try again."
           : error instanceof Error ? error.message : "Unable to generate an AI review.");
       }
     } finally {
@@ -1076,6 +1093,7 @@ export default function TriageDashboard() {
                       { value: "Critical", label: "Critical Risk" },
                       { value: "High", label: "High Risk" },
                       { value: "Medium", label: "Medium Risk" },
+                      { value: "Unassessed", label: "Needs Review" },
                     ]}
                   />
                   <FilterSelect
@@ -1126,7 +1144,9 @@ export default function TriageDashboard() {
                         <span className="domain-tag">{intake.domain}</span>
                       </div>
                       <span className={`risk-label risk-label--${intake.risk.toLowerCase()}`}>
-                        <span />{intake.risk === "Critical" ? "Critical Alert" : `${intake.risk} Priority`}
+                        <span />{intake.risk === "Critical"
+                          ? "Critical Alert"
+                          : intake.risk === "Unassessed" ? "Needs Review" : `${intake.risk} Priority`}
                       </span>
                     </div>
                     <h3>{intake.client}</h3>
@@ -1445,7 +1465,7 @@ export default function TriageDashboard() {
                 <header className="intake-review-header">
                   <div>
                     <h2 id="intake-review-heading">{intakeReview.source === "ai" ? "AI-assisted urgency review" : "Urgency overview"}</h2>
-                    <p>{intakeReview.intake.client} <span aria-hidden="true">·</span> {intakeReview.intake.domain}</p>
+                    <p>{intakeReview.intake.client || "Untitled intake"} <span aria-hidden="true">·</span> {intakeReview.intake.domain}</p>
                   </div>
                   <span className={`intake-review-risk intake-review-risk--${intakeReview.intake.risk.toLowerCase()}`}>
                     {intakeReview.intake.risk}
@@ -1477,23 +1497,28 @@ export default function TriageDashboard() {
                   <section className="intake-review-score" aria-label="Priority score">
                     <span>Priority score</span>
                     <div className="intake-review-score-value">
-                      <strong>{intakeReview.intake.priorityScore}</strong><small>/100</small>
+                      <strong>{intakeReview.intake.priorityScore ?? "—"}</strong>
+                      {intakeReview.intake.priorityScore !== null && <small>/100</small>}
                     </div>
                     <small className="intake-review-score-source">
-                      {intakeReview.source === "ai"
-                        ? `AI-assisted · ${intakeReview.provider}`
-                        : "Preliminary local score"}
+                      {intakeReview.intake.priorityScore === null
+                        ? "Needs evidence before scoring"
+                        : intakeReview.source === "ai"
+                          ? `AI-assisted · ${intakeReview.provider}`
+                          : "Text-only estimate"}
                     </small>
-                    <div
-                      className="intake-review-meter"
-                      role="progressbar"
-                      aria-label="Urgency score"
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                      aria-valuenow={intakeReview.intake.priorityScore}
-                    >
-                      <span style={{ width: `${intakeReview.intake.priorityScore}%` }} />
-                    </div>
+                    {intakeReview.intake.priorityScore !== null && (
+                      <div
+                        className="intake-review-meter"
+                        role="progressbar"
+                        aria-label="Urgency score"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={intakeReview.intake.priorityScore}
+                      >
+                        <span style={{ width: `${intakeReview.intake.priorityScore}%` }} />
+                      </div>
+                    )}
                   </section>
                   <div className="intake-review-stat">
                     <span>Signals</span>
@@ -1510,10 +1535,10 @@ export default function TriageDashboard() {
                     <h3 id="intake-review-breakdown-heading">How this score was formed</h3>
                     <dl>
                       {([
-                        ["Urgency", intakeReview.factors.urgency, 35],
-                        ["Stated deadlines", intakeReview.factors.deadline, 30],
-                        ["Reported impact", intakeReview.factors.impact, 25],
-                        ["Urgency-critical unknowns", intakeReview.factors.unknowns, 10],
+                        ["Temporal deadlines", intakeReview.factors.temporalDeadlines, 50],
+                        ["Case risk & impact", intakeReview.factors.caseRiskImpact, 30],
+                        ["Procedural status", intakeReview.factors.proceduralStatus, 20],
+                        ["AI severity bonus", intakeReview.factors.severityBonus, 10],
                       ] as const).map(([label, factor, maximum]) => (
                         <div className="intake-review-factor" key={label}>
                           <dt>{label}<span>{factor.score}/{maximum}</span></dt>
@@ -1521,7 +1546,12 @@ export default function TriageDashboard() {
                         </div>
                       ))}
                     </dl>
-                    <p>Component scores add to the priority score. Missing facts alone do not establish risk.</p>
+                    <p>
+                      Score = min(100, deadlines + case risk/impact + procedural status + AI severity bonus).
+                      {intakeReview.source === "local" && intakeReview.intake.documents.length > 0
+                        ? " Local estimates use entered text only; selected file contents are not included."
+                        : intakeReview.source === "local" ? " Local estimates use entered text only; the AI bonus is not applied." : ""}
+                    </p>
                   </section>
                 )}
                 {intakeReview.documentReview && (

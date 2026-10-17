@@ -15,6 +15,13 @@
       "when": 1792253429134,
       "tag": "0001_smart_mac_gargan",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792261929672,
+      "tag": "0002_typical_onslaught",
+      "breakpoints": true
     }
   ]
 }

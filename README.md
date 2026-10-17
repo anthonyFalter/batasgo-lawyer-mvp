@@ -33,7 +33,7 @@ You'll need Node.js and npm installed.
 npm ci
 ```
 
-For a fresh local setup, run `npx -y clerk@latest init` to configure Clerk and create local development credentials in `.env.local`. Keep that file private and do not overwrite the generated Clerk values. Set `DATABASE_URL` in `.env.local` to your Neon connection string and `GEMINI_API_KEY` to your Gemini key. Optionally set `GROQ_API_KEY` to enable Groq as a fallback; it defaults to `openai/gpt-oss-20b`, and `GROQ_MODEL` can override that model. Never commit or share `.env.local`. If you need to create `.env.local` manually, copy `.env.example` first and configure Clerk keys through your Clerk account.
+For a fresh local setup, run `npx -y clerk@latest init` to configure Clerk and create local development credentials in `.env.local`. Keep that file private and do not overwrite the generated Clerk values. Set `DATABASE_URL` in `.env.local` to your Neon connection string and `GEMINI_API_KEY` to your Gemini key. Gemini defaults to `gemini-2.5-flash`; set `GEMINI_MODEL` to override it. Optionally set `GROQ_API_KEY` to enable Groq as a fallback; it defaults to `openai/gpt-oss-20b`, and `GROQ_MODEL` can override that model. Never commit or share `.env.local`. If you need to create `.env.local` manually, copy `.env.example` first and configure Clerk keys through your Clerk account.
 
 Apply the existing schema migration to your Neon database with:
 
@@ -71,7 +71,7 @@ Case Overview intake records and decisions persist in Neon. The other workspace 
 ## Intake API
 
 - `GET /api/intakes` — list intakes for the authenticated user's workspace.
-- `POST /api/intakes` — create a workspace intake; its validated local or explicitly AI-reviewed priority is saved with the matter.
+- `POST /api/intakes` — create a workspace intake; its validated local or explicitly AI-reviewed priority is saved with the matter. Unscored intakes stay unassessed rather than receiving a fabricated default score.
 - `POST /api/intakes/review` — generate title, description, practice-area suggestions, an AI-assisted summary, and an explained priority score from explicitly submitted details and supported documents.
 - `PATCH /api/intakes/:intakeId` — update an intake's status (`pending`, `accepted`, or `declined`).
 - `POST /api/intakes/:intakeId/summary` — generate and save an AI summary **only for synthetic sample records**. It tries Gemini first, then Groq when `GROQ_API_KEY` is configured and Gemini fails.
@@ -88,7 +88,7 @@ The citizen-app submission path is not connected. Manually entered intake detail
 - **Handle client data carefully.** Collect only what the feature needs, enforce access checks for database records and uploaded files, and avoid logging message contents, documents, credentials, or other sensitive personal information.
 - **Review third-party services.** Before sending client data to AI, hosting, storage, or other providers, review their security, privacy, retention, and data-location practices.
 
-The sample-summary route checks the database `isSample` flag and does not accept intake text from the browser. The separate intake-review route accepts title, description, selected specialty, and supported PDF, DOCX, TXT, JPG, and PNG contents only when a lawyer explicitly requests an AI review. Documents are processed in memory and are not saved; the UI discloses which data and providers are involved before that action. Review providers' privacy, retention, and data-location terms before using real client information. The AI score is an assistive priority signal, its component explanations are shown for review, and the saved priority score can be incorrect. Provider availability and free-tier quotas are not guaranteed.
+The sample-summary route checks the database `isSample` flag and does not accept intake text from the browser. The separate intake-review route accepts title, description, selected specialty, and supported PDF, DOCX, TXT, JPG, and PNG contents only when a lawyer explicitly requests an AI review. Documents are processed in memory and are not saved; the UI discloses which data and providers are involved before that action. Review providers' privacy, retention, and data-location terms before using real client information. AI-assisted triage uses temporal deadlines (0–50), case risk and impact (0–30), procedural status (0–20), and an AI-only severity bonus (0–10), capped at 100. Each component's rationale is shown for lawyer verification. A local text-only estimate never scores file names or document contents; if it finds no explicit evidence, the matter remains unassessed until AI or a lawyer reviews it. The score supports prioritization and is not legal advice. Provider availability and free-tier quotas are not guaranteed.
 
 ## Available commands
 
