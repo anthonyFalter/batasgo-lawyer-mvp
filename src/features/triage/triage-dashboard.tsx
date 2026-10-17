@@ -5,6 +5,8 @@ import {
   ArrowRight,
   Check,
   ChevronDown,
+  ClipboardCheck,
+  FilePenLine,
   Sparkles,
   Clock3,
   Inbox,
@@ -28,6 +30,7 @@ type Intake = {
   deadlineOrder: number;
 };
 type Decision = { intake: Intake; result: "accepted" | "declined" };
+type DecisionFilter = "all" | Decision["result"];
 type RankedIntake = { intake: Intake; score: number; reasons: string[]; specialtyMatch: boolean };
 const initialIntakes: Intake[] = [
   {
@@ -260,8 +263,11 @@ export default function TriageDashboard() {
   const [search, setSearch] = useState("");
   const [toast, setToast] = useState("");
   const [toastUndoable, setToastUndoable] = useState(false);
+  const [decisionHistoryOpen, setDecisionHistoryOpen] = useState(false);
+  const [decisionFilter, setDecisionFilter] = useState<DecisionFilter>("all");
   const [recommendationOffset, setRecommendationOffset] = useState(0);
   const queueToolbarRef = useRef<HTMLDivElement>(null);
+  const decisionHistoryRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const toolbar = queueToolbarRef.current;
@@ -278,6 +284,24 @@ export default function TriageDashboard() {
     observer.observe(toolbar);
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (!decisionHistoryOpen) return;
+
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!decisionHistoryRef.current?.contains(event.target as Node)) setDecisionHistoryOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setDecisionHistoryOpen(false);
+    };
+
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [decisionHistoryOpen]);
 
   const visibleIntakes = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -300,6 +324,7 @@ export default function TriageDashboard() {
   }, [domainFilter, intakes, order, riskFilter, search, sortBy]);
 
   const recommendation = useMemo(() => rankIntakesForReview(intakes), [intakes]);
+  const visibleDecisions = decisions.filter(({ result }) => decisionFilter === "all" || result === decisionFilter);
 
   const showToast = (message: string, undoable = false) => {
     setToast(message);
@@ -318,6 +343,24 @@ export default function TriageDashboard() {
     setIntakes((current) => [...current, last.intake]);
     setDecisions((current) => current.slice(0, -1));
     showToast(`Restored ${last.intake.id} to the queue.`);
+  };
+
+  const importAcceptedMatter = (intake: Intake) => {
+    try {
+      window.sessionStorage.setItem("batasgo-accepted-intake", JSON.stringify({
+        id: intake.id,
+        client: intake.client,
+        domain: intake.domain,
+        risk: intake.risk,
+        summary: intake.summary,
+        result: "accepted",
+      }));
+    } catch {
+      showToast("This browser could not pass the accepted intake to Document Assembly.");
+      return;
+    }
+
+    window.location.assign("/documents?source=accepted-intake");
   };
 
   const resetFilters = () => {
@@ -360,17 +403,86 @@ export default function TriageDashboard() {
       searchPlaceholder="Search intake IDs, messages..."
       searchLabel="Search intake IDs, messages, and matters"
     >
-        <main className="dashboard">
+        <main className="dashboard" ref={decisionHistoryRef}>
           <div className="dashboard-heading">
             <div>
               <h1>Case Overview</h1>
             </div>
-            <button className="new-intake-button" type="button" onClick={() => unavailable("New intake creation")}>
-              <span aria-hidden="true">+</span> New intake
-            </button>
+            <div className="dashboard-heading-actions">
+              <div className="decision-history-anchor" ref={decisionHistoryRef}>
+                <button
+                  className="reviewed-button"
+                  type="button"
+                  aria-controls="reviewed-matters-panel"
+                  aria-expanded={decisionHistoryOpen}
+                  aria-label={decisionHistoryOpen ? "Show intake queue" : "Show reviewed matters"}
+                  onClick={() => setDecisionHistoryOpen((open) => !open)}
+                >
+                  <ClipboardCheck aria-hidden="true" size={10.72} />
+                  {decisionHistoryOpen ? "Queue" : "Reviewed"}
+                  <span className="reviewed-count">{decisions.length}</span>
+                </button>
+              </div>
+              <button className="new-intake-button" type="button" onClick={() => unavailable("New intake creation")}>
+                <span aria-hidden="true">+</span> New intake
+              </button>
+            </div>
           </div>
 
-          <div className="dashboard-grid">
+          {decisionHistoryOpen && (
+            <section className="decision-history-panel" id="reviewed-matters-panel" aria-label="Reviewed matters">
+              <div className="decision-history-heading">
+                <div>
+                  <h2>Reviewed matters</h2>
+                  <span>Current browser session only</span>
+                </div>
+                <strong>{decisions.length}</strong>
+              </div>
+              <div className="decision-history-filters" role="group" aria-label="Filter reviewed matters">
+                {([
+                  ["all", "All", decisions.length],
+                  ["accepted", "Accepted", decisions.filter(({ result }) => result === "accepted").length],
+                  ["declined", "Declined", decisions.filter(({ result }) => result === "declined").length],
+                ] as const).map(([filter, label, count]) => (
+                  <button
+                    type="button"
+                    key={filter}
+                    aria-pressed={decisionFilter === filter}
+                    onClick={() => setDecisionFilter(filter)}
+                  >
+                    {label} <span>{count}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="decision-history-list">
+                {visibleDecisions.length > 0 ? visibleDecisions.map(({ intake, result }) => (
+                  <article className="decision-history-item" key={intake.id}>
+                    <div className="decision-history-item-heading">
+                      <strong>{intake.id}</strong>
+                      <span className={`decision-history-status decision-history-status--${result}`}>
+                        {result === "accepted" ? "Accepted" : "Declined"}
+                      </span>
+                    </div>
+                    <p className="decision-history-client">{intake.client}</p>
+                    <p className="decision-history-context">{intake.domain} · {intake.risk} risk</p>
+                    <p className="decision-history-summary">{intake.summary}</p>
+                    {result === "accepted" && (
+                      <button className="decision-import-button" type="button" onClick={() => importAcceptedMatter(intake)}>
+                        <FilePenLine aria-hidden="true" size={10.72} />
+                        Import to Document Assembly
+                      </button>
+                    )}
+                  </article>
+                )) : (
+                  <p className="decision-history-empty">
+                    {decisions.length === 0 ? "Accepted and declined matters will appear here." : `No ${decisionFilter} matters yet.`}
+                  </p>
+                )}
+              </div>
+            </section>
+          )}
+
+          <div className="dashboard-grid" hidden={decisionHistoryOpen}>
             <section className="queue-section" aria-labelledby="queue-heading">
               <div className="queue-toolbar" ref={queueToolbarRef}>
                 <h2 id="queue-heading" className="sr-only">Incoming intake requests</h2>

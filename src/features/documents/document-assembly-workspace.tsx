@@ -50,6 +50,15 @@ type Attachment = {
   detail: string;
 };
 
+type ImportedIntake = {
+  id: string;
+  client: string;
+  domain: string;
+  risk: string;
+  summary: string;
+  result: "accepted";
+};
+
 const EDITOR_TABS: EditorTab[] = ["File", "Home", "Insert", "Format", "Review Changes", "View"];
 const TOTAL_CLAIM = "₱2,999,997.66";
 const MATTER_ID = "INTAKE-2024-0847";
@@ -164,6 +173,17 @@ function formatBytes(size: number) {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function isImportedIntake(value: unknown): value is ImportedIntake {
+  if (!value || typeof value !== "object") return false;
+  const intake = value as Partial<ImportedIntake>;
+  return intake.result === "accepted"
+    && typeof intake.id === "string"
+    && typeof intake.client === "string"
+    && typeof intake.domain === "string"
+    && typeof intake.risk === "string"
+    && typeof intake.summary === "string";
+}
+
 function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (character) => {
     const entities: Record<string, string> = {
@@ -180,6 +200,7 @@ function escapeHtml(value: string) {
 export default function DocumentAssemblyWorkspace() {
   const [search, setSearch] = useState("");
   const [workspaceStep, setWorkspaceStep] = useState<"templates" | "editor">("templates");
+  const [importedIntake, setImportedIntake] = useState<ImportedIntake | null>(null);
   const [currentDocumentTitle, setCurrentDocumentTitle] = useState(DOCUMENT_TITLE);
   const [draftHtml, setDraftHtml] = useState(INITIAL_DRAFT);
   const [draftFontFamily, setDraftFontFamily] = useState("Georgia");
@@ -219,6 +240,31 @@ export default function DocumentAssemblyWorkspace() {
   const chatMessagesEndRef = useRef<HTMLDivElement>(null);
   const matterReferenceTabRef = useRef<HTMLButtonElement>(null);
   const batasbotTabRef = useRef<HTMLButtonElement>(null);
+  const matterId = importedIntake?.id ?? MATTER_ID;
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("source") !== "accepted-intake") return;
+
+    let acceptedIntake: ImportedIntake | null = null;
+    try {
+      const rawIntake = window.sessionStorage.getItem("batasgo-accepted-intake");
+      const parsed: unknown = rawIntake ? JSON.parse(rawIntake) : null;
+      if (isImportedIntake(parsed)) acceptedIntake = parsed;
+    } catch {
+      acceptedIntake = null;
+    }
+
+    window.sessionStorage.removeItem("batasgo-accepted-intake");
+    window.history.replaceState(null, "", window.location.pathname);
+    if (!acceptedIntake) {
+      setToast("No accepted intake was found to import.");
+      return;
+    }
+
+    setImportedIntake(acceptedIntake);
+    setAttachments([]);
+    setAnnouncement(`${acceptedIntake.id} imported. Choose a document template to continue.`);
+  }, []);
 
   useEffect(() => {
     if (reviewOpen) firstReviewCheckRef.current?.focus();
@@ -230,9 +276,9 @@ export default function DocumentAssemblyWorkspace() {
 
   const filteredAttachments = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query || `${MATTER_ID} ${DOCUMENT_TITLE}`.toLowerCase().includes(query)) return attachments;
+    if (!query || `${matterId} ${DOCUMENT_TITLE}`.toLowerCase().includes(query)) return attachments;
     return attachments.filter((attachment) => `${attachment.name} ${attachment.kind} ${attachment.detail}`.toLowerCase().includes(query));
-  }, [attachments, search]);
+  }, [attachments, matterId, search]);
 
   const markDirty = () => {
     setIsDirty(true);
@@ -324,7 +370,7 @@ export default function DocumentAssemblyWorkspace() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${MATTER_ID.toLowerCase()}-document-draft.html`;
+    link.download = `${matterId.toLowerCase()}-document-draft.html`;
     document.body.append(link);
     link.click();
     link.remove();
@@ -372,7 +418,7 @@ export default function DocumentAssemblyWorkspace() {
         <div className="document-contextline">
           <div className="document-breadcrumb" aria-label="Document location">
             <button className="document-template-back" type="button" onClick={returnToTemplates}><ArrowLeft aria-hidden="true" size={10.72} /> Templates</button>
-            <span aria-hidden="true">/</span><strong>{MATTER_ID}</strong>
+            <span aria-hidden="true">/</span><strong>{matterId}</strong>
           </div>
           <div className="document-context-title">
             <strong>{currentDocumentTitle}</strong>
@@ -448,35 +494,49 @@ export default function DocumentAssemblyWorkspace() {
                   {summaryExpanded && (
                 <div className="matter-snapshot">
                   <div className="matter-snapshot-top">
-                    <span className="matter-domain">OFW Landbased / Logistics</span>
-                    <span className="matter-reference-id">{MATTER_ID}</span>
+                    <span className="matter-domain">{importedIntake?.domain ?? "OFW Landbased / Logistics"}</span>
+                    <span className="matter-reference-id">{matterId}</span>
                   </div>
-                  <dl className="matter-parties">
-                    <div><dt>Complainant</dt><dd>Juan Dela Cruz · Client #0847</dd></div>
-                    <div><dt>Responding agency</dt><dd>JDELCRUZ Global Manpower &amp; Logistics Corp.</dd></div>
-                    <div><dt>Principal / foreign employer</dt><dd>MariaCruz TransLogistics LLC · Riyadh, KSA</dd></div>
-                  </dl>
+                  {importedIntake ? (
+                    <>
+                      <dl className="matter-parties">
+                        <div><dt>Client</dt><dd>{importedIntake.client}</dd></div>
+                        <div><dt>Risk tier</dt><dd>{importedIntake.risk}</dd></div>
+                      </dl>
+                      <p className="document-imported-summary">{importedIntake.summary}</p>
+                    </>
+                  ) : (
+                    <dl className="matter-parties">
+                      <div><dt>Complainant</dt><dd>Juan Dela Cruz · Client #0847</dd></div>
+                      <div><dt>Responding agency</dt><dd>JDELCRUZ Global Manpower &amp; Logistics Corp.</dd></div>
+                      <div><dt>Principal / foreign employer</dt><dd>MariaCruz TransLogistics LLC · Riyadh, KSA</dd></div>
+                    </dl>
+                  )}
                 </div>
               )}
 
-              <div className="matter-facts" aria-label="Matter facts">
-                <div><span>Client tenure</span><strong>9 yrs, 29 days</strong></div>
-                <div><span>Last basic wage</span><strong>₱99,999 / mo</strong></div>
-              </div>
+              {!importedIntake && (
+                <div className="matter-facts" aria-label="Matter facts">
+                  <div><span>Client tenure</span><strong>9 yrs, 29 days</strong></div>
+                  <div><span>Last basic wage</span><strong>₱99,999 / mo</strong></div>
+                </div>
+              )}
 
-              <section className="claim-calculation" aria-labelledby="claim-title">
-                <h3 id="claim-title">Computation flow</h3>
-                <dl>
-                  <div><dt>Art. 298 separation pay (1 mo/yr)</dt><dd>₱999,999.00</dd></div>
-                  <div><dt>Illegal placement fee reimbursement</dt><dd>₱999,999.00</dd></div>
-                  <div><dt>Prorated 13th month &amp; backwages</dt><dd>₱999,999.66</dd></div>
-                  <div className="claim-total"><dt>Total monetary claim</dt><dd>{TOTAL_CLAIM}</dd></div>
-                </dl>
-                <button type="button" onClick={insertComputedTotal}>
-                  <ClipboardCopy aria-hidden="true" size={9.38} />
-                  Insert computed sum into draft
-                </button>
-              </section>
+              {!importedIntake && (
+                <section className="claim-calculation" aria-labelledby="claim-title">
+                  <h3 id="claim-title">Computation flow</h3>
+                  <dl>
+                    <div><dt>Art. 298 separation pay (1 mo/yr)</dt><dd>₱999,999.00</dd></div>
+                    <div><dt>Illegal placement fee reimbursement</dt><dd>₱999,999.00</dd></div>
+                    <div><dt>Prorated 13th month &amp; backwages</dt><dd>₱999,999.66</dd></div>
+                    <div className="claim-total"><dt>Total monetary claim</dt><dd>{TOTAL_CLAIM}</dd></div>
+                  </dl>
+                  <button type="button" onClick={insertComputedTotal}>
+                    <ClipboardCopy aria-hidden="true" size={9.38} />
+                    Insert computed sum into draft
+                  </button>
+                </section>
+              )}
 
               <section className="exhibits-section" aria-labelledby="exhibits-title">
                 <div className="exhibits-heading">
@@ -508,16 +568,26 @@ export default function DocumentAssemblyWorkspace() {
                     ))}
                   </ul>
                 ) : (
-                  <p className="exhibit-empty">No exhibits match “{search}”. Try another search or attach a file.</p>
+                  <p className="exhibit-empty">
+                    {importedIntake && attachments.length === 0
+                      ? "No source files were included with this intake. Attach original records before drafting."
+                      : `No exhibits match “${search}”. Try another search or attach a file.`}
+                  </p>
                 )}
               </section>
 
-              <section className="client-statement">
-                <div><strong>Client direct statement</strong><span>Voice note transcription</span></div>
-                <p>“I have the contract and remittance slips ready for review.”</p>
-                <time>3 min ago · Sample</time>
-              </section>
-              <p className="document-reference-note">Sample matter information for interface preview. No client data or files are connected.</p>
+              {!importedIntake && (
+                <section className="client-statement">
+                  <div><strong>Client direct statement</strong><span>Voice note transcription</span></div>
+                  <p>“I have the contract and remittance slips ready for review.”</p>
+                  <time>3 min ago · Sample</time>
+                </section>
+              )}
+              <p className="document-reference-note">
+                {importedIntake
+                  ? "Imported intake context is sample data. Template text is not prefilled from these details; verify and adapt it before use."
+                  : "Sample matter information for interface preview. No client data or files are connected."}
+              </p>
                 </div>
               )}
 
@@ -594,7 +664,7 @@ export default function DocumentAssemblyWorkspace() {
               <div className="document-file-icon"><FileText aria-hidden="true" size={11.39} /></div>
               <div className="document-name">
                 <h2>{currentDocumentTitle}</h2>
-                <span>{MATTER_ID}</span>
+                <span>{matterId}</span>
               </div>
               <span className="draft-only-badge">Draft only</span>
             </header>
@@ -733,7 +803,7 @@ export default function DocumentAssemblyWorkspace() {
                 }}><X size={12.06} /></button>
               </header>
               <div className="document-review-context">
-                <span>{currentDocumentTitle}</span><span>Matter: <strong>{MATTER_ID}</strong></span>
+                <span>{currentDocumentTitle}</span><span>Matter: <strong>{matterId}</strong></span>
               </div>
               <div className="document-review-checklist">
                 <h3>Required checklist</h3>
