@@ -1,8 +1,8 @@
 # BatasGO
 
-BatasGO is a lawyer-facing workspace prototype for reviewing client inquiries and managing related casework. The current MVP centers on an intake triage queue and includes connected workspace screens for documents, messages, a calendar, tasks, and BatasBot.
+BatasGO is a lawyer-facing workspace prototype for reviewing client inquiries and managing related casework. Its first backend-enabled MVP workflow is a persistent intake triage queue; documents, messages, calendar, tasks, and BatasBot remain local demonstrations.
 
-This project uses Next.js. The workspace features still use local sample content; Clerk sign-in protects workspace routes, but there is no connected matter-data API or persistent application data yet. Actions and chatbot replies are demonstrations, not live legal services or records.
+This project uses Next.js. Clerk-authenticated intake records and accept/decline decisions are saved in Neon, scoped to the signed-in user's workspace. Development workspaces are seeded with clearly labeled synthetic examples. Other workspace features still use local sample content and are not live legal services or records.
 
 ## Technology
 
@@ -12,17 +12,18 @@ This project uses Next.js. The workspace features still use local sample content
 - React
 - TypeScript
 - Clerk authentication with protected workspace routes
-- Neon serverless Postgres driver and Drizzle ORM for the database foundation
-- Zod for server-side configuration validation
+- Neon Postgres and Drizzle ORM for persistent intake and workspace data
+- Zod for server-side request validation
+- Google Gemini API, restricted to explicitly synthetic demo intakes
 
 ### Planned for a backend-enabled MVP
 
-- Data APIs and per-workspace authorization for client matters, messages, documents, and tasks.
+- Citizen-app intake submission integration and APIs for matters, messages, documents, and tasks.
 - An object-storage service for attachments, with file metadata and access rules kept in Postgres.
 - A Next.js-compatible hosting provider such as Vercel, selected after reviewing data-region availability, privacy terms, and backup requirements.
-- Server-side AI integrations only after reviewing provider data-retention terms and deciding which client information may be sent.
+- Gemini processing of real client data only after provider data-retention/privacy review and explicit approval.
 
-The Neon database is not connected until `DATABASE_URL` is configured and migrations are applied. Hosting, file storage, and AI provider choices are still undecided. The current application has no persistent matter data or AI service.
+Hosting and file storage remain undecided. The current citizen mobile app is not available, so there is no client submission integration yet.
 
 ## Getting started
 
@@ -32,7 +33,7 @@ You'll need Node.js and npm installed.
 npm ci
 ```
 
-For a fresh local setup, run `npx -y clerk@latest init` to configure Clerk and create local development credentials in `.env.local`. Keep that file private and do not overwrite the generated Clerk values. Set `DATABASE_URL` in `.env.local` to your Neon connection string; never commit the file or share the connection string. If you need to create `.env.local` manually, copy `.env.example` first and configure Clerk keys through your Clerk account.
+For a fresh local setup, run `npx -y clerk@latest init` to configure Clerk and create local development credentials in `.env.local`. Keep that file private and do not overwrite the generated Clerk values. Set `DATABASE_URL` in `.env.local` to your Neon connection string and `GEMINI_API_KEY` to your Gemini key; never commit or share `.env.local`. If you need to create `.env.local` manually, copy `.env.example` first and configure Clerk keys through your Clerk account.
 
 Apply the existing schema migration to your Neon database with:
 
@@ -40,7 +41,7 @@ Apply the existing schema migration to your Neon database with:
 npm run db:migrate
 ```
 
-The initial schema establishes workspaces and Clerk-user memberships as the basis for firm-level data isolation. After changing the Drizzle schema, generate a new migration with `npm run db:generate`, then apply it with `npm run db:migrate`. The current proxy protects workspace routes; the public `/api/health` endpoint only reports service liveness. No client-data API is implemented yet. Do not add live matter data until each data operation checks the authenticated user's workspace membership and permissions.
+The schema establishes workspaces, Clerk-user memberships, and intakes. After changing the Drizzle schema, generate a new migration with `npm run db:generate`, then apply it with `npm run db:migrate`. In development, the first authenticated Case Overview load creates an isolated workspace and seeds synthetic sample intakes if that workspace has no seed data. Do not treat these examples as client records.
 
 Start the development server with:
 
@@ -54,7 +55,7 @@ Open [http://localhost:3000](http://localhost:3000) for the BatasGO intro and wo
 
 | Route | Page |
 | --- | --- |
-| `/dashboard` | Case Overview: search, filter, sort, and try local accept or decline decisions. |
+| `/dashboard` | Case Overview: search, filter, sort, persist intake decisions, undo, and create intakes. |
 | `/batasbot` | BatasBot: sample chat replies and links to workspace screens. |
 | `/documents` | Document Assembly: edit a draft, review it, and export an HTML review copy. |
 | `/calendar` | Calendar: browse months, select dates, and search appointments. |
@@ -65,19 +66,28 @@ Open [http://localhost:3000](http://localhost:3000) for the BatasGO intro and wo
 | `/sign-in` | Clerk sign-in page. |
 | `/sign-up` | Clerk sign-up page. |
 
-All interactive changes use demo data in the browser; they are not saved to a server.
+Case Overview intake records and decisions persist in Neon. The other workspace screens use demo data in the browser and are not saved to a server. Intake document selection currently saves file names only; file contents are not uploaded.
+
+## Intake API
+
+- `GET /api/intakes` — list intakes for the authenticated user's workspace.
+- `POST /api/intakes` — create a workspace intake; risk and priority are calculated on the server.
+- `PATCH /api/intakes/:intakeId` — update an intake's status (`pending`, `accepted`, or `declined`).
+- `POST /api/intakes/:intakeId/summary` — generate and save a Gemini summary **only for synthetic sample records**.
+
+The intake endpoints require Clerk authentication and resolve workspace membership server-side; callers cannot select another workspace by sending an ID. The Gemini API key stays server-side, and manually created intakes are not sent to Gemini.
 
 ## Security and sensitive data
 
-The prototype does not yet handle live client records. Clerk authentication protects workspace routes, but there are no APIs for reading or writing matter data yet. Before adding those endpoints:
+The citizen-app submission path is not connected. Manually entered intake details are persisted to Neon, so use synthetic data until database location, retention, access controls, and organizational approval are confirmed. Intake API operations require Clerk authentication and are scoped to the user's workspace.
 
-- **Authorize every data operation.** Authentication alone is not enough. Check the Clerk identity and database workspace membership on the server for every request; never trust client-supplied user, workspace, or matter IDs as proof of access. Keep health-check responses minimal and free of secrets or internal configuration.
-- **Keep keys and credentials secret.** Store them in local environment files or the deployment platform's secret manager; never commit them or put them in source code. `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is intended to be public; keep `CLERK_SECRET_KEY` and `DATABASE_URL` server-only. The `.env*` files are ignored by Git, and `.env.example` contains placeholders only. Rotate any credential that may have been exposed.
+- **Authorize every data operation.** Never trust client-supplied user, workspace, or matter IDs as proof of access. Keep health-check responses minimal and free of secrets or internal configuration.
+- **Keep keys and credentials secret.** Store them in local environment files or the deployment platform's secret manager; never commit them or put them in source code. `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is intended to be public; keep `CLERK_SECRET_KEY`, `DATABASE_URL`, and `GEMINI_API_KEY` server-only. The `.env*` files are ignored by Git, and `.env.example` contains placeholders only. Rotate any credential that may have been exposed.
 - **Validate and limit input.** Validate request bodies and query parameters on the server, apply appropriate size and rate limits, and return errors that do not reveal internal details.
 - **Handle client data carefully.** Collect only what the feature needs, enforce access checks for database records and uploaded files, and avoid logging message contents, documents, credentials, or other sensitive personal information.
 - **Review third-party services.** Before sending client data to AI, hosting, storage, or other providers, review their security, privacy, retention, and data-location practices.
 
-Clerk authentication protects workspace routes. Because client-data APIs are not implemented, per-record API authorization is still future work; this guidance does not claim production-ready security.
+The Gemini summary route checks the database `isSample` flag and does not accept intake text from the browser. It is intentionally unavailable for manually created intakes until data-processing approval is made.
 
 ## Available commands
 
@@ -102,4 +112,4 @@ npm run db:migrate  # Apply pending database migrations
 
 ## Current scope
 
-This is an MVP prototype of the lawyer tool, not a production case-management service. Intake examples and other displayed content are sample data. Clerk sign-in and workspace route protection are configured; Neon-backed application data, business APIs, and persistent storage are not connected yet.
+This remains an MVP prototype, not a production case-management service. Intake records and decisions are persisted in Neon; development seed records are synthetic. Other displayed content is sample data. Citizen-app integration, file uploads, and AI analysis of manually entered intake data are not connected.

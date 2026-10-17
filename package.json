@@ -13,6 +13,7 @@
   "dependencies": {
     "@clerk/nextjs": "^7.9.17",
     "@fontsource-variable/inter": "^5.2.6",
+    "@google/genai": "^2.30.0",
     "@neondatabase/serverless": "^1.2.0",
     "drizzle-orm": "^0.45.4",
     "jszip": "^3.10.2",
