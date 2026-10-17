@@ -1086,6 +1086,33 @@
   border-radius: 5px;
 }
 
+@property --sample-summary-glow-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.sample-ai-summary.is-generating {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(#f6f8ff, #f6f8ff) padding-box,
+    conic-gradient(
+      from var(--sample-summary-glow-angle),
+      #e2e9ff 0deg 118deg,
+      #a9c3ff 145deg,
+      #315fca 158deg,
+      #a9c3ff 171deg,
+      #e2e9ff 198deg 360deg
+    ) border-box;
+  animation: sample-summary-border-rotate 1.8s linear infinite;
+}
+
+@keyframes sample-summary-border-rotate {
+  to {
+    --sample-summary-glow-angle: 360deg;
+  }
+}
+
 .sample-ai-summary-details > summary {
   display: flex;
   align-items: center;
@@ -1184,6 +1211,22 @@
 .sample-ai-summary button:disabled {
   cursor: wait;
   opacity: 0.7;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sample-ai-summary.is-generating {
+    animation: none;
+    background:
+      linear-gradient(#f6f8ff, #f6f8ff) padding-box,
+      conic-gradient(
+        from 0deg,
+        #e2e9ff 0deg 118deg,
+        #a9c3ff 145deg,
+        #315fca 158deg,
+        #a9c3ff 171deg,
+        #e2e9ff 198deg 360deg
+      ) border-box;
+  }
 }
 
 .intake-load-error {
