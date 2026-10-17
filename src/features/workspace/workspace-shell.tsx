@@ -29,10 +29,10 @@ const navItems = [
   { label: "Tasks", icon: ListChecks, href: "/tasks" },
   { label: "Document Assembly", icon: FilePenLine, href: "/documents" },
   { label: "BatasBot", icon: Bot, href: "/batasbot" },
-  { label: "Settings", icon: Settings },
+  { label: "Settings", icon: Settings, href: "/settings" },
 ];
 
-type WorkspacePage = "Case Overview" | "BatasBot" | "Document Assembly" | "Calendar" | "Messages" | "Tasks";
+type WorkspacePage = "Case Overview" | "BatasBot" | "Document Assembly" | "Calendar" | "Messages" | "Tasks" | "Settings";
 type Popover = "notifications" | "profile" | null;
 
 export default function WorkspaceShell({
