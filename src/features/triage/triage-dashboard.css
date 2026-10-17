@@ -98,6 +98,7 @@
   font-size: 13px !important;
   font-weight: 590;
   text-align: left;
+  text-decoration: none;
   transition: background-color 160ms ease, color 160ms ease;
 }
 

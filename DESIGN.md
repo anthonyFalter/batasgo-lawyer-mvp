@@ -246,6 +246,18 @@ Panels use 10px corners, secondary controls use 6–8px corners, and capsule fil
 - **Menu:** Match the account trigger's width, connect it without a gap, and continue its neutral border around the sides and lower edge. Keep the top corners square and round the lower corners.
 - **State:** Square the open trigger's lower corners and preserve a readable compact layout on mobile, where the trigger collapses to an avatar.
 
+### Calendar
+- **Layout:** Keep the application shell, sidebar, utility bar, spacing, and typography consistent with Case Overview. Use a month grid as the primary work surface and a selected-day agenda alongside it.
+- **Calendar grid:** White surface, fine cool-gray dividers, compact weekday labels, and a blue selected-day state. Keep adjacent-month dates muted.
+- **Appointments:** Use the established blue, red, and yellow accents to distinguish consultations, hearings, and deadlines. Keep event details readable in the selected-day agenda, and label local sample records clearly.
+- **Interaction:** Previous/next month controls, Today, date selection, and appointment search work locally; event creation remains a demo-only action.
+
+### Messages
+- **Layout:** Keep the shared workspace shell. Use a narrow Direct Messages list beside a full-height conversation thread; on mobile, show one pane at a time with an in-thread back action.
+- **Conversation list:** Compact text-only rows with case name, last message, and time. The selected row uses a quiet neutral fill.
+- **Thread:** Use a compact case header, light neutral inbound bubbles, workspace-blue outbound bubbles, and a rounded single-line composer docked to the bottom.
+- **Interaction:** Search conversations and thread content separately, select a thread, and send a local demo reply. Label the sample conversation and clarify that replies are not sent; file attachment remains a demo-only action.
+
 ### Cards / Containers
 - **Corner Style:** 10px.
 - **Background:** White against the cool canvas.

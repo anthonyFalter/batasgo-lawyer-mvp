@@ -1,27 +1,17 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
 import {
   ArrowDownWideNarrow,
-  Bell,
-  CalendarDays,
   Check,
   ChevronDown,
   Clock3,
-  FilePenLine,
   Inbox,
   Mail,
-  Menu,
-  Search,
-  Settings,
   ShieldAlert,
-  UserRound,
   X,
 } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import logo from "../../../assets/batasgo_logo.png";
-import "./triage-dashboard.css";
+import WorkspaceShell from "../workspace/workspace-shell";
 
 type Risk = "Critical" | "High" | "Medium";
 type Intake = {
@@ -36,8 +26,6 @@ type Intake = {
   deadlineOrder: number;
 };
 type Decision = { intake: Intake; result: "accepted" | "declined" };
-type Popover = "notifications" | "profile" | null;
-
 const initialIntakes: Intake[] = [
   {
     id: "INTAKE-2024-0847",
@@ -78,15 +66,6 @@ const initialIntakes: Intake[] = [
 ];
 
 const riskRank: Record<Risk, number> = { Critical: 3, High: 2, Medium: 1 };
-const navItems = [
-  { label: "Case Overview", icon: Inbox },
-  { label: "Draft Documents", icon: FilePenLine },
-  { label: "Calendar", icon: CalendarDays },
-  { label: "Messages", icon: Mail },
-  { label: "Tasks", icon: Clock3 },
-  { label: "Settings", icon: Settings },
-];
-
 function FilterSelect({
   label,
   value,
@@ -216,7 +195,6 @@ function FilterSelect({
 }
 
 export default function TriageDashboard() {
-  const searchInputRef = useRef<HTMLInputElement>(null);
   const [intakes, setIntakes] = useState(initialIntakes);
   const [decisions, setDecisions] = useState<Decision[]>([]);
   const [domainFilter, setDomainFilter] = useState("all");
@@ -224,21 +202,8 @@ export default function TriageDashboard() {
   const [sortBy, setSortBy] = useState("risk");
   const [order, setOrder] = useState("default");
   const [search, setSearch] = useState("");
-  const [popover, setPopover] = useState<Popover>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [toastUndoable, setToastUndoable] = useState(false);
-
-  useEffect(() => {
-    const focusSearch = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        searchInputRef.current?.focus();
-      }
-    };
-    window.addEventListener("keydown", focusSearch);
-    return () => window.removeEventListener("keydown", focusSearch);
-  }, []);
 
   const visibleIntakes = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -290,112 +255,18 @@ export default function TriageDashboard() {
   const unavailable = (label: string) => showToast(`${label} is not part of this demo yet.`);
 
   return (
-    <div className="workspace">
-      <button
-        className={`mobile-scrim${sidebarOpen ? " is-visible" : ""}`}
-        aria-label="Close navigation"
-        onClick={() => setSidebarOpen(false)}
-        tabIndex={sidebarOpen ? 0 : -1}
-      />
-      <aside className={`sidebar${sidebarOpen ? " sidebar--open" : ""}`}>
-        <Link className="brand" href="/dashboard" aria-label="BatasGO home">
-          <Image src={logo} alt="BatasGO" priority />
-        </Link>
-        <nav className="primary-nav" aria-label="Main navigation">
-          {navItems.map(({ label, icon: Icon }, index) => (
-            <button
-              className={`nav-item${index === 0 ? " nav-item--active" : ""}`}
-              key={label}
-              type="button"
-              aria-current={index === 0 ? "page" : undefined}
-              onClick={() => {
-                setSidebarOpen(false);
-                if (index !== 0) unavailable(label);
-              }}
-            >
-              <Icon aria-hidden="true" size={18} strokeWidth={2.5} />
-              <span>{label}</span>
-            </button>
-          ))}
-        </nav>
-        <section className="subscription">
-          <div className="subscription-copy">
-            <strong>Bataser Pro</strong>
-            <span>Next renewal: Mar 12, 2024</span>
-          </div>
-          <button className="subscription-button" type="button" onClick={() => unavailable("Subscription management")}>
-            Manage Subscription
-          </button>
-        </section>
-      </aside>
-
-      <div className="app-column">
-        <header className="topbar">
-          <button className="icon-button mobile-menu" type="button" aria-label="Open navigation" onClick={() => setSidebarOpen(true)}>
-            <Menu size={20} />
-          </button>
-          <label className="global-search">
-            <Search aria-hidden="true" size={18} />
-            <span className="sr-only">Search intake IDs, messages, and matters</span>
-            <input
-              ref={searchInputRef}
-              type="search"
-              placeholder="Search for IntakeID, messages..."
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-            <kbd>Ctrl K</kbd>
-          </label>
-          <div className="topbar-actions">
-            <div className="popover-anchor">
-              <button
-                className="icon-button notification-button"
-                type="button"
-                aria-label="Notifications, 3 unread"
-                aria-expanded={popover === "notifications"}
-                onClick={() => setPopover(popover === "notifications" ? null : "notifications")}
-              >
-                <Bell size={19} />
-                <span className="notification-count">3</span>
-              </button>
-              {popover === "notifications" && (
-                <div className="popover notification-popover" role="region" aria-label="Notifications">
-                  <div className="popover-heading"><strong>Notifications</strong><span>3 new</span></div>
-                  <p><b>New urgent intake</b><span>Labor & Employment · 3 minutes ago</span></p>
-                  <p><b>Consultation reminder</b><span>Contract Mediation · Today, 2:30 PM</span></p>
-                  <p><b>New client message</b><span>Client Case #0847 · 4 minutes ago</span></p>
-                </div>
-              )}
-            </div>
-            <div className="popover-anchor">
-              <button
-                className="profile-button"
-                type="button"
-                aria-expanded={popover === "profile"}
-                onClick={() => setPopover(popover === "profile" ? null : "profile")}
-              >
-                <span className="profile-avatar"><UserRound size={17} /></span>
-                <span>Atty. Juan Dela Cruz</span>
-                <ChevronDown aria-hidden="true" size={15} />
-              </button>
-              {popover === "profile" && (
-                <div className="popover profile-popover" role="region" aria-label="Account menu">
-                  <strong>Atty. Juan Dela Cruz</strong>
-                  <span>Sample lawyer account</span>
-                  <button type="button" onClick={() => { setPopover(null); unavailable("Account settings"); }}>
-                    <Settings size={15} /> Account settings
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </header>
-
+    <WorkspaceShell
+      activePage="Case Overview"
+      search={search}
+      onSearchChange={setSearch}
+      onUnavailable={unavailable}
+      searchPlaceholder="Search intake IDs, messages..."
+      searchLabel="Search intake IDs, messages, and matters"
+    >
         <main className="dashboard">
           <div className="dashboard-heading">
             <div>
               <h1>Case Overview</h1>
-              <p>Review incoming matters and decide what needs your attention.</p>
             </div>
             <button className="new-intake-button" type="button" onClick={() => unavailable("New intake creation")}>
               <span aria-hidden="true">+</span> New intake
@@ -559,7 +430,6 @@ export default function TriageDashboard() {
             </aside>
           </div>
         </main>
-      </div>
       {toast && (
         <div className="toast" role="status">
           <span className="toast-check"><Check size={16} /></span>
@@ -570,6 +440,6 @@ export default function TriageDashboard() {
           </button>
         </div>
       )}
-    </div>
+    </WorkspaceShell>
   );
 }

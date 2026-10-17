@@ -24,9 +24,9 @@ Lawyers review intake information and case materials, communicate with clients, 
 
 ## Capabilities and Constraints
 
-- This page is a front-end interaction demo using local sample data only.
-- Search, domain and risk filtering, sorting, and accept/decline actions operate locally; no backend or persistence is connected.
-- The triage screen lives at `/dashboard`; the public home page remains unchanged.
+- The Case Overview, Calendar, and Messages are front-end interaction demos using local sample data only.
+- Search, domain and risk filtering, sorting, and accept/decline actions operate locally on Case Overview. The Calendar supports local month navigation, date selection, and appointment search. Messages supports local conversation search, selection, and composing local replies. No backend or persistence is connected.
+- Case Overview lives at `/dashboard`, the Calendar lives at `/calendar`, Messages lives at `/messages`, and the public home page remains unchanged.
 - The stack is Next.js App Router, React, and TypeScript.
 
 ## Brand Commitments
