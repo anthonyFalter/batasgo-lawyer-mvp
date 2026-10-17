@@ -37,6 +37,8 @@ type RankedIntake = { intake: Intake; score: number; reasons: string[]; specialt
 type AiSummaryBlock = { type: "paragraph"; text: string } | { type: "list"; items: string[] };
 type AiSummarySection = { heading: string; blocks: AiSummaryBlock[] };
 
+const seenDecisionIdsStorageKey = "batasgo:triage:seen-decision-ids";
+
 const aiSummaryHeadings = [
   "Reported issue",
   "Time-sensitive facts",
@@ -356,6 +358,8 @@ function FilterSelect({
 export default function TriageDashboard() {
   const [intakes, setIntakes] = useState<Intake[]>([]);
   const [decisions, setDecisions] = useState<Decision[]>([]);
+  const [seenDecisionIds, setSeenDecisionIds] = useState<Set<string>>(() => new Set());
+  const [warpingIntakeIds, setWarpingIntakeIds] = useState<Set<string>>(() => new Set());
   const [isLoadingIntakes, setIsLoadingIntakes] = useState(true);
   const [intakeLoadError, setIntakeLoadError] = useState("");
   const [busyIntakeId, setBusyIntakeId] = useState<string | null>(null);
@@ -383,6 +387,8 @@ export default function TriageDashboard() {
   const [intakeReview, setIntakeReview] = useState<IntakeReview | null>(null);
   const queueToolbarRef = useRef<HTMLDivElement>(null);
   const decisionHistoryRef = useRef<HTMLDivElement>(null);
+  const decisionHistoryButtonRef = useRef<HTMLButtonElement>(null);
+  const intakeCardRefs = useRef(new Map<string, HTMLElement>());
   const intakeDialogRef = useRef<HTMLDialogElement>(null);
   const documentInputRef = useRef<HTMLInputElement>(null);
 
@@ -415,6 +421,22 @@ export default function TriageDashboard() {
   useEffect(() => {
     void loadIntakes();
   }, [loadIntakes]);
+
+  useEffect(() => {
+    try {
+      const storedIds = window.localStorage.getItem(seenDecisionIdsStorageKey);
+      if (storedIds === null) return;
+
+      const parsed: unknown = JSON.parse(storedIds);
+      if (!Array.isArray(parsed) || !parsed.every((id): id is string => typeof id === "string")) {
+        throw new Error("Saved reviewed-matter status is invalid.");
+      }
+      setSeenDecisionIds(new Set(parsed));
+    } catch (error) {
+      console.error("Unable to restore reviewed-matter status.", error);
+      setToast("Unread review status couldn't be restored from this browser.");
+    }
+  }, []);
 
   useEffect(() => {
     if (newIntakeOpen && intakeDialogRef.current && !intakeDialogRef.current.open) {
@@ -484,6 +506,10 @@ export default function TriageDashboard() {
 
   const recommendation = useMemo(() => rankIntakesForReview(intakes), [intakes]);
   const visibleDecisions = decisions.filter(({ result }) => decisionFilter === "all" || result === decisionFilter);
+  const unseenDecisionCount = decisions.reduce(
+    (count, { intake }) => count + (seenDecisionIds.has(intake.id) ? 0 : 1),
+    0,
+  );
 
   const showToast = (message: string, undoable = false) => {
     setToast(message);
@@ -502,15 +528,105 @@ export default function TriageDashboard() {
     return parsed.data.intake;
   };
 
+  const animateIntakeToReviewed = async (intakeId: string) => {
+    const card = intakeCardRefs.current.get(intakeId);
+    const destination = decisionHistoryButtonRef.current;
+    if (
+      !card
+      || !destination
+      || typeof card.animate !== "function"
+      || window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      return;
+    }
+
+    const cardBounds = card.getBoundingClientRect();
+    const destinationBounds = destination.getBoundingClientRect();
+    const translateX = destinationBounds.left + destinationBounds.width / 2
+      - (cardBounds.left + cardBounds.width / 2);
+    const translateY = destinationBounds.top + destinationBounds.height / 2
+      - (cardBounds.top + cardBounds.height / 2);
+    let animation: Animation;
+
+    setWarpingIntakeIds((current) => new Set(current).add(intakeId));
+    try {
+      animation = card.animate([
+        {
+          transform: "translate3d(0, 0, 0) scale(1) skewX(0deg)",
+          opacity: 1,
+          filter: "blur(0px)",
+        },
+        {
+          transform: `translate3d(${translateX * 0.38}px, ${translateY * 0.38}px, 0) scale(.78) skewX(8deg) rotate(2deg)`,
+          opacity: 0.92,
+          filter: "blur(.4px)",
+          offset: 0.38,
+        },
+        {
+          transform: `translate3d(${translateX}px, ${translateY}px, 0) scale(.06) skewX(-16deg) rotate(-10deg)`,
+          opacity: 0,
+          filter: "blur(3px)",
+        },
+      ], {
+        duration: 440,
+        easing: "cubic-bezier(.22, .7, .3, 1)",
+        fill: "forwards",
+      });
+      await new Promise<void>((resolve) => {
+        animation.onfinish = () => resolve();
+        animation.oncancel = () => resolve();
+      });
+    } catch (error) {
+      console.error("Unable to animate the reviewed intake transition.", error);
+    } finally {
+      setWarpingIntakeIds((current) => {
+        const next = new Set(current);
+        next.delete(intakeId);
+        return next;
+      });
+    }
+  };
+
+  const toggleDecisionHistory = () => {
+    const opening = !decisionHistoryOpen;
+    if (opening) {
+      const nextSeenIds = new Set(seenDecisionIds);
+      decisions.forEach(({ intake }) => nextSeenIds.add(intake.id));
+      setSeenDecisionIds(nextSeenIds);
+      try {
+        window.localStorage.setItem(seenDecisionIdsStorageKey, JSON.stringify([...nextSeenIds]));
+      } catch (error) {
+        console.error("Unable to save reviewed-matter status.", error);
+        showToast("Reviewed matters opened, but their seen status couldn't be saved in this browser.");
+      }
+    }
+    setDecisionHistoryOpen(opening);
+  };
+
   const decide = async (intake: Intake, result: Decision["result"]) => {
     setBusyIntakeId(intake.id);
     try {
       const updated = await updateIntakeStatus(intake, result);
+      await animateIntakeToReviewed(intake.id);
       setIntakes((current) => current.filter((item) => item.id !== intake.id));
       setDecisions((current) => [...current.filter(({ intake: item }) => item.id !== intake.id), {
         intake: updated,
         result,
       }]);
+      const nextSeenIds = new Set(seenDecisionIds);
+      const decisionWasSeen = nextSeenIds.delete(intake.id);
+      setSeenDecisionIds(nextSeenIds);
+      if (decisionWasSeen) {
+        try {
+          window.localStorage.setItem(seenDecisionIdsStorageKey, JSON.stringify([...nextSeenIds]));
+        } catch (error) {
+          console.error("Unable to update reviewed-matter status.", error);
+          showToast(`${intake.reference} ${result}. Unread status couldn't be saved in this browser.`, true);
+          decisionHistoryButtonRef.current?.focus({ preventScroll: true });
+          return;
+        }
+      }
+      decisionHistoryButtonRef.current?.focus({ preventScroll: true });
       showToast(`${intake.reference} ${result}.`, true);
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Unable to save the intake decision.");
@@ -527,6 +643,17 @@ export default function TriageDashboard() {
       const restored = await updateIntakeStatus(last.intake, "pending");
       setIntakes((current) => [restored, ...current]);
       setDecisions((current) => current.filter(({ intake }) => intake.id !== last.intake.id));
+      const nextSeenIds = new Set(seenDecisionIds);
+      if (nextSeenIds.delete(last.intake.id)) {
+        setSeenDecisionIds(nextSeenIds);
+        try {
+          window.localStorage.setItem(seenDecisionIdsStorageKey, JSON.stringify([...nextSeenIds]));
+        } catch (error) {
+          console.error("Unable to update reviewed-matter status.", error);
+          showToast("Matter restored, but its unread status couldn't be updated in this browser.");
+          return;
+        }
+      }
       showToast(`Restored ${last.intake.reference} to the queue.`);
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Unable to undo the intake decision.");
@@ -732,16 +859,27 @@ export default function TriageDashboard() {
             <div className="dashboard-heading-actions">
               <div className="decision-history-anchor" ref={decisionHistoryRef}>
                 <button
+                  ref={decisionHistoryButtonRef}
                   className="reviewed-button"
                   type="button"
                   aria-controls="reviewed-matters-panel"
                   aria-expanded={decisionHistoryOpen}
-                  aria-label={decisionHistoryOpen ? "Show intake queue" : "Show reviewed matters"}
-                  onClick={() => setDecisionHistoryOpen((open) => !open)}
+                  aria-label={decisionHistoryOpen
+                    ? "Show intake queue"
+                    : `Show reviewed matters${unseenDecisionCount > 0 ? `, ${unseenDecisionCount} unseen` : ""}`}
+                  onClick={toggleDecisionHistory}
                 >
                   <ClipboardCheck aria-hidden="true" size={10.72} />
                   {decisionHistoryOpen ? "Queue" : "Reviewed"}
                   <span className="reviewed-count">{decisions.length}</span>
+                  {unseenDecisionCount > 0 && (
+                    <span className="reviewed-unseen-count" aria-hidden="true">
+                      {unseenDecisionCount > 99 ? "99+" : unseenDecisionCount}
+                    </span>
+                  )}
+                  <span className="sr-only" aria-live="polite">
+                    {unseenDecisionCount > 0 ? `${unseenDecisionCount} reviewed matters not yet seen.` : ""}
+                  </span>
                 </button>
               </div>
               <button className="new-intake-button" type="button" onClick={openNewIntake}>
@@ -871,9 +1009,13 @@ export default function TriageDashboard() {
               {isLoadingIntakes && <p className="intake-loading" role="status">Loading your workspace intakes…</p>}
               {visibleIntakes.map((intake) => (
                   <article
-                    className="intake-card"
+                    className={`intake-card${warpingIntakeIds.has(intake.id) ? " is-warping" : ""}`}
                     id={`intake-${intake.id}`}
                     key={intake.id}
+                    ref={(element) => {
+                      if (element) intakeCardRefs.current.set(intake.id, element);
+                      else intakeCardRefs.current.delete(intake.id);
+                    }}
                   >
                     <div className="intake-card-top">
                       <div className="intake-tags">
