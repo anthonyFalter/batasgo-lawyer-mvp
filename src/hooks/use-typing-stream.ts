@@ -4,58 +4,133 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 export type TypingPhase = "idle" | "thinking" | "typing";
 
-const THINKING_DELAY_MS = 260;
-const TYPING_TICK_MS = 20;
-const CHARACTERS_PER_TICK = 4;
-
 export function useTypingStream() {
   const [text, setText] = useState("");
   const [phase, setPhase] = useState<TypingPhase>("idle");
-  const thinkingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const typingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const activeRef = useRef(false);
 
-  const clearTimers = useCallback(() => {
-    if (thinkingTimeoutRef.current) {
-      clearTimeout(thinkingTimeoutRef.current);
-      thinkingTimeoutRef.current = null;
+  const clearStream = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
     }
-    if (typingIntervalRef.current) {
-      clearInterval(typingIntervalRef.current);
-      typingIntervalRef.current = null;
-    }
+    activeRef.current = false;
   }, []);
 
-  const startTyping = useCallback((fullText: string, onComplete: () => void) => {
-    clearTimers();
-    setText("");
-    setPhase("thinking");
+  /**
+   * Start streaming from a real fetch Response (ReadableStream).
+   * Appends each chunk to `text` as it arrives.
+   */
+  const startStream = useCallback(
+    (
+      response: Response,
+      onComplete: (fullText: string) => void,
+      onError?: (error: unknown, partialText: string) => void,
+    ) => {
+      clearStream();
+      setText("");
+      setPhase("thinking");
 
-    thinkingTimeoutRef.current = setTimeout(() => {
-      thinkingTimeoutRef.current = null;
-      setPhase("typing");
-      let visibleCharacters = 0;
+      const abort = new AbortController();
+      abortControllerRef.current = abort;
+      activeRef.current = true;
 
-      typingIntervalRef.current = setInterval(() => {
-        visibleCharacters = Math.min(visibleCharacters + CHARACTERS_PER_TICK, fullText.length);
-        setText(fullText.slice(0, visibleCharacters));
-
-        if (visibleCharacters === fullText.length) {
-          clearTimers();
-          setText("");
+      (async () => {
+        if (!response.body) {
+          onError?.(new Error("Response stream is unavailable."), "");
           setPhase("idle");
-          onComplete();
+          return;
         }
-      }, TYPING_TICK_MS);
-    }, THINKING_DELAY_MS);
-  }, [clearTimers]);
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let accumulated = "";
+        let streamError: unknown;
+
+        setPhase("typing");
+        try {
+          while (true) {
+            if (abort.signal.aborted) break;
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value, { stream: true });
+            accumulated += chunk;
+            if (activeRef.current) setText(accumulated);
+          }
+        } catch (error) {
+          streamError = error;
+        } finally {
+          reader.releaseLock();
+          if (activeRef.current) {
+            activeRef.current = false;
+            setText("");
+            setPhase("idle");
+            if (streamError !== undefined) onError?.(streamError, accumulated);
+            else onComplete(accumulated);
+          }
+        }
+      })();
+    },
+    [clearStream],
+  );
+
+  /**
+   * Legacy helper: animate a pre-loaded string the same way the old hook did.
+   * Used for the triage handoff bootstrap messages (still static content).
+   */
+  const startTyping = useCallback(
+    (fullText: string, onComplete: () => void) => {
+      clearStream();
+      setText("");
+      setPhase("thinking");
+      activeRef.current = true;
+
+      const THINKING_DELAY_MS = 260;
+      const TYPING_TICK_MS = 20;
+      const CHARACTERS_PER_TICK = 4;
+
+      const thinkingTimeout = setTimeout(() => {
+        if (!activeRef.current) return;
+        setPhase("typing");
+        let visible = 0;
+        const interval = setInterval(() => {
+          if (!activeRef.current) {
+            clearInterval(interval);
+            return;
+          }
+          visible = Math.min(visible + CHARACTERS_PER_TICK, fullText.length);
+          setText(fullText.slice(0, visible));
+          if (visible === fullText.length) {
+            clearInterval(interval);
+            activeRef.current = false;
+            setText("");
+            setPhase("idle");
+            onComplete();
+          }
+        }, TYPING_TICK_MS);
+
+        // Store abort handle so cancelTyping can clear the interval too
+        abortControllerRef.current = {
+          abort: () => clearInterval(interval),
+          signal: new AbortController().signal,
+        } as unknown as AbortController;
+      }, THINKING_DELAY_MS);
+
+      abortControllerRef.current = {
+        abort: () => clearTimeout(thinkingTimeout),
+        signal: new AbortController().signal,
+      } as unknown as AbortController;
+    },
+    [clearStream],
+  );
 
   const cancelTyping = useCallback(() => {
-    clearTimers();
+    clearStream();
     setText("");
     setPhase("idle");
-  }, [clearTimers]);
+  }, [clearStream]);
 
-  useEffect(() => clearTimers, [clearTimers]);
+  useEffect(() => () => clearStream(), [clearStream]);
 
-  return { text, phase, startTyping, cancelTyping };
+  return { text, phase, startTyping, startStream, cancelTyping };
 }

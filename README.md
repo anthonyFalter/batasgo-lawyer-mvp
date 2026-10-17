@@ -33,7 +33,7 @@ You'll need Node.js and npm installed.
 npm ci
 ```
 
-For a fresh local setup, run `npx -y clerk@latest init` to configure Clerk and create local development credentials in `.env.local`. Keep that file private and do not overwrite the generated Clerk values. Set `DATABASE_URL` in `.env.local` to your Neon connection string and `GEMINI_API_KEY` to your Gemini key. Gemini defaults to `gemini-2.5-flash`; set `GEMINI_MODEL` to override it. Optionally set `GROQ_API_KEY` to enable Groq as a fallback; it defaults to `openai/gpt-oss-20b`, and `GROQ_MODEL` can override that model. Never commit or share `.env.local`. If you need to create `.env.local` manually, copy `.env.example` first and configure Clerk keys through your Clerk account.
+For a fresh local setup, run `npx -y clerk@latest init` to configure Clerk and create local development credentials in `.env.local`. Keep that file private and do not overwrite the generated Clerk values. Set `DATABASE_URL` in `.env.local` to your Neon connection string and `GEMINI_API_KEY` to your Gemini key. Gemini defaults to `gemini-2.5-flash`; set `GEMINI_MODEL` to override it. Optionally set `GROQ_API_KEY` to enable Groq as a fallback; intake reviews default to `openai/gpt-oss-20b` (overridable with `GROQ_MODEL`), and BatasBot defaults to `openai/gpt-oss-20b` (overridable with `GROQ_CHAT_MODEL`). Never commit or share `.env.local`. If you need to create `.env.local` manually, copy `.env.example` first and configure Clerk keys through your Clerk account.
 
 Apply the existing schema migration to your Neon database with:
 
@@ -56,7 +56,7 @@ Open [http://localhost:3000](http://localhost:3000) for the BatasGO intro and wo
 | Route | Page |
 | --- | --- |
 | `/dashboard` | Case Overview: search, filter, sort, persist intake decisions, undo, and create intakes. |
-| `/batasbot` | BatasBot: sample chat replies and links to workspace screens. |
+| `/batasbot` | BatasBot: AI chat with persisted conversation sessions and links to workspace screens. |
 | `/documents` | Document Assembly: edit a draft, review it, and export an HTML review copy. |
 | `/calendar` | Calendar: browse months, select dates, and search appointments. |
 | `/messages` | Messages: search conversations and compose local replies. |
@@ -66,7 +66,7 @@ Open [http://localhost:3000](http://localhost:3000) for the BatasGO intro and wo
 | `/sign-in` | Clerk sign-in page. |
 | `/sign-up` | Clerk sign-up page. |
 
-Case Overview intake records and decisions persist in Neon. The other workspace screens use demo data in the browser and are not saved to a server. Intake document selection saves file names only. If a lawyer explicitly requests an AI review, selected supported file contents are temporarily processed and sent to configured AI providers; uploaded contents are not stored in Neon.
+Case Overview intake records and decisions and BatasBot conversation sessions persist in Neon; BatasBot sessions can be deleted from the session list. Document Assembly, Messages, Calendar, and Tasks use demo data in the browser and are not saved to a server. Intake document selection saves file names only. If a lawyer explicitly requests an AI review, supported file contents are temporarily processed and sent to configured AI providers; uploaded contents are not stored in Neon.
 
 ## Intake API
 
