@@ -6,106 +6,144 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
-  FilePlus2,
   MapPin,
+  MessageCircle,
   X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import WorkspaceShell from "../workspace/workspace-shell";
 import "./calendar-workspace.css";
 
-type EventKind = "consultation" | "hearing" | "deadline";
+type EventKind = "family" | "labor" | "civil" | "criminal";
+type CalendarView = "day" | "week" | "month";
 
 type CalendarEvent = {
   id: string;
-  day: number;
-  time: string;
+  date: string;
+  startTime: string;
+  durationMinutes: number;
   title: string;
   matter: string;
   kind: EventKind;
   location: string;
+  details: string;
+  attendees: string;
 };
 
 const sampleEvents: CalendarEvent[] = [
   {
-    id: "consult-01",
-    day: 3,
-    time: "09:30 AM",
-    title: "Initial client consultation",
-    matter: "Santos · Employment concern",
-    kind: "consultation",
+    id: "event-bautista",
+    date: "2024-09-16",
+    startTime: "09:00",
+    durationMinutes: 60,
+    title: "R. Bautista",
+    matter: "Family support consultation",
+    kind: "family",
     location: "Meeting room 1",
+    details: "Review the support agreement and confirm the documents needed for the next filing.",
+    attendees: "R. Bautista, Atty. Dela Cruz, and intake associate",
   },
   {
-    id: "hearing-01",
-    day: 8,
-    time: "02:00 PM",
-    title: "DOLE mediation conference",
-    matter: "Santos v. Northstar Agency",
-    kind: "hearing",
-    location: "DOLE NCR, Quezon City",
+    id: "event-firmas",
+    date: "2024-09-16",
+    startTime: "14:30",
+    durationMinutes: 60,
+    title: "Firmas Dev. Corp.",
+    matter: "Civil contract review",
+    kind: "civil",
+    location: "Conference room 2",
+    details: "Discuss the proposed revisions to the development agreement and outstanding clauses.",
+    attendees: "Firmas representative and legal team",
   },
   {
-    id: "deadline-01",
-    day: 12,
-    time: "11:00 AM",
-    title: "Submit position paper",
-    matter: "Reyes · Civil dispute",
-    kind: "deadline",
-    location: "Filing deadline",
+    id: "event-santos",
+    date: "2024-09-17",
+    startTime: "10:00",
+    durationMinutes: 60,
+    title: "M. Santos",
+    matter: "Labor case · Northstar Agency",
+    kind: "labor",
+    location: "Meeting room 1",
+    details: "Prepare for the labor mediation and review the client’s timeline and supporting records.",
+    attendees: "M. Santos, Atty. Dela Cruz, and case associate",
   },
   {
-    id: "consult-02",
-    day: 17,
-    time: "10:00 AM",
-    title: "Contract mediation conference",
-    matter: "Fintrex Development Corp.",
-    kind: "consultation",
+    id: "event-alcantara",
+    date: "2024-09-17",
+    startTime: "16:00",
+    durationMinutes: 60,
+    title: "R. Alcantara",
+    matter: "Criminal defense · Case conference",
+    kind: "criminal",
+    location: "Private meeting room",
+    details: "Review the next hearing date, evidence list, and questions for the client.",
+    attendees: "R. Alcantara and defense counsel",
+  },
+  {
+    id: "event-ramos",
+    date: "2024-09-18",
+    startTime: "11:30",
+    durationMinutes: 60,
+    title: "L. Ramos",
+    matter: "Labor case · Benefits review",
+    kind: "labor",
+    location: "Video conference",
+    details: "Check the benefits computation and agree on the documents to request from the employer.",
+    attendees: "L. Ramos and case associate",
+  },
+  {
+    id: "event-hernandez",
+    date: "2024-09-19",
+    startTime: "09:00",
+    durationMinutes: 60,
+    title: "T. Hernandez",
+    matter: "Family matter · Case update",
+    kind: "family",
+    location: "Meeting room 3",
+    details: "Share the latest filing update and confirm the client’s preferred next steps.",
+    attendees: "T. Hernandez and Atty. Dela Cruz",
+  },
+  {
+    id: "event-sy",
+    date: "2024-09-19",
+    startTime: "14:00",
+    durationMinutes: 60,
+    title: "K. Sy",
+    matter: "Criminal defense · Evidence review",
+    kind: "criminal",
     location: "Meeting room 2",
+    details: "Walk through the evidence index and outline remaining review questions.",
+    attendees: "K. Sy and defense counsel",
   },
   {
-    id: "hearing-02",
-    day: 21,
-    time: "01:30 PM",
-    title: "Pre-trial conference",
-    matter: "People v. Alcantara",
-    kind: "hearing",
-    location: "Regional Trial Court",
-  },
-  {
-    id: "deadline-02",
-    day: 26,
-    time: "09:00 AM",
-    title: "Review evidence submission",
-    matter: "Garcia · Property matter",
-    kind: "deadline",
-    location: "Internal deadline",
-  },
-  {
-    id: "consult-03",
-    day: 28,
-    time: "03:00 PM",
-    title: "Client case update",
-    matter: "Client Case #0839",
-    kind: "consultation",
-    location: "Video call",
+    id: "event-weekly-sync",
+    date: "2024-09-20",
+    startTime: "10:00",
+    durationMinutes: 60,
+    title: "Weekly sync",
+    matter: "Labor and employment team",
+    kind: "labor",
+    location: "Main conference room",
+    details: "Review open labor matters, upcoming deadlines, and follow-up assignments.",
+    attendees: "Labor and employment team",
   },
 ];
 
 const weekdays = [
-  { short: "Mon", compact: "M" },
-  { short: "Tue", compact: "T" },
-  { short: "Wed", compact: "W" },
-  { short: "Thu", compact: "T" },
-  { short: "Fri", compact: "F" },
-  { short: "Sat", compact: "S" },
-  { short: "Sun", compact: "S" },
+  { short: "Mon", full: "Monday" },
+  { short: "Tue", full: "Tuesday" },
+  { short: "Wed", full: "Wednesday" },
+  { short: "Thu", full: "Thursday" },
+  { short: "Fri", full: "Friday" },
+  { short: "Sat", full: "Saturday" },
+  { short: "Sun", full: "Sunday" },
 ];
 
 const eventKindLabels: Record<EventKind, string> = {
-  consultation: "Consultation",
-  hearing: "Hearing",
-  deadline: "Deadline",
+  family: "Family law",
+  labor: "Labor law",
+  civil: "Civil law",
+  criminal: "Criminal law",
 };
 
 function dateKey(date: Date) {
@@ -123,66 +161,104 @@ function getCalendarDays(month: Date) {
   );
 }
 
-export default function CalendarWorkspace() {
-  const today = useMemo(() => new Date(), []);
-  const [month, setMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
-  const [selectedDate, setSelectedDate] = useState(today);
-  const [search, setSearch] = useState("");
-  const [toast, setToast] = useState("");
+function getWeekdays(date: Date) {
+  const monday = new Date(date);
+  monday.setDate(date.getDate() - ((date.getDay() + 6) % 7));
+  return Array.from({ length: 5 }, (_, index) => {
+    const day = new Date(monday);
+    day.setDate(monday.getDate() + index);
+    return day;
+  });
+}
 
-  const monthEvents = useMemo(
-    () =>
-      sampleEvents.map((event) => ({
-        ...event,
-        date: new Date(month.getFullYear(), month.getMonth(), event.day),
-      })),
-    [month],
-  );
+function formatClock(time: string) {
+  const [hour, minute] = time.split(":").map(Number);
+  const suffix = hour >= 12 ? "PM" : "AM";
+  return `${String(hour % 12 || 12).padStart(2, "0")}:${String(minute).padStart(2, "0")} ${suffix}`;
+}
 
-  const eventsByDate = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    const visible = monthEvents.filter((event) =>
-      !query || `${event.title} ${event.matter} ${event.location} ${eventKindLabels[event.kind]}`.toLowerCase().includes(query),
-    );
-    const grouped = new Map<string, (typeof visible)[number][]>();
+function eventEndTime(event: CalendarEvent) {
+  const [hour, minute] = event.startTime.split(":").map(Number);
+  const endMinutes = hour * 60 + minute + event.durationMinutes;
+  return formatClock(`${String(Math.floor(endMinutes / 60) % 24).padStart(2, "0")}:${String(endMinutes % 60).padStart(2, "0")}`);
+}
 
-    for (const event of visible) {
-      const key = dateKey(event.date);
-      grouped.set(key, [...(grouped.get(key) ?? []), event]);
-    }
-    return grouped;
-  }, [monthEvents, search]);
-
-  const selectedEvents = eventsByDate.get(dateKey(selectedDate)) ?? [];
-  const hasSearchMatches = eventsByDate.size > 0;
-  const calendarDays = getCalendarDays(month);
-  const monthLabel = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(month);
-  const selectedDateLabel = new Intl.DateTimeFormat("en-US", {
+function CalendarEventTooltip({ event }: { event: CalendarEvent }) {
+  const eventDate = new Date(`${event.date}T12:00:00`);
+  const dateLabel = new Intl.DateTimeFormat("en-US", {
     weekday: "long",
     month: "long",
     day: "numeric",
-  }).format(selectedDate);
+  }).format(eventDate);
 
-  const moveMonth = (direction: -1 | 1) => {
-    const nextMonth = new Date(month.getFullYear(), month.getMonth() + direction, 1);
-    const finalDay = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
-    setMonth(nextMonth);
-    setSelectedDate(new Date(nextMonth.getFullYear(), nextMonth.getMonth(), Math.min(selectedDate.getDate(), finalDay)));
+  return (
+    <div className="calendar-event-tooltip" id={`${event.id}-details`} role="tooltip">
+      <div className="calendar-tooltip-heading">
+        <span className={`calendar-tooltip-kind calendar-tooltip-kind--${event.kind}`}>{eventKindLabels[event.kind]}</span>
+        <strong>{event.title}</strong>
+      </div>
+      <p className="calendar-tooltip-matter">{event.matter}</p>
+      <p className="calendar-tooltip-description">{event.details}</p>
+      <div className="calendar-tooltip-meta">
+        <span><CalendarDays aria-hidden="true" size={14} />{dateLabel}</span>
+        <span><Clock3 aria-hidden="true" size={14} />{formatClock(event.startTime)} – {eventEndTime(event)}</span>
+        <span><MapPin aria-hidden="true" size={14} />{event.location}</span>
+        <span><MessageCircle aria-hidden="true" size={14} />{event.attendees}</span>
+      </div>
+    </div>
+  );
+}
+
+export default function CalendarWorkspace() {
+  const demoToday = useMemo(() => new Date(2024, 8, 17), []);
+  const [selectedDate, setSelectedDate] = useState(demoToday);
+  const [view, setView] = useState<CalendarView>("week");
+  const [search, setSearch] = useState("");
+  const [toast, setToast] = useState("");
+
+  const eventsByDate = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    const visible = sampleEvents.filter((event) =>
+      !query || `${event.title} ${event.matter} ${event.location} ${event.details} ${eventKindLabels[event.kind]}`.toLowerCase().includes(query),
+    );
+    const grouped = new Map<string, CalendarEvent[]>();
+
+    for (const event of visible) {
+      const key = event.date;
+      grouped.set(key, [...(grouped.get(key) ?? []), event]);
+    }
+    return grouped;
+  }, [search]);
+
+  const calendarDays = getCalendarDays(selectedDate);
+  const weekdaysInView = getWeekdays(selectedDate);
+  const visibleDays = view === "day" ? [selectedDate] : weekdaysInView;
+  const monthLabel = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(selectedDate);
+  const selectedDateKey = dateKey(selectedDate);
+
+  const moveDate = (direction: -1 | 1) => {
+    const nextDate = new Date(selectedDate);
+    if (view === "month") {
+      nextDate.setMonth(nextDate.getMonth() + direction);
+    } else {
+      nextDate.setDate(nextDate.getDate() + (view === "day" ? direction : direction * 7));
+    }
+    setSelectedDate(nextDate);
   };
 
   const goToToday = () => {
-    setMonth(new Date(today.getFullYear(), today.getMonth(), 1));
-    setSelectedDate(today);
-  };
-
-  const selectDate = (date: Date) => {
-    setSelectedDate(date);
-    if (date.getMonth() !== month.getMonth() || date.getFullYear() !== month.getFullYear()) {
-      setMonth(new Date(date.getFullYear(), date.getMonth(), 1));
-    }
+    setSelectedDate(demoToday);
   };
 
   const unavailable = (label: string) => setToast(`${label} is not part of this demo yet.`);
+  const timeRows = [
+    { label: "08:00 AM", minute: 0 },
+    { label: "10:00 AM", minute: 120 },
+    { label: "12:00 PM", minute: 240 },
+    { label: "02:00 PM", minute: 360 },
+    { label: "04:00 PM", minute: 480 },
+    { label: "06:00 PM", minute: 600 },
+  ];
 
   return (
     <WorkspaceShell
@@ -194,123 +270,195 @@ export default function CalendarWorkspace() {
       searchLabel="Search appointments and matters"
     >
       <main className="dashboard calendar-page">
-        <div className="dashboard-heading">
-          <div>
-            <h1>Calendar</h1>
-          </div>
-          <button className="new-intake-button calendar-create-button" type="button" onClick={() => unavailable("Event creation")}>
-            <FilePlus2 aria-hidden="true" size={15} /> Create event
-          </button>
-        </div>
-
         <div className="calendar-layout">
-          <section className="calendar-panel" aria-label="Calendar month view">
-            <div className="calendar-toolbar">
+          <section className="calendar-panel calendar-schedule-panel" aria-label={`${view} calendar schedule`}>
+            <div className="calendar-toolbar calendar-schedule-toolbar">
               <div className="calendar-month-switcher">
-                <button className="calendar-icon-button" type="button" aria-label="Previous month" onClick={() => moveMonth(-1)}>
+                <h1 aria-live="polite">{monthLabel}</h1>
+                <button className="calendar-icon-button" type="button" aria-label={view === "month" ? "Previous month" : "Previous period"} onClick={() => moveDate(-1)}>
                   <ChevronLeft size={18} />
                 </button>
-                <h2 aria-live="polite">{monthLabel}</h2>
-                <button className="calendar-icon-button" type="button" aria-label="Next month" onClick={() => moveMonth(1)}>
+                <button className="calendar-icon-button" type="button" aria-label={view === "month" ? "Next month" : "Next period"} onClick={() => moveDate(1)}>
                   <ChevronRight size={18} />
                 </button>
               </div>
-              <button className="calendar-today-button" type="button" onClick={goToToday}>Today</button>
-            </div>
-
-            <div className="calendar-legend" aria-label="Appointment types">
-              <span><i className="calendar-legend-dot calendar-legend-dot--consultation" />Consultation</span>
-              <span><i className="calendar-legend-dot calendar-legend-dot--hearing" />Hearing</span>
-              <span><i className="calendar-legend-dot calendar-legend-dot--deadline" />Deadline</span>
-            </div>
-
-            <div className="calendar-grid">
-              {weekdays.map((weekday) => (
-                <div className="calendar-weekday" key={weekday.short}>
-                  <span className="calendar-weekday-full">{weekday.short}</span>
-                  <span className="calendar-weekday-compact">{weekday.compact}</span>
+              <div className="calendar-toolbar-actions">
+                <div className="calendar-view-tabs" role="group" aria-label="Calendar view">
+                  {(["day", "week", "month"] as const).map((option) => (
+                    <button
+                      className={view === option ? "is-active" : ""}
+                      type="button"
+                      key={option}
+                      aria-pressed={view === option}
+                      onClick={() => setView(option)}
+                    >
+                      {option[0].toUpperCase() + option.slice(1)}
+                    </button>
+                  ))}
                 </div>
-              ))}
-              {calendarDays.map((date) => {
-                const key = dateKey(date);
-                const events = eventsByDate.get(key) ?? [];
-                const isCurrentMonth = date.getMonth() === month.getMonth();
-                const isToday = key === dateKey(today);
-                const isSelected = key === dateKey(selectedDate);
-
-                return (
-                  <button
-                    className={[
-                      "calendar-day",
-                      isCurrentMonth ? "" : "calendar-day--outside",
-                      isToday ? "calendar-day--today" : "",
-                      isSelected ? "calendar-day--selected" : "",
-                    ].filter(Boolean).join(" ")}
-                    type="button"
-                    key={key}
-                    aria-pressed={isSelected}
-                    aria-current={isToday ? "date" : undefined}
-                    aria-label={`${new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric" }).format(date)}${events.length ? `, ${events.length} ${events.length === 1 ? "appointment" : "appointments"}` : ""}`}
-                    onClick={() => selectDate(date)}
-                  >
-                    <span className="calendar-day-number">{date.getDate()}</span>
-                    {events.length > 0 && (
-                      <span className="calendar-day-events">
-                        {events.slice(0, 2).map((event) => (
-                          <span className={`calendar-event-preview calendar-event-preview--${event.kind}`} key={event.id}>
-                            <span className="calendar-event-time">{event.time}</span>
-                            <span>{event.title}</span>
-                          </span>
-                        ))}
-                        {events.length > 2 && <span className="calendar-more-events">+{events.length - 2} more</span>}
-                      </span>
-                    )}
-                    {events.length > 0 && (
-                      <span className="calendar-mobile-dots" aria-hidden="true">
-                        {events.slice(0, 3).map((event) => <i className={`calendar-legend-dot--${event.kind}`} key={event.id} />)}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-            <p className="calendar-sample-note">Sample calendar entries for interface preview. No appointments are connected.</p>
-          </section>
-
-          <aside className="agenda-panel" aria-labelledby="agenda-heading">
-            <div className="agenda-panel-heading">
-              <div>
-                <h2 id="agenda-heading">Selected day</h2>
-                <p>{selectedDateLabel}</p>
+                <button className="calendar-today-button" type="button" onClick={goToToday}>Today</button>
               </div>
-              <span className="agenda-count">{selectedEvents.length}</span>
             </div>
-            {selectedEvents.length > 0 ? (
-              <div className="agenda-events" aria-live="polite">
-                {selectedEvents.map((event) => (
-                  <article className={`agenda-event agenda-event--${event.kind}`} key={event.id}>
-                    <div className="agenda-event-time"><Clock3 aria-hidden="true" size={14} />{event.time}</div>
-                    <div className="agenda-event-content">
-                      <span className={`agenda-event-kind agenda-event-kind--${event.kind}`}>{eventKindLabels[event.kind]}</span>
-                      <h3>{event.title}</h3>
-                      <p>{event.matter}</p>
-                      <span className="agenda-event-location"><MapPin aria-hidden="true" size={13} />{event.location}</span>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <div className="agenda-empty" aria-live="polite">
-                <span className="agenda-empty-icon"><CalendarDays aria-hidden="true" size={20} /></span>
-                <h3>{search && !hasSearchMatches ? "No matching appointments" : search ? "No matches on this day" : "Nothing scheduled"}</h3>
-                <p>{search && !hasSearchMatches ? "Try another search term." : search ? "This search has appointments on other dates." : "There are no appointments on this day. Choose another date or create an event."}</p>
-                {!search && (
-                  <button type="button" onClick={() => unavailable("Event creation")}>
-                    Create event
-                  </button>
-                )}
+
+            {view === "week" && (
+              <div className="calendar-mobile-day-picker" role="group" aria-label="Choose a weekday">
+                {weekdaysInView.map((date) => {
+                  const key = dateKey(date);
+                  const weekday = weekdays[(date.getDay() + 6) % 7];
+                  const isToday = key === dateKey(demoToday);
+
+                  return (
+                    <button
+                      className={`${key === selectedDateKey ? "is-selected" : ""}${isToday ? " is-today" : ""}`}
+                      type="button"
+                      key={key}
+                      aria-pressed={key === selectedDateKey}
+                      onClick={() => setSelectedDate(date)}
+                    >
+                      <span>{weekday.short}</span>
+                      <strong>{date.getDate()}</strong>
+                    </button>
+                  );
+                })}
               </div>
             )}
+
+            {view === "month" ? (
+              <div className="calendar-month-scroll">
+                <div className="calendar-month-grid" aria-label="Month calendar">
+                  {weekdays.map((weekday) => <div className="calendar-month-weekday" key={weekday.full}>{weekday.short}</div>)}
+                  {calendarDays.map((date) => {
+                    const key = dateKey(date);
+                    const events = eventsByDate.get(key) ?? [];
+                    const isToday = key === dateKey(demoToday);
+
+                    return (
+                      <div className={`calendar-month-cell${date.getMonth() === selectedDate.getMonth() ? "" : " is-outside"}`} key={key}>
+                        <button
+                          className={`calendar-month-date${isToday ? " is-today" : ""}${key === selectedDateKey ? " is-selected" : ""}`}
+                          type="button"
+                          aria-label={`Select ${new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric" }).format(date)}`}
+                          onClick={() => { setSelectedDate(date); setView("day"); }}
+                        >
+                          {date.getDate()}
+                        </button>
+                        <div className="calendar-month-events">
+                          {events.map((event) => (
+                            <article className={`calendar-month-event calendar-month-event--${event.kind}`} key={event.id}>
+                              <button type="button" aria-describedby={`${event.id}-details`}>
+                                <span>{formatClock(event.startTime)}</span> {event.title}
+                              </button>
+                              <CalendarEventTooltip event={event} />
+                            </article>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="calendar-schedule-scroll">
+                <div
+                  className={`calendar-week-schedule${view === "day" ? " is-day-view" : ""}`}
+                  data-selected-day={Math.min((selectedDate.getDay() + 6) % 7, 4)}
+                >
+                  <div className="calendar-week-head">
+                    <div className="calendar-time-gutter" aria-hidden="true" />
+                    {visibleDays.map((date) => {
+                      const key = dateKey(date);
+                      const isToday = key === dateKey(demoToday);
+                      const weekday = weekdays[(date.getDay() + 6) % 7];
+
+                      return (
+                        <button
+                          className={`calendar-weekday-heading${isToday ? " is-today" : ""}${key === selectedDateKey ? " is-selected" : ""}`}
+                          type="button"
+                          key={key}
+                          aria-pressed={key === selectedDateKey}
+                          onClick={() => setSelectedDate(date)}
+                        >
+                          <span>{weekday.short}{isToday && <strong> (Today)</strong>}</span>
+                          <b>{date.getDate()}</b>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="calendar-week-body">
+                    <div className="calendar-time-axis" aria-hidden="true">
+                      {timeRows.map((row) => (
+                        <span key={row.label} style={{ top: `${row.minute / 600 * 100}%` }}>{row.label}</span>
+                      ))}
+                    </div>
+                    <div className="calendar-day-columns">
+                      {visibleDays.map((date) => {
+                        const key = dateKey(date);
+                        const events = eventsByDate.get(key) ?? [];
+                        const isToday = key === dateKey(demoToday);
+
+                        return (
+                          <div className={`calendar-day-column${isToday ? " is-today" : ""}`} key={key}>
+                            {events.map((event) => {
+                              const [hour, minute] = event.startTime.split(":").map(Number);
+                              const minutesFromStart = hour * 60 + minute - 8 * 60;
+
+                              return (
+                                <article
+                                  className={`calendar-schedule-event calendar-schedule-event--${event.kind}`}
+                                  key={event.id}
+                                  style={{ top: `${minutesFromStart / 600 * 100}%` }}
+                                >
+                                  <button type="button" aria-describedby={`${event.id}-details`}>
+                                    <strong>{formatClock(event.startTime)}</strong>
+                                    <span>{event.title}</span>
+                                    <small>{eventKindLabels[event.kind].replace(" law", "").toUpperCase()} (3 SP)</small>
+                                  </button>
+                                  <CalendarEventTooltip event={event} />
+                                </article>
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            <p className="calendar-sample-note">Sample schedule · Local demo data only</p>
+          </section>
+
+          <aside className="calendar-reference-rail" aria-label="Calendar updates">
+            <section className="calendar-rail-card" aria-labelledby="recent-messages-heading">
+              <div className="calendar-rail-heading">
+                <h2 id="recent-messages-heading">Recent Messages</h2>
+              </div>
+              <div className="calendar-recent-messages">
+                <article>
+                  <div><strong>Client Case #0847</strong><time>4m ago</time></div>
+                  <p>U-upload ko po ba ito dito?</p>
+                </article>
+                <article>
+                  <div><strong>Atty. Clara Ocampo</strong><time>1h ago</time></div>
+                  <p>The Cebu Court hearing has been moved to March 1st morning.</p>
+                </article>
+                <article>
+                  <div><strong>Client Case #0839</strong><time>3h ago</time></div>
+                  <p>They sent another demanding message today. Screenshot sa...</p>
+                </article>
+              </div>
+            </section>
+
+            <section className="calendar-rail-card calendar-stats-card" aria-labelledby="quick-stats-heading">
+              <div className="calendar-rail-heading">
+                <h2 id="quick-stats-heading">Quick Stats</h2>
+              </div>
+              <dl className="calendar-quick-stats">
+                <div><dt>This Week’s Consultations</dt><dd>8 Scheduled</dd></div>
+                <div><dt>New Intake Requests</dt><dd className="is-urgent">3 Pending</dd></div>
+                <div><dt>Completed Follow-ups</dt><dd>5 Checked</dd></div>
+              </dl>
+            </section>
           </aside>
         </div>
       </main>

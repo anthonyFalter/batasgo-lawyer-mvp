@@ -42,14 +42,14 @@
 .batasbot-page-brand h1 {
   margin: 0;
   color: var(--heading);
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 700;
 }
 
 .batasbot-page-brand p {
   margin: 2px 0 0;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 16px;
 }
 
 .batasbot-new-chat {
@@ -64,7 +64,7 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-control);
   cursor: pointer;
-  font-size: 11px;
+  font-size: 16px;
   font-weight: 600;
 }
 
@@ -126,7 +126,7 @@
   max-width: 470px;
   margin: 8px 0 0;
   color: var(--body-ink);
-  font-size: 12px;
+  font-size: 16px;
   line-height: 1.55;
 }
 
@@ -168,7 +168,7 @@
 .batasbot-starters button span {
   min-width: 0;
   flex: 1;
-  font-size: 10px;
+  font-size: 16px;
   font-weight: 560;
   line-height: 1.4;
 }
@@ -230,7 +230,7 @@
   color: var(--ink);
   background: #f1f4f9;
   border-radius: var(--radius-panel) var(--radius-panel) var(--radius-panel) var(--radius-small);
-  font-size: 12px;
+  font-size: 16px;
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
@@ -258,7 +258,7 @@
   background: var(--surface);
   border: 1px solid #dce7ff;
   border-radius: var(--radius-control);
-  font-size: 10px;
+  font-size: 16px;
   font-weight: 620;
   text-decoration: none;
 }
@@ -346,7 +346,7 @@
   background: transparent;
   border: 0;
   font: inherit;
-  font-size: 12px;
+  font-size: 16px;
   line-height: 1.5;
   outline: 0;
 }
@@ -382,7 +382,7 @@
 .batasbot-main-disclaimer {
   margin: 7px 0 0;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 16px;
   line-height: 1.4;
   text-align: center;
 }
@@ -401,7 +401,7 @@
   border: 1px solid #3d4656;
   border-radius: var(--radius-control);
   box-shadow: 0 4px 12px rgb(19 27 41 / 18%);
-  font-size: 11px;
+  font-size: 16px;
 }
 
 .batasbot-notice > span {
@@ -442,7 +442,7 @@
   }
 
   .batasbot-page-brand h1 {
-    font-size: 13px;
+    font-size: 16px;
   }
 
   .batasbot-new-chat {
@@ -462,7 +462,7 @@
 
   .batasbot-welcome > p {
     max-width: 330px;
-    font-size: 11px;
+    font-size: 16px;
   }
 
   .batasbot-starters {
@@ -488,7 +488,7 @@
 
   .batasbot-thread-body > p {
     padding: 9px 11px;
-    font-size: 11px;
+    font-size: 16px;
   }
 
   .batasbot-compose-area {

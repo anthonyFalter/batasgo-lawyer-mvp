@@ -31,7 +31,7 @@
   min-height: 100vh;
   color: var(--ink);
   background: var(--canvas);
-  font-size: 13px;
+  font-size: 16px;
 }
 
 .workspace button,
@@ -114,7 +114,7 @@
   background: transparent;
   border: 0;
   cursor: pointer;
-  font-size: 13px !important;
+  font-size: 16px !important;
   font-weight: 590;
   text-align: left;
   text-decoration: none;
@@ -162,13 +162,13 @@
 }
 
 .subscription-copy strong {
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 700;
 }
 
 .subscription-copy span {
   color: #758198;
-  font-size: 10px;
+  font-size: 16px;
 }
 
 .subscription-button {
@@ -178,7 +178,7 @@
   border: 0;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 11px !important;
+  font-size: 16px !important;
   font-weight: 620;
   transition: background-color 160ms ease, transform 160ms ease;
 }
@@ -241,7 +241,7 @@
   background: transparent;
   border: 0;
   outline: 0;
-  font-size: 12px !important;
+  font-size: 16px !important;
 }
 
 .global-search input::placeholder {
@@ -260,7 +260,7 @@
   border: 1px solid #e7e9ef;
   border-radius: 4px;
   font-family: inherit;
-  font-size: 10px;
+  font-size: 16px;
   white-space: nowrap;
 }
 
@@ -305,7 +305,7 @@
   background: var(--red);
   border: 2px solid white;
   border-radius: 50%;
-  font-size: 10px;
+  font-size: 16px;
   font-weight: 700;
 }
 
@@ -320,7 +320,7 @@
   border: 1px solid transparent;
   border-radius: 23px;
   cursor: pointer;
-  font-size: 11px !important;
+  font-size: 16px !important;
   font-weight: 630;
   white-space: nowrap;
 }
@@ -377,13 +377,13 @@
 }
 
 .popover-heading strong {
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .popover-heading span,
 .profile-popover > span {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 16px;
 }
 
 .notification-popover p {
@@ -393,7 +393,7 @@
   margin: 0;
   padding: 11px 0;
   border-top: 1px solid #edf0f4;
-  font-size: 11px;
+  font-size: 16px;
 }
 
 .notification-popover p span {
@@ -422,7 +422,7 @@
 }
 
 .profile-popover > strong {
-  font-size: 12px;
+  font-size: 16px;
 }
 
 .profile-popover button {
@@ -466,7 +466,7 @@
 .dashboard-heading p {
   margin: 7px 0 0;
   color: #778196;
-  font-size: 12px;
+  font-size: 16px;
 }
 
 .live-indicator > span {
@@ -488,7 +488,7 @@
   border-radius: 7px;
   box-shadow: 0 2px 5px rgb(50 92 195 / 18%);
   cursor: pointer;
-  font-size: 11px !important;
+  font-size: 16px !important;
   font-weight: 650;
   white-space: nowrap;
   transition: background-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
@@ -553,7 +553,7 @@
   border: 1px solid transparent;
   border-radius: 20px;
   cursor: pointer;
-  font-size: 10px !important;
+  font-size: 16px !important;
   font-weight: 660;
   white-space: nowrap;
   transition: background-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
@@ -607,7 +607,7 @@
   color: #465166;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 500;
   outline: none;
   transition: color 120ms ease, background-color 120ms ease;
@@ -666,7 +666,7 @@
   align-items: center;
   gap: 6px;
   color: #778196;
-  font-size: 10px;
+  font-size: 16px;
   white-space: nowrap;
 }
 
@@ -729,7 +729,7 @@
   color: #414650;
   background: #f0f1f4;
   border-radius: 12px;
-  font-size: 9px;
+  font-size: 16px;
   font-weight: 690;
   white-space: nowrap;
 }
@@ -751,7 +751,7 @@
   align-items: center;
   gap: 6px;
   color: #64738c;
-  font-size: 10px;
+  font-size: 16px;
   font-weight: 590;
   white-space: nowrap;
 }
@@ -774,7 +774,7 @@
 .intake-card h3 {
   margin: 12px 0 4px;
   color: #353943;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 680;
   letter-spacing: -0.01em;
 }
@@ -784,7 +784,7 @@
   overflow: hidden;
   margin: 0;
   color: #6f7d96;
-  font-size: 11px;
+  font-size: 16px;
   line-height: 1.55;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -803,7 +803,7 @@
   flex-wrap: wrap;
   gap: 10px;
   color: #8190a8;
-  font-size: 10px;
+  font-size: 16px;
 }
 
 .intake-timing > span {
@@ -833,7 +833,7 @@
   border: 0;
   border-radius: 18px;
   cursor: pointer;
-  font-size: 10px !important;
+  font-size: 16px !important;
   font-weight: 670;
   transition: filter 150ms ease, transform 150ms ease;
 }
@@ -858,7 +858,7 @@
 .sample-note {
   margin-top: 12px;
   color: #8490a2;
-  font-size: 10px;
+  font-size: 16px;
   line-height: 1.5;
 }
 
@@ -888,14 +888,14 @@
 
 .empty-queue h3 {
   margin: 13px 0 5px;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .empty-queue p {
   max-width: 35ch;
   margin: 0;
   color: #778196;
-  font-size: 11px;
+  font-size: 16px;
   line-height: 1.6;
 }
 
@@ -907,7 +907,7 @@
   border: 1px solid #d9e4ff;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 11px !important;
+  font-size: 16px !important;
   font-weight: 620;
 }
 
@@ -937,7 +937,7 @@
 .rail-panel-heading h2 {
   margin: 0;
   color: #383c44;
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 700;
 }
 
@@ -946,7 +946,7 @@
   align-items: center;
   gap: 5px;
   color: #7f8ba0;
-  font-size: 8px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.06em;
 }
@@ -986,7 +986,7 @@
 
 .stat-tile span {
   color: #697991;
-  font-size: 8px;
+  font-size: 16px;
   font-weight: 650;
   letter-spacing: 0.025em;
   text-transform: uppercase;
@@ -998,7 +998,7 @@
   background: transparent;
   border: 0;
   cursor: pointer;
-  font-size: 10px !important;
+  font-size: 16px !important;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -1044,7 +1044,7 @@
 .schedule-item > div strong {
   overflow: hidden;
   color: #3b3f47;
-  font-size: 10px;
+  font-size: 16px;
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1052,7 +1052,7 @@
 
 .schedule-item time span {
   color: #8491a6;
-  font-size: 9px;
+  font-size: 16px;
   text-transform: uppercase;
 }
 
@@ -1066,7 +1066,7 @@
 .schedule-item > div span {
   overflow: hidden;
   color: #71809a;
-  font-size: 9px;
+  font-size: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1116,7 +1116,7 @@
 .message-meta strong {
   overflow: hidden;
   color: #40434a;
-  font-size: 10px;
+  font-size: 16px;
   font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1125,14 +1125,14 @@
 .message-meta time {
   flex: 0 0 auto;
   color: #8c99ae;
-  font-size: 9px;
+  font-size: 16px;
 }
 
 .message-preview {
   display: -webkit-box;
   overflow: hidden;
   color: #75829a;
-  font-size: 10px;
+  font-size: 16px;
   line-height: 1.45;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 1;
@@ -1154,7 +1154,7 @@
   border: 1px solid #3d4656;
   border-radius: 9px;
   box-shadow: 0 10px 28px rgb(19 27 41 / 24%);
-  font-size: 11px;
+  font-size: 16px;
   animation: toast-in 260ms cubic-bezier(.16, 1, .3, 1) both;
 }
 
@@ -1180,7 +1180,7 @@
   background: transparent;
   border: 0;
   cursor: pointer;
-  font-size: 11px !important;
+  font-size: 16px !important;
   font-weight: 700;
 }
 
@@ -1415,7 +1415,7 @@
   }
 
   .global-search input {
-    font-size: 11px !important;
+    font-size: 16px !important;
   }
 
   .global-search kbd {
@@ -1462,7 +1462,7 @@
     min-height: 35px;
     gap: 5px;
     padding: 0 10px;
-    font-size: 10px !important;
+    font-size: 16px !important;
   }
 
   .new-intake-button > span {
@@ -1490,7 +1490,7 @@
   .filter-trigger {
     padding-right: 11px;
     padding-left: 11px;
-    font-size: 9px !important;
+    font-size: 16px !important;
   }
 
   .results-count {
@@ -1513,23 +1513,23 @@
   .domain-tag {
     min-height: 21px;
     padding: 0 7px;
-    font-size: 8px;
+    font-size: 16px;
   }
 
   .risk-label {
     gap: 4px;
     padding-top: 5px;
-    font-size: 9px;
+    font-size: 16px;
   }
 
   .intake-card h3 {
     margin-top: 10px;
-    font-size: 12px;
+    font-size: 16px;
     line-height: 1.45;
   }
 
   .intake-summary {
-    font-size: 10px;
+    font-size: 16px;
   }
 
   .intake-card-footer {
@@ -1541,7 +1541,7 @@
 
   .intake-timing {
     gap: 8px;
-    font-size: 9px;
+    font-size: 16px;
   }
 
   .decision-actions {

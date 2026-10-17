@@ -41,7 +41,7 @@
 .conversation-panel-heading h2 {
   margin: 0;
   color: var(--heading);
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 700;
 }
 
@@ -73,7 +73,7 @@
   background: transparent;
   border: 0;
   outline: 0;
-  font-size: 12px !important;
+  font-size: 16px !important;
 }
 
 .conversation-search input::placeholder {
@@ -139,7 +139,7 @@
 .conversation-item-top strong {
   overflow: hidden;
   color: var(--heading);
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 680;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -148,7 +148,7 @@
 .conversation-item-top time {
   flex: 0 0 auto;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 16px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -160,7 +160,7 @@
   display: -webkit-box;
   overflow: hidden;
   color: #59677d;
-  font-size: 11px;
+  font-size: 16px;
   line-height: 1.4;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 1;
@@ -180,7 +180,7 @@
 
 .conversation-empty p {
   margin: 0;
-  font-size: 12px;
+  font-size: 16px;
   line-height: 1.5;
 }
 
@@ -208,7 +208,7 @@
   overflow: hidden;
   margin: 0;
   color: var(--heading);
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -218,7 +218,7 @@
   overflow: hidden;
   margin: 3px 0 0;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -226,7 +226,7 @@
 .thread-retention {
   flex: 0 0 auto;
   color: #657188;
-  font-size: 10px;
+  font-size: 16px;
 }
 
 .messages-icon-button.thread-back-button {
@@ -276,7 +276,7 @@
 
 .thread-message-bubble > p {
   margin: 0;
-  font-size: 12px;
+  font-size: 16px;
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
@@ -288,7 +288,7 @@
   gap: 3px;
   margin-top: 5px;
   color: #91a0b5;
-  font-size: 9px;
+  font-size: 16px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -303,7 +303,7 @@
   color: var(--muted);
   background: var(--surface-subtle);
   border-radius: var(--radius-control);
-  font-size: 11px;
+  font-size: 16px;
 }
 
 .thread-empty {
@@ -330,7 +330,7 @@
 .thread-empty h2 {
   margin: 13px 0 0;
   color: var(--heading);
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 700;
 }
 
@@ -338,7 +338,7 @@
   max-width: 270px;
   margin: 6px 0 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 16px;
   line-height: 1.5;
 }
 
@@ -350,7 +350,7 @@
   border: 1px solid #dce7ff;
   border-radius: var(--radius-control);
   cursor: pointer;
-  font-size: 12px !important;
+  font-size: 16px !important;
   font-weight: 650;
 }
 
@@ -409,7 +409,7 @@
   background: transparent;
   border: 0;
   outline: 0;
-  font-size: 12px !important;
+  font-size: 16px !important;
 }
 
 .composer-input-wrap input::placeholder {
@@ -452,7 +452,7 @@
 .composer-hint {
   margin: 6px 0 0;
   color: #91a0b5;
-  font-size: 9px;
+  font-size: 16px;
   line-height: 1.4;
   text-align: center;
 }
@@ -514,11 +514,11 @@
   }
 
   .thread-contact h2 {
-    font-size: 12px;
+    font-size: 16px;
   }
 
   .thread-retention {
-    font-size: 9px;
+    font-size: 16px;
   }
 
   .thread-messages {
@@ -530,7 +530,7 @@
   }
 
   .composer-hint {
-    font-size: 9px;
+    font-size: 16px;
   }
 }
 

@@ -17,7 +17,7 @@
 .document-page-heading p {
   margin: 5px 0 0;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 16px;
 }
 
 .document-page-actions {
@@ -32,7 +32,7 @@
   gap: 6px;
   margin-right: 3px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 16px;
   white-space: nowrap;
 }
 
@@ -53,7 +53,7 @@
 .document-review-trigger {
   min-height: 36px;
   padding: 0 11px;
-  font-size: 10px !important;
+  font-size: 16px !important;
 }
 
 .document-secondary-action {
@@ -92,7 +92,7 @@
   color: var(--muted);
   background: var(--surface);
   border-bottom: 1px solid var(--line-soft);
-  font-size: 10px;
+  font-size: 16px;
 }
 
 .document-breadcrumb {
@@ -112,7 +112,7 @@
 .document-demo-tag {
   flex: 0 0 auto;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 16px;
   white-space: nowrap;
 }
 
@@ -128,7 +128,7 @@
 
 .document-context-title strong {
   overflow: hidden;
-  font-size: 11px;
+  font-size: 16px;
   font-weight: 670;
   text-overflow: ellipsis;
 }
@@ -136,7 +136,7 @@
 .document-context-title > span {
   flex: 0 0 auto;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 16px;
   font-style: italic;
 }
 
@@ -183,7 +183,7 @@
 .document-reference-heading h2 {
   margin: 0;
   color: var(--heading);
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 680;
 }
 
@@ -216,7 +216,7 @@
   background: transparent;
   border: 0;
   cursor: pointer;
-  font-size: 10px !important;
+  font-size: 16px !important;
   font-weight: 600;
 }
 
@@ -278,7 +278,7 @@
   border: 0;
   border-radius: var(--radius-control);
   cursor: pointer;
-  font-size: 9px !important;
+  font-size: 16px !important;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -319,14 +319,14 @@
   color: var(--blue-ink);
   background: var(--blue-pale);
   border-radius: var(--radius-small);
-  font-size: 9px;
+  font-size: 16px;
   font-weight: 620;
   line-height: 1.3;
 }
 
 .matter-reference-id {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 16px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -346,14 +346,14 @@
 
 .matter-parties dt {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 16px;
   line-height: 1.45;
 }
 
 .matter-parties dd {
   margin: 0;
   color: var(--ink);
-  font-size: 9px;
+  font-size: 16px;
   font-weight: 570;
   line-height: 1.45;
   text-align: right;
@@ -381,13 +381,13 @@
 
 .matter-facts span {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 16px;
 }
 
 .matter-facts strong {
   overflow: hidden;
   color: var(--heading);
-  font-size: 11px;
+  font-size: 16px;
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -404,7 +404,7 @@
 .claim-calculation h3 {
   margin: 0 0 8px;
   color: var(--heading);
-  font-size: 11px;
+  font-size: 16px;
   font-weight: 680;
 }
 
@@ -424,7 +424,7 @@
 
 .claim-calculation dt {
   color: var(--body-ink);
-  font-size: 9px;
+  font-size: 16px;
   line-height: 1.35;
 }
 
@@ -432,7 +432,7 @@
   flex: 0 0 auto;
   margin: 0;
   color: var(--heading);
-  font-size: 9px;
+  font-size: 16px;
   font-weight: 680;
   font-variant-numeric: tabular-nums;
 }
@@ -445,13 +445,13 @@
 
 .claim-total dt {
   color: var(--blue-ink);
-  font-size: 10px;
+  font-size: 16px;
   font-weight: 650;
 }
 
 .claim-total dd {
   color: var(--blue-ink);
-  font-size: 12px;
+  font-size: 16px;
 }
 
 .claim-calculation > button {
@@ -468,7 +468,7 @@
   border: 0;
   border-radius: var(--radius-filter);
   cursor: pointer;
-  font-size: 9px !important;
+  font-size: 16px !important;
   font-weight: 620;
 }
 
@@ -492,7 +492,7 @@
   min-width: 0;
   margin: 0;
   color: #58677e;
-  font-size: 9px;
+  font-size: 16px;
   font-weight: 650;
   letter-spacing: 0.025em;
   text-transform: uppercase;
@@ -536,7 +536,7 @@
   color: var(--urgent-ink);
   background: #ffe8e9;
   border-radius: 4px;
-  font-size: 8px;
+  font-size: 16px;
   font-weight: 720;
 }
 
@@ -558,7 +558,7 @@
 .exhibit-file-copy strong {
   overflow: hidden;
   color: var(--ink);
-  font-size: 9px;
+  font-size: 16px;
   font-weight: 570;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -567,7 +567,7 @@
 .exhibit-file-copy small {
   overflow: hidden;
   color: var(--muted);
-  font-size: 8px;
+  font-size: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -595,7 +595,7 @@
 .exhibit-empty {
   margin: 7px 0;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 16px;
   line-height: 1.5;
 }
 
@@ -616,27 +616,27 @@
 
 .client-statement strong {
   color: var(--heading);
-  font-size: 9px;
+  font-size: 16px;
   font-weight: 650;
 }
 
 .client-statement > div span,
 .client-statement time {
   color: var(--muted);
-  font-size: 8px;
+  font-size: 16px;
 }
 
 .client-statement p {
   margin: 7px 0 4px;
   color: var(--ink);
-  font-size: 10px;
+  font-size: 16px;
   line-height: 1.45;
 }
 
 .document-reference-note {
   margin: 11px 0 0;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 16px;
   line-height: 1.45;
 }
 
@@ -742,7 +742,7 @@
   color: var(--ink);
   background: #f1f4f9;
   border-radius: var(--radius-chip) var(--radius-chip) var(--radius-chip) 4px;
-  font-size: 10px;
+  font-size: 16px;
   line-height: 1.55;
   overflow-wrap: anywhere;
 }
@@ -813,7 +813,7 @@
   border: 1px solid #dce7ff;
   border-radius: var(--radius-chip);
   cursor: pointer;
-  font-size: 9px;
+  font-size: 16px;
   font-weight: 560;
 }
 
@@ -848,7 +848,7 @@
   background: transparent;
   border: 0;
   font: inherit;
-  font-size: 10px;
+  font-size: 16px;
   line-height: 1.45;
   outline: 0;
 }
@@ -890,7 +890,7 @@
 .batasbot-disclaimer {
   margin: 7px 2px 0;
   color: var(--muted);
-  font-size: 8px;
+  font-size: 16px;
   line-height: 1.4;
   text-align: center;
 }
@@ -930,7 +930,7 @@
   overflow: hidden;
   margin: 0;
   color: var(--heading);
-  font-size: 10px;
+  font-size: 16px;
   font-weight: 680;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -940,7 +940,7 @@
   display: block;
   margin-top: 2px;
   color: var(--muted);
-  font-size: 8px;
+  font-size: 16px;
 }
 
 .draft-only-badge {
@@ -949,7 +949,7 @@
   color: var(--muted);
   background: var(--surface-subtle);
   border-radius: var(--radius-chip);
-  font-size: 8px;
+  font-size: 16px;
   font-weight: 580;
 }
 
@@ -978,7 +978,7 @@
   background: transparent;
   border: 0;
   cursor: pointer;
-  font-size: 9px !important;
+  font-size: 16px !important;
   font-weight: 560;
   white-space: nowrap;
 }
@@ -1029,7 +1029,7 @@
   border: 1px solid transparent;
   border-radius: var(--radius-small);
   cursor: pointer;
-  font-size: 9px !important;
+  font-size: 16px !important;
   font-weight: 550;
   white-space: nowrap;
 }
@@ -1074,7 +1074,7 @@
   background: transparent;
   border: 0;
   cursor: pointer;
-  font-size: 9px !important;
+  font-size: 16px !important;
 }
 
 .editor-select-wrap > svg {
@@ -1110,7 +1110,7 @@
   border: 1px solid #d9e0e9;
   box-shadow: 0 2px 7px rgb(29 40 60 / 5%);
   font-family: serif;
-  font-size: 12px;
+  font-size: 16px;
   line-height: 1.65;
   outline: 0;
 }
@@ -1136,7 +1136,7 @@
 
 .document-paper .legal-office {
   font-family: sans-serif;
-  font-size: 10px;
+  font-size: 16px;
 }
 
 .document-paper .legal-parties {
@@ -1158,7 +1158,7 @@
   min-width: 125px;
   color: var(--heading);
   font-family: sans-serif;
-  font-size: 10px;
+  font-size: 16px;
   line-height: 1.8;
   text-align: right;
 }
@@ -1173,7 +1173,7 @@
 .document-paper h2 {
   margin: 0 auto 18px;
   max-width: 34ch;
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.5;
   text-align: center;
   text-decoration: underline;
@@ -1182,7 +1182,7 @@
 
 .document-paper h3 {
   margin: 18px 0 7px;
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 700;
 }
 
@@ -1213,7 +1213,7 @@
   color: var(--muted);
   border-top: 1px solid #d6dbe3;
   font-family: sans-serif;
-  font-size: 8px;
+  font-size: 16px;
   line-height: 1.5;
 }
 
@@ -1230,7 +1230,7 @@
   color: var(--muted);
   background: var(--surface);
   border-top: 1px solid var(--line-soft);
-  font-size: 8px;
+  font-size: 16px;
 }
 
 .document-editor-footer > span:first-child {
@@ -1277,13 +1277,13 @@
 
 .document-review-dialog-header h2 {
   margin: 0;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 720;
 }
 
 .document-review-dialog-header p {
   margin: 5px 0 0;
-  font-size: 10px;
+  font-size: 16px;
   line-height: 1.45;
 }
 
@@ -1305,7 +1305,7 @@
   color: #46546a;
   background: var(--surface-subtle);
   border-bottom: 1px solid var(--line-soft);
-  font-size: 9px;
+  font-size: 16px;
 }
 
 .document-review-context > span + span {
@@ -1322,7 +1322,7 @@
 .document-review-checklist h3 {
   margin: 0 0 2px;
   color: #58677e;
-  font-size: 9px;
+  font-size: 16px;
   font-weight: 680;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1353,13 +1353,13 @@
 
 .document-review-check strong {
   color: var(--heading);
-  font-size: 10px;
+  font-size: 16px;
   font-weight: 650;
 }
 
 .document-review-check small {
   color: var(--body-ink);
-  font-size: 9px;
+  font-size: 16px;
   line-height: 1.45;
 }
 
@@ -1377,7 +1377,7 @@
   min-height: 36px;
   gap: 6px;
   padding: 0 13px;
-  font-size: 10px !important;
+  font-size: 16px !important;
 }
 
 .document-export-button:disabled {
@@ -1401,7 +1401,7 @@
   border: 1px solid rgb(255 255 255 / 14%);
   border-radius: var(--radius-control);
   box-shadow: 0 10px 28px rgb(19 27 41 / 24%);
-  font-size: 10px;
+  font-size: 16px;
   animation: toast-in 180ms ease-out both;
 }
 
@@ -1472,7 +1472,7 @@
     border: 0;
     border-radius: var(--radius-filter);
     cursor: pointer;
-    font-size: 10px !important;
+    font-size: 16px !important;
     font-weight: 600;
   }
 
@@ -1541,7 +1541,7 @@
 
   .document-page-heading p {
     max-width: 26ch;
-    font-size: 9px;
+    font-size: 16px;
     line-height: 1.4;
   }
 
@@ -1559,7 +1559,7 @@
   .document-review-trigger {
     min-height: 33px;
     padding: 0 8px;
-    font-size: 9px !important;
+    font-size: 16px !important;
   }
 
   .document-contextline {
@@ -1572,7 +1572,7 @@
   .document-breadcrumb {
     grid-column: 1 / -1;
     gap: 5px;
-    font-size: 8px;
+    font-size: 16px;
   }
 
   .document-context-title {
@@ -1580,12 +1580,12 @@
   }
 
   .document-context-title strong {
-    font-size: 9px;
+    font-size: 16px;
   }
 
   .document-context-title > span,
   .document-contextline > .document-save-state {
-    font-size: 8px;
+    font-size: 16px;
   }
 
   .document-reference {
@@ -1602,11 +1602,11 @@
   }
 
   .document-name h2 {
-    font-size: 9px;
+    font-size: 16px;
   }
 
   .draft-only-badge {
-    font-size: 8px;
+    font-size: 16px;
   }
 
   .editor-tabs {
@@ -1616,7 +1616,7 @@
 
   .editor-tab {
     padding: 0 8px;
-    font-size: 8px !important;
+    font-size: 16px !important;
   }
 
   .editor-toolbar {
@@ -1632,7 +1632,7 @@
   .document-paper {
     min-height: 700px;
     padding: 30px 24px 38px;
-    font-size: 10px;
+    font-size: 16px;
     line-height: 1.55;
   }
 
@@ -1641,24 +1641,24 @@
   }
 
   .document-paper .legal-office {
-    font-size: 8px;
+    font-size: 16px;
   }
 
   .document-paper .legal-docket {
     min-width: 90px;
-    font-size: 8px;
+    font-size: 16px;
   }
 
   .document-paper h2 {
-    font-size: 11px;
+    font-size: 16px;
   }
 
   .document-paper h3 {
-    font-size: 10px;
+    font-size: 16px;
   }
 
   .document-editor-footer {
-    font-size: 8px;
+    font-size: 16px;
   }
 
   .document-review-scrim {
@@ -1676,16 +1676,16 @@
   }
 
   .document-review-dialog-header h2 {
-    font-size: 13px;
+    font-size: 16px;
   }
 
   .document-review-dialog-header p {
-    font-size: 9px;
+    font-size: 16px;
   }
 
   .document-review-context {
     padding: 9px 13px;
-    font-size: 8px;
+    font-size: 16px;
   }
 
   .document-review-checklist {
