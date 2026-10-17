@@ -4,6 +4,7 @@ import {
   AlignCenter,
   AlignLeft,
   AlignRight,
+  ArrowLeft,
   Bold,
   Bot,
   Check,
@@ -25,6 +26,10 @@ import {
 } from "lucide-react";
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useTypingStream } from "@/hooks/use-typing-stream";
+import DocumentTemplatePicker, {
+  type DocumentTemplate,
+  sanitizeTemplateMarkup,
+} from "./document-template-picker";
 import WorkspaceShell from "../workspace/workspace-shell";
 import "./document-assembly-workspace.css";
 
@@ -106,6 +111,54 @@ const INITIAL_DRAFT = `
 <p class="legal-disclaimer">DEMO DRAFT · Verify all facts and legal authorities before use. This sample is not legal advice and is not connected to a live client matter.</p>
 `;
 
+const BUILT_IN_TEMPLATES: DocumentTemplate[] = [
+  {
+    id: "position-paper",
+    name: DOCUMENT_TITLE,
+    category: "Pleadings",
+    description: "A structured SENA position paper with facts, claims, and a verification-ready signature block.",
+    html: INITIAL_DRAFT,
+    previewTheme: "blue",
+    source: "library",
+  },
+  {
+    id: "demand-letter",
+    name: "Demand letter",
+    category: "Correspondence",
+    description: "Formal client correspondence with a clear issue summary and requested action.",
+    html: `<div class="legal-letterhead"><p>ATTORNEY AT LAW</p><p>MAKATI CITY · PHILIPPINES</p></div><p>September 17, 2024</p><p><strong>VIA REGISTERED MAIL</strong></p><p>To: [Recipient name]<br>[Recipient address]</p><p>Re: <strong>[Matter or subject]</strong></p><p>Dear [Recipient name]:</p><p>We represent [Client name] regarding [brief description of matter]. This letter summarizes the requested resolution and the records supporting our client's position.</p><h2>REQUESTED ACTION</h2><p>Please provide a written response by [date] addressing the matters described above. Our client reserves all rights and remedies available under applicable law.</p><p>Sincerely,</p><p><strong>[Attorney name]</strong><br>Counsel for [Client name]</p>`,
+    previewTheme: "red",
+    source: "library",
+  },
+  {
+    id: "legal-memorandum",
+    name: "Legal memorandum",
+    category: "Research",
+    description: "An issue, rule, analysis, and conclusion structure for internal legal research.",
+    html: `<div class="legal-letterhead"><p>CONFIDENTIAL · ATTORNEY WORK PRODUCT</p></div><h1>LEGAL MEMORANDUM</h1><p><strong>To:</strong> [Supervising attorney]<br><strong>From:</strong> [Researching attorney]<br><strong>Date:</strong> [Date]<br><strong>Re:</strong> [Question presented]</p><hr><h2>QUESTION PRESENTED</h2><p>[State the legal issue to be resolved.]</p><h2>BRIEF ANSWER</h2><p>[Summarize the likely answer and the principal qualification.]</p><h2>FACTS</h2><p>[Set out material facts and identify any facts requiring confirmation.]</p><h2>ANALYSIS</h2><p>[Explain the applicable rule, analyze the relevant facts, and identify uncertainties.]</p><h2>CONCLUSION</h2><p>[State the recommended next step.]</p>`,
+    previewTheme: "gray",
+    source: "library",
+  },
+  {
+    id: "client-consultation",
+    name: "Client consultation notes",
+    category: "Client notes",
+    description: "An organized meeting record for key facts, client goals, and follow-up items.",
+    html: `<h1>CLIENT CONSULTATION NOTES</h1><p><strong>Client:</strong> [Client name]<br><strong>Date and time:</strong> [Date]<br><strong>Attendees:</strong> [Attendees]<br><strong>Matter:</strong> [Matter type]</p><h2>CLIENT'S OBJECTIVES</h2><p>[Record the client's stated goals in their own words where appropriate.]</p><h2>RELEVANT FACTS</h2><ol><li>[Fact and source]</li><li>[Fact and source]</li><li>[Fact to confirm]</li></ol><h2>DOCUMENTS TO REQUEST</h2><ul><li>[Document]</li><li>[Document]</li></ul><h2>NEXT STEPS</h2><p>[Action] · [Owner] · [Due date]</p><p><em>Confidential working notes. Verify all details against the matter record.</em></p>`,
+    previewTheme: "green",
+    source: "library",
+  },
+  {
+    id: "blank-document",
+    name: "Blank document",
+    category: "Client notes",
+    description: "A clean page with formal legal-document typography, ready for your own structure.",
+    html: "<p><br></p>",
+    previewTheme: "plain",
+    source: "library",
+  },
+];
+
 function formatBytes(size: number) {
   if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`;
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
@@ -126,6 +179,10 @@ function escapeHtml(value: string) {
 
 export default function DocumentAssemblyWorkspace() {
   const [search, setSearch] = useState("");
+  const [workspaceStep, setWorkspaceStep] = useState<"templates" | "editor">("templates");
+  const [currentDocumentTitle, setCurrentDocumentTitle] = useState(DOCUMENT_TITLE);
+  const [draftHtml, setDraftHtml] = useState(INITIAL_DRAFT);
+  const [draftFontFamily, setDraftFontFamily] = useState("Georgia");
   const [attachments, setAttachments] = useState(DEFAULT_ATTACHMENTS);
   const [activeTab, setActiveTab] = useState<EditorTab>("Home");
   const [summaryExpanded, setSummaryExpanded] = useState(true);
@@ -261,8 +318,8 @@ export default function DocumentAssemblyWorkspace() {
   };
 
   const exportDraft = () => {
-    const text = editorRef.current?.innerText ?? "";
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(DOCUMENT_TITLE)}</title></head><body><article style="max-width:720px;margin:40px auto;font:16px Georgia,serif;line-height:1.65;white-space:pre-wrap">${escapeHtml(text)}</article></body></html>`;
+    const content = sanitizeTemplateMarkup(editorRef.current?.innerHTML ?? draftHtml);
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(currentDocumentTitle)}</title></head><body><article style="max-width:720px;margin:40px auto;font:16px '${escapeHtml(draftFontFamily)}',serif;line-height:1.65;white-space:pre-wrap">${content}</article></body></html>`;
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -279,6 +336,21 @@ export default function DocumentAssemblyWorkspace() {
     reviewTriggerRef.current?.focus();
   };
 
+  const chooseTemplate = (template: DocumentTemplate) => {
+    setCurrentDocumentTitle(template.name);
+    setDraftHtml(template.html);
+    setDraftFontFamily(template.analysis?.fontFamily ?? "Georgia");
+    setIsDirty(false);
+    setSavedLabel("Draft only");
+    setReviewChecks({ facts: false, law: false, privacy: false });
+    setWorkspaceStep("editor");
+  };
+
+  const returnToTemplates = () => {
+    if (editorRef.current) setDraftHtml(editorRef.current.innerHTML);
+    setWorkspaceStep("templates");
+  };
+
   const allChecksComplete = REVIEW_CHECKS.every(({ id }) => reviewChecks[id]);
 
   return (
@@ -291,13 +363,19 @@ export default function DocumentAssemblyWorkspace() {
       searchLabel="Search this matter's documents"
       compactNavigation
     >
-      <main className="document-assembly">
+      <main className={`document-assembly${workspaceStep === "templates" ? " document-assembly--template-picker" : ""}`}>
+        <div className="document-template-stage" hidden={workspaceStep !== "templates"}>
+          <DocumentTemplatePicker templates={BUILT_IN_TEMPLATES} onSelect={chooseTemplate} />
+        </div>
+
+        <div className="document-editor-stage" hidden={workspaceStep !== "editor"}>
         <div className="document-contextline">
           <div className="document-breadcrumb" aria-label="Document location">
-            <span>Matters</span><span aria-hidden="true">/</span><strong>{MATTER_ID}</strong><span aria-hidden="true">/</span><span>SENA Request &amp; Position Paper</span>
+            <button className="document-template-back" type="button" onClick={returnToTemplates}><ArrowLeft aria-hidden="true" size={16} /> Templates</button>
+            <span aria-hidden="true">/</span><strong>{MATTER_ID}</strong>
           </div>
           <div className="document-context-title">
-            <strong>{DOCUMENT_TITLE}</strong>
+            <strong>{currentDocumentTitle}</strong>
             <span>(Draft Only)</span>
           </div>
         </div>
@@ -515,7 +593,7 @@ export default function DocumentAssemblyWorkspace() {
             <header className="document-editor-heading">
               <div className="document-file-icon"><FileText aria-hidden="true" size={17} /></div>
               <div className="document-name">
-                <h2>{DOCUMENT_TITLE}</h2>
+                <h2>{currentDocumentTitle}</h2>
                 <span>{MATTER_ID}</span>
               </div>
               <span className="draft-only-badge">Draft only</span>
@@ -613,6 +691,7 @@ export default function DocumentAssemblyWorkspace() {
               <article
                 ref={editorRef}
                 className={`document-paper${pageWide ? " document-paper--wide" : ""}`}
+                style={{ fontFamily: draftFontFamily }}
                 contentEditable
                 suppressContentEditableWarning
                 role="textbox"
@@ -622,7 +701,7 @@ export default function DocumentAssemblyWorkspace() {
                 onInput={(event) => {
                   markDirty();
                 }}
-                dangerouslySetInnerHTML={{ __html: INITIAL_DRAFT }}
+                dangerouslySetInnerHTML={{ __html: draftHtml }}
               />
             </div>
             <footer className="document-editor-footer">
@@ -654,7 +733,7 @@ export default function DocumentAssemblyWorkspace() {
                 }}><X size={18} /></button>
               </header>
               <div className="document-review-context">
-                <span>{DOCUMENT_TITLE}</span><span>Matter: <strong>{MATTER_ID}</strong></span>
+                <span>{currentDocumentTitle}</span><span>Matter: <strong>{MATTER_ID}</strong></span>
               </div>
               <div className="document-review-checklist">
                 <h3>Required checklist</h3>
@@ -683,6 +762,7 @@ export default function DocumentAssemblyWorkspace() {
             </section>
           </div>
         )}
+        </div>
 
         {toast && (
           <div className="document-toast" role="status">
