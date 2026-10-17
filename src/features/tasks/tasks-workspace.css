@@ -237,9 +237,9 @@
 .task-table-heading,
 .task-row {
   display: grid;
-  grid-template-columns: minmax(230px, 1fr) minmax(100px, 0.3fr) minmax(130px, 0.36fr) minmax(95px, 0.25fr);
+  grid-template-columns: minmax(230px, 1fr) minmax(90px, 0.24fr) minmax(120px, 0.32fr) minmax(95px, 0.25fr) 32px;
   align-items: center;
-  column-gap: 18px;
+  column-gap: 14px;
   padding-right: 18px;
   padding-left: 18px;
 }
@@ -279,24 +279,29 @@
   background: #fbfcfd;
 }
 
-.task-completion {
+.task-main {
+  display: flex;
+  min-width: 0;
   grid-column: 1;
   grid-row: 1;
-  width: 16px;
-  height: 16px;
-  margin: 0;
-  accent-color: #4b78ff;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.task-completion {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  margin: 1px 0 0;
+  accent-color: var(--blue);
   cursor: pointer;
 }
 
 .task-description {
   display: flex;
   min-width: 0;
-  grid-column: 1;
-  grid-row: 1;
   flex-direction: column;
   gap: 4px;
-  padding-left: 28px;
 }
 
 .task-description strong {
@@ -368,6 +373,29 @@
 
 .task-status--completed {
   color: var(--blue-ink);
+}
+
+.task-delete-button {
+  display: inline-grid;
+  width: 30px;
+  height: 30px;
+  grid-column: 5;
+  grid-row: 1;
+  place-items: center;
+  color: var(--muted) !important;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  transition: color 130ms ease, background-color 130ms ease, border-color 130ms ease;
+}
+
+.task-delete-button:hover {
+  color: var(--urgent-ink) !important;
+}
+
+.task-delete-button:focus-visible {
+  color: var(--urgent-ink) !important;
 }
 
 .task-row--completed .task-description strong {
@@ -537,23 +565,25 @@
 
   .task-row {
     min-height: 96px;
-    grid-template-columns: 20px minmax(0, 1fr) 66px;
+    grid-template-columns: minmax(0, 1fr) 64px 28px;
     align-content: center;
-    gap: 7px 10px;
+    gap: 7px 8px;
     padding: 13px 11px 12px;
   }
 
-  .task-completion {
+  .task-main {
     grid-column: 1;
     grid-row: 1;
-    align-self: start;
-    margin-top: 2px;
+    gap: 10px;
+  }
+
+  .task-completion {
+    margin-top: 1px;
   }
 
   .task-description {
-    grid-column: 2;
-    grid-row: 1;
-    padding-left: 0;
+    grid-column: auto;
+    grid-row: auto;
   }
 
   .task-description strong {
@@ -565,12 +595,12 @@
   }
 
   .task-priority {
-    grid-column: 2;
+    grid-column: 1;
     grid-row: 2;
   }
 
   .task-due-date {
-    grid-column: 3;
+    grid-column: 2;
     grid-row: 2;
     justify-self: end;
     font-size: 9px;
@@ -578,15 +608,19 @@
   }
 
   .task-status {
-    grid-column: 3;
+    grid-column: 2;
     grid-row: 1;
     justify-self: end;
     gap: 3px;
     font-size: 9px;
   }
 
-  .task-row--completed .task-description {
-    padding-right: 0;
+  .task-delete-button {
+    width: 28px;
+    height: 28px;
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: end;
   }
 
   .task-empty-state {

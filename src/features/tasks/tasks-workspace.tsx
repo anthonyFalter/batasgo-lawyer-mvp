@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown, Plus, RotateCcw, X } from "lucide-react";
+import { Check, ChevronDown, Plus, RotateCcw, Trash2, X } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import WorkspaceShell from "../workspace/workspace-shell";
 import "./tasks-workspace.css";
@@ -195,6 +195,11 @@ export default function TasksWorkspace() {
     setAnnouncement(`${task.title} marked ${completed ? "complete" : "open"}.`);
   };
 
+  const deleteTask = (task: Task) => {
+    setTasks((current) => current.filter((item) => item.id !== task.id));
+    setAnnouncement(`${task.title} deleted.`);
+  };
+
   const resetDraft = () => {
     setDraftTitle("");
     setDraftMatter("");
@@ -354,6 +359,7 @@ export default function TasksWorkspace() {
             <span>Priority</span>
             <span>Due date</span>
             <span>Status</span>
+            <span>Actions</span>
           </div>
 
           {visibleTasks.length > 0 ? (
@@ -363,16 +369,18 @@ export default function TasksWorkspace() {
                 const overdue = !task.completed && offset < 0;
                 return (
                   <li className={`task-row${task.completed ? " task-row--completed" : ""}`} key={task.id}>
-                    <input
-                      className="task-completion"
-                      type="checkbox"
-                      checked={task.completed}
-                      onChange={() => toggleTask(task)}
-                      aria-label={`${task.completed ? "Reopen" : "Mark"} task: ${task.title}`}
-                    />
-                    <div className="task-description">
-                      <strong>{task.title}</strong>
-                      <span>{task.matter || "No matter linked"}</span>
+                    <div className="task-main">
+                      <input
+                        className="task-completion"
+                        type="checkbox"
+                        checked={task.completed}
+                        onChange={() => toggleTask(task)}
+                        aria-label={`${task.completed ? "Reopen" : "Mark"} task: ${task.title}`}
+                      />
+                      <div className="task-description">
+                        <strong>{task.title}</strong>
+                        <span>{task.matter || "No matter linked"}</span>
+                      </div>
                     </div>
                     <span className={`task-priority task-priority--${task.priority}`}>{priorityLabels[task.priority]}</span>
                     <time className={`task-due-date${overdue ? " task-due-date--overdue" : ""}`} dateTime={task.dueDate}>
@@ -381,6 +389,14 @@ export default function TasksWorkspace() {
                     <span className={`task-status${task.completed ? " task-status--completed" : ""}`}>
                       {task.completed ? <><Check aria-hidden="true" size={13} />Complete</> : "Open"}
                     </span>
+                    <button
+                      className="task-delete-button"
+                      type="button"
+                      aria-label={`Delete task: ${task.title}`}
+                      onClick={() => deleteTask(task)}
+                    >
+                      <Trash2 aria-hidden="true" size={15} />
+                    </button>
                   </li>
                 );
               })}

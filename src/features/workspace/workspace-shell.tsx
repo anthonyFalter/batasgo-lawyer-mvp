@@ -18,18 +18,19 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import logo from "../../../assets/batasgo_logo.png";
+import collapsedLogo from "../../../assets/batasgo_collapsed.png";
 import "../triage/triage-dashboard.css";
 
 const navItems = [
   { label: "Case Overview", icon: Inbox, href: "/dashboard" },
-  { label: "Draft Documents", icon: FilePenLine },
+  { label: "Document Assembly", icon: FilePenLine, href: "/documents" },
   { label: "Calendar", icon: CalendarDays, href: "/calendar" },
   { label: "Messages", icon: Mail, href: "/messages" },
   { label: "Tasks", icon: ListChecks, href: "/tasks" },
   { label: "Settings", icon: Settings },
 ];
 
-type WorkspacePage = "Case Overview" | "Calendar" | "Messages" | "Tasks";
+type WorkspacePage = "Case Overview" | "Document Assembly" | "Calendar" | "Messages" | "Tasks";
 type Popover = "notifications" | "profile" | null;
 
 export default function WorkspaceShell({
@@ -40,6 +41,7 @@ export default function WorkspaceShell({
   onUnavailable,
   searchPlaceholder = "Search matters and messages...",
   searchLabel = "Search matters and messages",
+  compactNavigation = false,
 }: {
   activePage: WorkspacePage;
   children: React.ReactNode;
@@ -48,6 +50,7 @@ export default function WorkspaceShell({
   onUnavailable: (label: string) => void;
   searchPlaceholder?: string;
   searchLabel?: string;
+  compactNavigation?: boolean;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [popover, setPopover] = useState<Popover>(null);
@@ -68,7 +71,7 @@ export default function WorkspaceShell({
   const closeSidebar = () => setSidebarOpen(false);
 
   return (
-    <div className="workspace">
+    <div className={`workspace${compactNavigation ? " workspace--compact-navigation" : ""}`}>
       <button
         className={`mobile-scrim${sidebarOpen ? " is-visible" : ""}`}
         aria-label="Close navigation"
@@ -76,8 +79,8 @@ export default function WorkspaceShell({
         tabIndex={sidebarOpen ? 0 : -1}
       />
       <aside className={`sidebar${sidebarOpen ? " sidebar--open" : ""}`}>
-        <Link className="brand" href="/dashboard" aria-label="BatasGO home" onClick={closeSidebar}>
-          <Image src={logo} alt="BatasGO" priority />
+        <Link className="brand" href="/dashboard" aria-label="BatasGO home" onClick={closeSidebar} title="BatasGO">
+          <Image src={compactNavigation ? collapsedLogo : logo} alt="BatasGO" priority />
         </Link>
         <nav className="primary-nav" aria-label="Main navigation">
           {navItems.map(({ label, icon: Icon, href }) => {
@@ -91,6 +94,7 @@ export default function WorkspaceShell({
                 key={label}
                 aria-current={active ? "page" : undefined}
                 onClick={closeSidebar}
+                title={compactNavigation ? label : undefined}
               >
                 <Icon aria-hidden="true" size={18} strokeWidth={2.5} />
                 <span>{label}</span>
@@ -100,6 +104,7 @@ export default function WorkspaceShell({
                 className={className}
                 key={label}
                 type="button"
+                title={compactNavigation ? label : undefined}
                 onClick={() => {
                   closeSidebar();
                   onUnavailable(label);
