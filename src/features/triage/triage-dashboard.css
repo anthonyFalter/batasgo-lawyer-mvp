@@ -1000,7 +1000,8 @@
 }
 
 .intake-id,
-.domain-tag {
+.domain-tag,
+.intake-sample-badge {
   display: inline-flex;
   min-height: 15.41px;
   align-items: center;
@@ -1016,6 +1017,14 @@
 .intake-id {
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.005em;
+}
+
+.intake-sample-badge {
+  color: #705300;
+  background: #fff2c9;
+  font-size: 8.71px;
+  font-weight: 750;
+  letter-spacing: 0.035em;
 }
 
 .domain-tag {
@@ -1067,6 +1076,82 @@
   line-height: 1.55;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+}
+
+.sample-ai-summary {
+  margin-top: 6px;
+  padding: 6px 7px;
+  background: #f6f8ff;
+  border: 1px solid #e2e9ff;
+  border-radius: 5px;
+}
+
+.sample-ai-summary strong {
+  color: #425886;
+  font-size: 9.38px;
+}
+
+.sample-ai-summary p {
+  margin: 3px 0 0;
+  color: #5f6d83;
+  font-size: 9.38px;
+  line-height: 1.5;
+}
+
+.sample-ai-summary small {
+  display: block;
+  margin-top: 3px;
+  color: #7c879a;
+  font-size: 8.71px;
+  line-height: 1.4;
+}
+
+.sample-ai-summary button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  color: #315fca;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 9.38px;
+  font-weight: 650;
+}
+
+.sample-ai-summary button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.intake-load-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  color: #8f3037;
+  background: #fff1f1;
+  border: 1px solid #f1c8ca;
+  border-radius: 5px;
+  font-size: 11px;
+}
+
+.intake-load-error button {
+  padding: 3px 7px;
+  color: inherit;
+  background: #fff;
+  border: 1px solid #e2b1b4;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.intake-loading {
+  margin: 12px 0;
+  color: #64738c;
+  font-size: 11px;
+  text-align: center;
 }
 
 .intake-document-summary {
@@ -1132,6 +1217,11 @@
 .decision-button:hover {
   filter: brightness(0.93);
   transform: translateY(-0.67px);
+}
+
+.decision-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
 }
 
 .decision-button:active {
