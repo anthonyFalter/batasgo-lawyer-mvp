@@ -6,15 +6,19 @@ import {
   Check,
   ChevronDown,
   ClipboardCheck,
+  FileText,
   FilePenLine,
   Sparkles,
+  LoaderCircle,
   Clock3,
   Inbox,
   Mail,
+  Paperclip,
   ShieldAlert,
+  Upload,
   X,
 } from "lucide-react";
-import { type CSSProperties, useEffect, useId, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type FormEvent, useEffect, useId, useMemo, useRef, useState } from "react";
 import WorkspaceShell from "../workspace/workspace-shell";
 
 type Risk = "Critical" | "High" | "Medium";
@@ -28,8 +32,11 @@ type Intake = {
   receivedOrder: number;
   deadline: string;
   deadlineOrder: number;
+  documents?: string[];
+  priorityScore?: number;
 };
 type Decision = { intake: Intake; result: "accepted" | "declined" };
+type IntakeReview = { intake: Intake; summary: string; signals: string[] };
 type DecisionFilter = "all" | Decision["result"];
 type RankedIntake = { intake: Intake; score: number; reasons: string[]; specialtyMatch: boolean };
 const initialIntakes: Intake[] = [
@@ -73,6 +80,70 @@ const initialIntakes: Intake[] = [
 
 const riskRank: Record<Risk, number> = { Critical: 3, High: 2, Medium: 1 };
 const profileSpecialty = "Labor & Employment litigation";
+const specialtyOptions = [
+  "Labor & Employment",
+  "Family Law",
+  "Civil Disputes",
+  "Criminal Defense",
+  "Immigration",
+  "Corporate & Commercial",
+  "Other",
+];
+
+function getRiskFromScore(score: number): Risk {
+  if (score >= 80) return "Critical";
+  if (score >= 60) return "High";
+  return "Medium";
+}
+
+function suggestIntakeDetails(title: string, description: string, documentNames: string[]) {
+  const source = `${title} ${description} ${documentNames.join(" ")}`.toLowerCase();
+  const specialty = /employment|labor|workplace|wage|salary|dismissal|employer/.test(source)
+    ? "Labor & Employment"
+    : /divorce|custody|marriage|family|spouse|inheritance/.test(source)
+      ? "Family Law"
+      : /criminal|arrest|police|prosecution|bail/.test(source)
+        ? "Criminal Defense"
+        : /immigration|visa|deportation|citizenship/.test(source)
+          ? "Immigration"
+          : /contract|company|corporate|business|shareholder/.test(source)
+            ? "Corporate & Commercial"
+            : "Civil Disputes";
+  const topic = /passport|withheld/.test(source)
+    ? "passport withholding"
+    : /wage|salary|compensation|unpaid/.test(source)
+      ? "unpaid compensation"
+      : /dismiss|termination|fired/.test(source)
+        ? "an employment separation"
+        : /custody|divorce|spouse/.test(source)
+          ? "a family law concern"
+          : /contract|agreement|invoice|payment/.test(source)
+            ? "a contract or payment dispute"
+            : "a matter requiring legal review";
+  const suggestedTitle = title.trim() || `${specialty} matter`;
+  const suggestedDescription = description.trim()
+    || `Prospective ${specialty.toLowerCase()} matter involving ${topic}. Review the submitted materials, confirm the key parties and dates, and identify any upcoming deadlines.`;
+  const summary = description.trim()
+    ? description.trim().replace(/\s+/g, " ").split(/(?<=[.!?])\s/)[0].slice(0, 220)
+    : `A ${specialty.toLowerCase()} inquiry${documentNames.length ? ` with ${documentNames.length} supporting document${documentNames.length === 1 ? "" : "s"}` : ""}. Review key facts and deadlines before proceeding.`;
+  const signals = [
+    { pattern: /deadline|hearing|court|summons|urgent|today|overdue/, label: "Time-sensitive" },
+    { pattern: /threat|violence|safety|eviction|passport|withheld/, label: "Immediate impact" },
+    { pattern: /unpaid|wage|salary|dismiss|termination|filing/, label: "Employment or financial concern" },
+  ].filter(({ pattern }) => pattern.test(source)).map(({ label }) => label);
+  if (documentNames.length) signals.push(`${documentNames.length} document${documentNames.length === 1 ? "" : "s"} attached`);
+  if (signals.length === 0) signals.push("Initial review needed");
+  const score = Math.min(
+    98,
+    42
+      + (/deadline|hearing|court|summons|urgent|today|overdue/.test(source) ? 28 : 0)
+      + (/threat|violence|safety|eviction|passport|withheld/.test(source) ? 20 : 0)
+      + (/unpaid|wage|salary|dismiss|termination|filing/.test(source) ? 16 : 0)
+      + (documentNames.length > 0 ? 5 : 0),
+  );
+
+  return { title: suggestedTitle, description: suggestedDescription, specialty, summary, signals, score };
+}
 
 function rankIntakesForReview(intakes: Intake[]): RankedIntake | null {
   const needSignals = [
@@ -266,8 +337,30 @@ export default function TriageDashboard() {
   const [decisionHistoryOpen, setDecisionHistoryOpen] = useState(false);
   const [decisionFilter, setDecisionFilter] = useState<DecisionFilter>("all");
   const [recommendationOffset, setRecommendationOffset] = useState(0);
+  const [newIntakeOpen, setNewIntakeOpen] = useState(false);
+  const [intakeTitle, setIntakeTitle] = useState("");
+  const [intakeDescription, setIntakeDescription] = useState("");
+  const [intakeSpecialty, setIntakeSpecialty] = useState("");
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
+  const [intakeStage, setIntakeStage] = useState<"form" | "calculating" | "review">("form");
+  const [intakeReview, setIntakeReview] = useState<IntakeReview | null>(null);
   const queueToolbarRef = useRef<HTMLDivElement>(null);
   const decisionHistoryRef = useRef<HTMLDivElement>(null);
+  const intakeDialogRef = useRef<HTMLDialogElement>(null);
+  const documentInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (newIntakeOpen && intakeDialogRef.current && !intakeDialogRef.current.open) {
+      intakeDialogRef.current.showModal();
+    }
+  }, [newIntakeOpen]);
+
+  useEffect(() => {
+    if (!newIntakeOpen || intakeStage !== "calculating") return;
+    const timer = window.setTimeout(() => setIntakeStage("review"), 2000);
+    return () => window.clearTimeout(timer);
+  }, [intakeStage, newIntakeOpen]);
 
   useEffect(() => {
     const toolbar = queueToolbarRef.current;
@@ -392,6 +485,86 @@ export default function TriageDashboard() {
     window.location.assign("/batasbot?source=triage");
   };
 
+  const clearManualIntake = () => {
+    setIntakeTitle("");
+    setIntakeDescription("");
+    setIntakeSpecialty("");
+    setSelectedFiles([]);
+    setIntakeStage("form");
+    setIntakeReview(null);
+    setIsDraggingFiles(false);
+  };
+
+  const closeNewIntake = () => {
+    if (intakeDialogRef.current?.open) intakeDialogRef.current.close();
+    setNewIntakeOpen(false);
+    clearManualIntake();
+  };
+
+  const openNewIntake = () => {
+    clearManualIntake();
+    setNewIntakeOpen(true);
+  };
+
+  const addDocuments = (files: FileList | File[]) => {
+    const incomingFiles = Array.from(files);
+    setSelectedFiles((current) => {
+      const existingFiles = new Set(current.map((file) => `${file.name}:${file.size}:${file.lastModified}`));
+      return [
+        ...current,
+        ...incomingFiles.filter((file) => !existingFiles.has(`${file.name}:${file.size}:${file.lastModified}`)),
+      ];
+    });
+  };
+
+  const generateIntakeSuggestions = () => {
+    const suggestions = suggestIntakeDetails(
+      intakeTitle,
+      intakeDescription,
+      selectedFiles.map((file) => file.name),
+    );
+    setIntakeTitle(suggestions.title);
+    setIntakeDescription(suggestions.description);
+    setIntakeSpecialty(suggestions.specialty);
+  };
+
+  const submitManualIntake = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const suggestions = suggestIntakeDetails(
+      intakeTitle,
+      intakeDescription,
+      selectedFiles.map((file) => file.name),
+    );
+    const id = `INTAKE-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+    const specialty = intakeSpecialty || suggestions.specialty;
+    const newIntake: Intake = {
+      id,
+      domain: specialty,
+      risk: getRiskFromScore(suggestions.score),
+      client: intakeTitle.trim() || suggestions.title,
+      summary: intakeDescription.trim() || suggestions.description,
+      received: "Just now",
+      receivedOrder: Math.max(0, ...intakes.map((intake) => intake.receivedOrder)) + 1,
+      deadline: "No deadline set",
+      deadlineOrder: 99,
+      documents: selectedFiles.map((file) => file.name),
+      priorityScore: suggestions.score,
+    };
+
+    setIntakeReview({ intake: newIntake, summary: suggestions.summary, signals: suggestions.signals });
+    setIntakeStage("calculating");
+  };
+
+  const proceedWithManualIntake = () => {
+    if (!intakeReview) return;
+    setIntakes((current) => [intakeReview.intake, ...current]);
+    setDecisionHistoryOpen(false);
+    resetFilters();
+    setSortBy("newest");
+    closeNewIntake();
+    showToast("New intake added to the queue.");
+  };
+
   const unavailable = (label: string) => showToast(`${label} is not part of this demo yet.`);
 
   return (
@@ -423,7 +596,7 @@ export default function TriageDashboard() {
                   <span className="reviewed-count">{decisions.length}</span>
                 </button>
               </div>
-              <button className="new-intake-button" type="button" onClick={() => unavailable("New intake creation")}>
+              <button className="new-intake-button" type="button" onClick={openNewIntake}>
                 <span aria-hidden="true">+</span> New intake
               </button>
             </div>
@@ -494,7 +667,7 @@ export default function TriageDashboard() {
                     tone="blue"
                     options={[
                       { value: "all", label: "All Domains" },
-                      ...Array.from(new Set(initialIntakes.map(({ domain }) => domain))).map((domain) => ({ value: domain, label: domain })),
+                      ...specialtyOptions.map((domain) => ({ value: domain, label: domain })),
                     ]}
                   />
                   <FilterSelect
@@ -556,6 +729,12 @@ export default function TriageDashboard() {
                     </div>
                     <h3>{intake.client}</h3>
                     <p className="intake-summary">{intake.summary}</p>
+                    {intake.documents && intake.documents.length > 0 && (
+                      <div className="intake-document-summary" title={intake.documents.join(", ")}>
+                        <Paperclip aria-hidden="true" size={9.38} />
+                        {intake.documents.length} attached {intake.documents.length === 1 ? "document" : "documents"}
+                      </div>
+                    )}
                     <div className="intake-card-footer">
                       <div className="intake-timing">
                         <span><Clock3 size={10.05} aria-hidden="true" /> {intake.received}</span>
@@ -679,6 +858,202 @@ export default function TriageDashboard() {
             </aside>
           </div>
         </main>
+      {newIntakeOpen && (
+        <dialog
+          ref={intakeDialogRef}
+          className="new-intake-dialog"
+          aria-labelledby={intakeStage === "form" ? "new-intake-heading" : intakeStage === "calculating" ? "intake-calculating-heading" : "intake-review-heading"}
+          onClose={() => setNewIntakeOpen(false)}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) closeNewIntake();
+          }}
+        >
+          <div className="new-intake-dialog-content">
+            {intakeStage === "form" && (
+              <header className="new-intake-dialog-header">
+                <div>
+                  <h2 id="new-intake-heading">Create an intake</h2>
+                  <p>Enter matter details and attach supporting documents.</p>
+                </div>
+                <button className="quiet-icon-button" type="button" aria-label="Close new intake" onClick={closeNewIntake}>
+                  <X aria-hidden="true" size={13.4} />
+                </button>
+              </header>
+            )}
+            {intakeStage === "form" ? (
+              <form className="new-intake-form" onSubmit={submitManualIntake}>
+              <section className="intake-upload-section" aria-labelledby="intake-upload-label">
+                <div className="intake-form-label" id="intake-upload-label">Documents</div>
+                <input
+                  ref={documentInputRef}
+                  className="intake-file-input"
+                  type="file"
+                  accept=".pdf,.doc,.docx,.txt,.rtf,.jpg,.jpeg,.png"
+                  multiple
+                  onChange={(event) => {
+                    if (event.currentTarget.files) addDocuments(event.currentTarget.files);
+                    event.currentTarget.value = "";
+                  }}
+                />
+                <button
+                  className={`intake-dropzone${isDraggingFiles ? " is-dragging" : ""}`}
+                  type="button"
+                  onClick={() => documentInputRef.current?.click()}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    setIsDraggingFiles(true);
+                  }}
+                  onDragLeave={() => setIsDraggingFiles(false)}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    setIsDraggingFiles(false);
+                    addDocuments(event.dataTransfer.files);
+                  }}
+                >
+                  <span className="intake-dropzone-icon"><Upload aria-hidden="true" size={13.4} /></span>
+                  <span><strong>Choose documents</strong><small>or drag and drop · PDF, Word, text, or image</small></span>
+                </button>
+                {selectedFiles.length > 0 && (
+                  <ul className="intake-file-list" aria-label="Selected documents">
+                    {selectedFiles.map((file) => (
+                      <li key={`${file.name}-${file.size}-${file.lastModified}`}>
+                        <FileText aria-hidden="true" size={12.06} />
+                        <span title={file.name}>{file.name}</span>
+                        <small>{file.size < 1024 * 1024 ? `${Math.max(1, Math.round(file.size / 1024))} KB` : `${(file.size / (1024 * 1024)).toFixed(1)} MB`}</small>
+                        <button
+                          type="button"
+                          aria-label={`Remove ${file.name}`}
+                          onClick={() => {
+                            setSelectedFiles((current) => current.filter((item) => item !== file));
+                          }}
+                        >
+                          <X aria-hidden="true" size={10.72} />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+
+              <div className="intake-form-fields">
+                <label className="intake-form-field" htmlFor="manual-intake-title">
+                  <span>Title</span>
+                  <input
+                    id="manual-intake-title"
+                    autoFocus
+                    maxLength={120}
+                    placeholder="e.g. Unpaid wages and dismissal"
+                    value={intakeTitle}
+                    onChange={(event) => setIntakeTitle(event.target.value)}
+                  />
+                </label>
+                <label className="intake-form-field" htmlFor="manual-intake-specialty">
+                  <span>Specialty</span>
+                  <select
+                    id="manual-intake-specialty"
+                    value={intakeSpecialty}
+                    onChange={(event) => setIntakeSpecialty(event.target.value)}
+                  >
+                    <option value="" disabled>Select a legal specialty</option>
+                    {specialtyOptions.map((specialty) => <option value={specialty} key={specialty}>{specialty}</option>)}
+                  </select>
+                </label>
+                <label className="intake-form-field intake-form-field--wide" htmlFor="manual-intake-description">
+                  <span>Description</span>
+                  <textarea
+                    id="manual-intake-description"
+                    rows={4}
+                    maxLength={1200}
+                    placeholder="Summarize the client's situation, key dates, and requested help."
+                    value={intakeDescription}
+                    onChange={(event) => setIntakeDescription(event.target.value)}
+                  />
+                </label>
+              </div>
+
+              <section className="intake-ai-assist" aria-label="Optional BatasBot suggestions">
+                <button className="intake-ai-button" type="button" onClick={generateIntakeSuggestions}>
+                  <Sparkles aria-hidden="true" size={10.72} /> Suggest with BatasBot
+                </button>
+              </section>
+
+              <footer className="new-intake-form-footer">
+                <p>Fields can be left blank. Let BatasBot do the heavy lifting.</p>
+                <div className="new-intake-form-actions">
+                  <button className="intake-cancel-button" type="button" onClick={closeNewIntake}>Cancel</button>
+                  <button className="intake-submit-button" type="submit"><Check aria-hidden="true" size={12.06} /> Add to queue</button>
+                </div>
+              </footer>
+              </form>
+            ) : intakeStage === "calculating" ? (
+              <section className="intake-calculating" role="status" aria-live="polite">
+                <span className="intake-calculating-icon"><LoaderCircle aria-hidden="true" size={24.12} /></span>
+                <h2 id="intake-calculating-heading">Calculating metrics</h2>
+                <div className="intake-calculating-track" aria-hidden="true"><span /></div>
+                <p>Assessing urgency and key signals</p>
+              </section>
+            ) : intakeReview && (
+              <section className="intake-review" aria-labelledby="intake-review-heading">
+                <header className="intake-review-header">
+                  <div>
+                    <h2 id="intake-review-heading">Urgency overview</h2>
+                    <p>{intakeReview.intake.client} <span aria-hidden="true">·</span> {intakeReview.intake.domain}</p>
+                  </div>
+                  <span className={`intake-review-risk intake-review-risk--${intakeReview.intake.risk.toLowerCase()}`}>
+                    {intakeReview.intake.risk}
+                  </span>
+                </header>
+
+                <div className="intake-review-metrics">
+                  <section className="intake-review-score" aria-label="Priority score">
+                    <span>Priority score</span>
+                    <div className="intake-review-score-value">
+                      <strong>{intakeReview.intake.priorityScore}</strong><small>/100</small>
+                    </div>
+                    <div
+                      className="intake-review-meter"
+                      role="progressbar"
+                      aria-label="Urgency score"
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={intakeReview.intake.priorityScore}
+                    >
+                      <span style={{ width: `${intakeReview.intake.priorityScore}%` }} />
+                    </div>
+                  </section>
+                  <div className="intake-review-stat">
+                    <span>Signals</span>
+                    <strong>{intakeReview.signals.length}</strong>
+                  </div>
+                  <div className="intake-review-stat">
+                    <span>Documents</span>
+                    <strong>{intakeReview.intake.documents?.length ?? 0}</strong>
+                  </div>
+                </div>
+
+                <div className="intake-review-signals" aria-label="Urgency signals">
+                  {intakeReview.signals.map((signal) => <span key={signal}>{signal}</span>)}
+                </div>
+
+                <section className="intake-review-summary" aria-labelledby="intake-review-summary-heading">
+                  <div>
+                    <Sparkles aria-hidden="true" size={12.06} />
+                    <h3 id="intake-review-summary-heading">BatasBot summary</h3>
+                  </div>
+                  <p>{intakeReview.summary}</p>
+                </section>
+
+                <footer className="intake-review-footer">
+                  <button className="intake-cancel-button" type="button" onClick={() => setIntakeStage("form")}>Edit details</button>
+                  <button className="intake-submit-button" type="button" onClick={proceedWithManualIntake}>
+                    Proceed <ArrowRight aria-hidden="true" size={12.06} />
+                  </button>
+                </footer>
+              </section>
+            )}
+          </div>
+        </dialog>
+      )}
       {toast && (
         <div className="toast" role="status">
           <span className="toast-check"><Check size={10.72} /></span>
