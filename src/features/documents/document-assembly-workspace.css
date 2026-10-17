@@ -1445,7 +1445,7 @@
 
 @media (max-width: 656.6px) {
   .document-assembly {
-    height: 100vh;
+    height: calc(100dvh - 64px);
     padding: 0;
   }
 
@@ -1462,7 +1462,7 @@
 @media (max-width: 536px) {
   .document-assembly {
     min-height: 0;
-    height: 100dvh;
+    height: calc(100dvh - 64px);
     padding: 0;
   }
 
@@ -1536,7 +1536,7 @@
 
 @media (max-width: 428.8px) {
   .document-assembly {
-    height: 100dvh;
+    height: calc(100dvh - 64px);
     min-height: 0;
     padding: 0;
   }
@@ -2536,7 +2536,7 @@
 
 @media (max-width: 536px) {
   .document-assembly--template-picker {
-    height: 100dvh;
+    height: calc(100dvh - 64px);
   }
 
   .document-template-picker {
@@ -2681,5 +2681,36 @@
 
   .document-template-back {
     font-size: 10.72px;
+  }
+}
+
+@media (max-width: 536px) {
+  .document-template-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .document-template-card {
+    min-height: 0;
+  }
+
+  .document-template-card-footer {
+    align-items: center;
+    gap: 12px;
+  }
+
+  .document-mobile-switcher {
+    gap: 6px;
+    margin: 0 0 8px;
+    padding: 4px;
+  }
+
+  .document-mobile-switcher button {
+    min-height: 44px;
+  }
+
+  .editor-toolbar {
+    min-height: 48px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
   }
 }

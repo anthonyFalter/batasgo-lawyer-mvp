@@ -37,6 +37,11 @@ a {
 }
 
 @media (max-width: 657px) {
+  html,
+  body {
+    min-width: 0;
+  }
+
   .workspace button:not(.calendar-day),
   .workspace input,
   .workspace select,

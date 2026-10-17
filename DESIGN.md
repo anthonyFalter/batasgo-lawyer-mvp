@@ -209,7 +209,7 @@ The palette is cool and restrained; saturated accents mark controls and urgency 
 
 At desktop widths, a fixed left navigation and horizontal utility header frame a two-column work area: intake queue on the left and diagnostics, schedule, and messages on the right. The content is capped at 1800px. The desktop sidebar is 239px wide (214px at narrower desktop widths), and the main header is 94px tall.
 
-At 980px and below, navigation becomes a slide-in drawer and the right rail moves below the queue. At 640px and below, filters form a two-column grid, card actions expand to share the row, the account control collapses to an avatar, and the rail stacks vertically. A 12–22px spacing rhythm organizes controls and panels.
+At 980px and below, navigation becomes a slide-in drawer and the right rail moves below the queue. At 657px and below, the utility header reflows around a 44px menu, flexible search field, notification control, and avatar; the navigation drawer uses full labels rather than a desktop icon rail. Mobile body copy is at least 14px, form text is 16px, and primary controls provide 44px touch targets. The intake filters use a two-column grid, decision actions share a full-width row, and supporting panels stack after the queue. Document templates become a single-column list; the calendar, messages, tasks, settings, and BatasBot keep their core workflows in a single-column layout.
 
 ## Elevation & Depth
 
@@ -279,7 +279,7 @@ Panels use 10px corners, secondary controls use 6–8px corners, and capsule fil
 ### Navigation
 - **Style:** White fixed rail with compact dark labels and line icons.
 - **Active:** Pale-blue background with a 6px blue edge.
-- **Mobile:** Hidden off-canvas drawer opened from the header, with a dismissible scrim.
+- **Mobile:** Full-label off-canvas drawer opened from a 44px header control, with a dismissible scrim. The document workspace uses the same drawer instead of a persistent icon rail.
 
 ### Intake Row
 The queue row combines matter ID and domain, risk status, concise summary, received/deadline metadata, and paired accept/decline controls. Decisions remove the item locally and offer an undo action.

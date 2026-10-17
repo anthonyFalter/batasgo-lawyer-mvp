@@ -544,3 +544,70 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+@media (max-width: 656.6px) {
+  .messages-page {
+    height: calc(100dvh - 64px);
+    min-height: 320px;
+    padding: 12px;
+  }
+
+  .thread-header {
+    min-height: 64px;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+
+  .thread-contact {
+    min-width: 0;
+  }
+
+  .thread-contact h2 {
+    font-size: 16px !important;
+  }
+
+  .thread-contact p,
+  .thread-retention {
+    font-size: 12px !important;
+  }
+
+  .thread-message {
+    max-width: 88%;
+    padding: 12px;
+  }
+
+  .composer-hint {
+    font-size: 12px !important;
+  }
+}
+
+@media (max-width: 656.6px) {
+  body .workspace .messages-workspace {
+    position: relative;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  body .workspace .messages-workspace > .conversation-panel,
+  body .workspace .messages-workspace > .thread-panel {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  body .workspace .messages-workspace--thread-open > .conversation-panel,
+  body .workspace .messages-workspace:not(.messages-workspace--thread-open) > .thread-panel {
+    display: none;
+  }
+
+  body .workspace .messages-icon-button.thread-back-button {
+    display: inline-grid;
+  }
+
+  body .workspace .thread-contact {
+    min-width: 0;
+  }
+
+  body .workspace .thread-contact h2 {
+    font-size: 16px !important;
+  }
+}

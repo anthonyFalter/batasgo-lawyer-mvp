@@ -2098,6 +2098,148 @@
   }
 }
 
+@media (max-width: 656.6px) {
+  .dashboard {
+    padding: 20px 16px 28px;
+  }
+
+  .dashboard-heading {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  .dashboard-heading h1 {
+    max-width: none;
+    font-size: 24px;
+  }
+
+  .dashboard-heading-actions {
+    width: 100%;
+    gap: 8px;
+  }
+
+  .dashboard-heading-actions > * {
+    flex: 1 1 0;
+  }
+
+  .dashboard-heading-actions button {
+    justify-content: center;
+    min-height: 44px;
+    font-size: 14px;
+  }
+
+  .queue-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .filters {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .filter-control {
+    width: 100%;
+    min-width: 0;
+    height: 44px;
+  }
+
+  .filter-trigger {
+    justify-content: space-between;
+    min-height: 44px;
+    gap: 4px;
+    padding: 0 8px;
+    font-size: 14px !important;
+    white-space: normal;
+  }
+
+  .filter-trigger > span {
+    min-width: 0;
+    flex: 1 1 0;
+    line-height: 1.15;
+    text-align: left;
+    white-space: normal;
+  }
+
+  .results-count {
+    align-self: flex-start;
+  }
+
+  .intake-list {
+    gap: 12px;
+  }
+
+  .intake-card {
+    padding: 16px;
+  }
+
+  .intake-card-top {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .intake-tags {
+    flex: 1 1 220px;
+    gap: 6px;
+  }
+
+  .intake-id,
+  .domain-tag {
+    min-height: 26px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+
+  .risk-label {
+    margin-left: auto;
+    padding-top: 4px;
+    font-size: 12px;
+  }
+
+  .intake-card h3 {
+    margin-top: 12px;
+    font-size: 16px;
+  }
+
+  .intake-card-footer {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 14px;
+    padding-top: 12px;
+  }
+
+  .intake-timing {
+    gap: 10px;
+    font-size: 12px;
+  }
+
+  .decision-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .decision-button {
+    min-width: 0;
+    min-height: 48px;
+    justify-content: center;
+    padding: 0 8px;
+    font-size: 14px !important;
+  }
+
+  .insights-rail {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .workspace *,
   .workspace *::before,
@@ -2730,5 +2872,38 @@
 
   .intake-review-stat {
     min-height: 65px;
+  }
+}
+
+@media (max-width: 656.6px) {
+  body .workspace .insights-rail {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  body .workspace .insights-rail > .rail-panel,
+  body .workspace .insights-rail > .rail-panel.triage-ai-panel {
+    width: 100%;
+    min-width: 0;
+  }
+
+  body .workspace .insights-rail > .rail-panel.triage-ai-panel {
+    display: flex;
+    grid-template-columns: minmax(0, 1fr);
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  body .workspace .schedule-item {
+    grid-template-columns: 76px minmax(0, 1fr);
+  }
+
+  body .workspace .schedule-item time strong {
+    font-size: 12px;
+    text-overflow: clip;
   }
 }

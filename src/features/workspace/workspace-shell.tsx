@@ -21,6 +21,7 @@ import { useEffect, useRef, useState } from "react";
 import logo from "../../../assets/batasgo_logo.png";
 import collapsedLogo from "../../../assets/batasgo_collapsed.png";
 import "../triage/triage-dashboard.css";
+import "./mobile-workspace.css";
 
 const navItems = [
   { label: "Case Overview", icon: Inbox, href: "/dashboard" },
