@@ -4,13 +4,14 @@ import {
   ArrowRight,
   Bot,
   Check,
+  CloudUpload,
   FileText,
   Search,
   Sparkles,
   Upload,
   X,
 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { type DragEvent, useEffect, useMemo, useRef, useState } from "react";
 
 export type TemplateAnalysis = {
   documentType: string;
@@ -65,6 +66,95 @@ function safeFontFamily(source: string) {
 function safeAccentColor(source: string) {
   const match = source.match(/#[0-9a-f]{3}(?:[0-9a-f]{3})?\b/i);
   return match?.[0] ?? "#3569df";
+}
+
+async function convertDocxToHtml(arrayBuffer: ArrayBuffer) {
+  const JSZip = (await import("jszip")).default;
+  const archive = await JSZip.loadAsync(arrayBuffer);
+  const documentFile = archive.file("word/document.xml");
+  if (!documentFile) throw new Error("This DOCX file does not contain a readable document body.");
+
+  const namespace = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  const parser = new DOMParser();
+  const documentXml = parser.parseFromString(await documentFile.async("string"), "application/xml");
+  if (documentXml.querySelector("parsererror")) throw new Error("This DOCX file has invalid document markup.");
+
+  const wordChildren = (element: Element) => Array.from(element.children).filter((child) => child.namespaceURI === namespace);
+  const wordChild = (element: Element | null | undefined, name: string) => element ? wordChildren(element).find((child) => child.localName === name) : undefined;
+  const wordValue = (element: Element | undefined) => element?.getAttributeNS(namespace, "val") ?? "";
+
+  const convertRun = (run: Element) => {
+    const properties = wordChild(run, "rPr");
+    let text = wordChildren(run).map((child) => {
+      if (child.localName === "t" || child.localName === "delText") return escapeHtml(child.textContent ?? "");
+      if (child.localName === "tab") return "&emsp;";
+      if (child.localName === "br" || child.localName === "cr") return "<br>";
+      return "";
+    }).join("");
+    if (!text) return "";
+
+    const isBold = Boolean(wordChild(properties, "b"));
+    const isItalic = Boolean(wordChild(properties, "i"));
+    if (isBold && isItalic) text = `<strong><em>${text}</em></strong>`;
+    else if (isBold) text = `<strong>${text}</strong>`;
+    else if (isItalic) text = `<em>${text}</em>`;
+    if (wordChild(properties, "u")) text = `<u>${text}</u>`;
+
+    const styles: string[] = [];
+    const fonts = wordChild(properties, "rFonts");
+    const runFont = fonts?.getAttributeNS(namespace, "ascii") ?? fonts?.getAttributeNS(namespace, "hAnsi");
+    if (runFont && FONT_OPTIONS.some((font) => font.toLowerCase() === runFont.toLowerCase())) styles.push(`font-family: '${escapeHtml(runFont)}'`);
+    const fontSize = wordValue(wordChild(properties, "sz"));
+    if (fontSize && Number(fontSize) > 0 && Number(fontSize) <= 72) styles.push(`font-size: ${Number(fontSize) / 2}pt`);
+    const color = wordValue(wordChild(properties, "color"));
+    if (/^[\da-f]{6}$/i.test(color)) styles.push(`color: #${color}`);
+
+    return styles.length ? `<span style="${styles.join("; ")}">${text}</span>` : text;
+  };
+
+  const convertParagraph = (paragraph: Element) => {
+    const properties = wordChild(paragraph, "pPr");
+    const styleId = wordValue(wordChild(properties, "pStyle")).toLowerCase();
+    const headingMatch = styleId.match(/(?:heading|title)(\d?)/);
+    const headingLevel = headingMatch ? Math.min(Number(headingMatch[1] || 1), 4) : 0;
+    const tag = headingLevel ? `h${headingLevel}` : "p";
+    const alignmentValue = wordValue(wordChild(properties, "jc"));
+    const alignment = alignmentValue === "both" ? "justify" : alignmentValue;
+    const text = wordChildren(paragraph).map((child) => {
+      if (child.localName === "r") return convertRun(child);
+      if (child.localName === "hyperlink") return wordChildren(child).map(convertRun).join("");
+      return "";
+    }).join("");
+    if (!text.trim()) return "";
+    const alignStyle = ["center", "right", "justify"].includes(alignment) ? ` style="text-align: ${alignment}"` : "";
+    return `<${tag}${alignStyle}>${text}</${tag}>`;
+  };
+
+  const convertTable = (table: Element) => {
+    const rows = wordChildren(table).filter((child) => child.localName === "tr").map((row) => {
+      const cells = wordChildren(row).filter((child) => child.localName === "tc").map((cell) => {
+        const content = wordChildren(cell).filter((child) => child.localName === "p").map(convertParagraph).join("");
+        return `<td>${content || "<p><br></p>"}</td>`;
+      }).join("");
+      return `<tr>${cells}</tr>`;
+    }).join("");
+    return rows ? `<table><tbody>${rows}</tbody></table>` : "";
+  };
+
+  const body = documentXml.getElementsByTagNameNS(namespace, "body")[0];
+  if (!body) throw new Error("This DOCX file does not contain a readable document body.");
+  const content = wordChildren(body).map((child) => {
+    if (child.localName === "p") return convertParagraph(child);
+    if (child.localName === "tbl") return convertTable(child);
+    return "";
+  }).join("");
+  const stylesFile = archive.file("word/styles.xml");
+  const stylesXml = stylesFile ? parser.parseFromString(await stylesFile.async("string"), "application/xml") : null;
+  const defaultRunProperties = stylesXml?.getElementsByTagNameNS(namespace, "rPr")[0];
+  const defaultFonts = wordChild(defaultRunProperties, "rFonts");
+  const rawFont = defaultFonts?.getAttributeNS(namespace, "ascii") ?? defaultFonts?.getAttributeNS(namespace, "hAnsi") ?? "";
+  const documentFont = FONT_OPTIONS.find((font) => font.toLowerCase() === rawFont.toLowerCase()) ?? "Georgia";
+  return `<div style="font-family: '${documentFont}'">${content}</div>`;
 }
 
 export function sanitizeTemplateMarkup(markup: string) {
@@ -154,8 +244,45 @@ export default function DocumentTemplatePicker({ templates, onSelect }: Document
   const [uploadedTemplates, setUploadedTemplates] = useState<DocumentTemplate[]>([]);
   const [analysisPreview, setAnalysisPreview] = useState<DocumentTemplate | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isUploadPromptOpen, setIsUploadPromptOpen] = useState(false);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const uploadRef = useRef<HTMLInputElement>(null);
+  const uploadToggleRef = useRef<HTMLButtonElement>(null);
+  const browseButtonRef = useRef<HTMLButtonElement>(null);
+  const uploadDialogRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!isUploadPromptOpen) return;
+
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    browseButtonRef.current?.focus();
+    const handleDialogKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setIsUploadPromptOpen(false);
+        return;
+      }
+      if (event.key !== "Tab" || !uploadDialogRef.current) return;
+
+      const focusable = Array.from(uploadDialogRef.current.querySelectorAll<HTMLElement>("button:not(:disabled)"));
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleDialogKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleDialogKeyDown);
+      previousFocus?.focus();
+    };
+  }, [isUploadPromptOpen]);
 
   const visibleTemplates = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -173,13 +300,12 @@ export default function DocumentTemplatePicker({ templates, onSelect }: Document
     setIsAnalyzing(true);
 
     try {
+      if (file.size > 10 * 1024 * 1024) throw new Error("Templates must be smaller than 10 MB.");
       const extension = file.name.split(".").pop()?.toLowerCase();
       let sourceMarkup = "";
 
       if (extension === "docx") {
-        const mammoth = (await import("mammoth")).default;
-        const result = await mammoth.convertToHtml({ arrayBuffer: await file.arrayBuffer() });
-        sourceMarkup = result.value;
+        sourceMarkup = await convertDocxToHtml(await file.arrayBuffer());
       } else if (extension === "html" || extension === "htm") {
         sourceMarkup = await file.text();
       } else if (extension === "txt") {
@@ -210,6 +336,7 @@ export default function DocumentTemplatePicker({ templates, onSelect }: Document
       setUploadedTemplates((current) => [uploadedTemplate, ...current]);
       setAnalysisPreview(uploadedTemplate);
       setCategory("My templates");
+      setIsUploadPromptOpen(false);
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : "This template could not be read.");
     } finally {
@@ -218,12 +345,17 @@ export default function DocumentTemplatePicker({ templates, onSelect }: Document
     }
   };
 
+  const handleTemplateDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDraggingFile(false);
+    void handleUpload(event.dataTransfer.files[0]);
+  };
+
   return (
     <section className="document-template-picker" aria-labelledby="template-picker-title">
       <header className="template-picker-header">
         <div>
           <h1 id="template-picker-title">Start a document</h1>
-          <p>Choose a legal format, or bring a template you already trust.</p>
         </div>
         <div className="template-upload-actions">
           <input
@@ -234,19 +366,71 @@ export default function DocumentTemplatePicker({ templates, onSelect }: Document
             aria-label="Upload a document template"
             onChange={(event) => void handleUpload(event.target.files?.[0])}
           />
-          <button className="template-upload-button" type="button" onClick={() => uploadRef.current?.click()} disabled={isAnalyzing}>
+          <button
+            className="template-upload-button"
+            ref={uploadToggleRef}
+            type="button"
+            aria-expanded={isUploadPromptOpen}
+            aria-controls="template-upload-prompt"
+            disabled={isAnalyzing}
+            onClick={() => {
+              setUploadError("");
+              setIsUploadPromptOpen((open) => !open);
+            }}
+          >
             <Upload aria-hidden="true" size={18} />
-            {isAnalyzing ? "Reading template..." : "Upload a template"}
+            {isAnalyzing ? "Reading template..." : isUploadPromptOpen ? "Close upload" : "Upload a template"}
           </button>
         </div>
       </header>
 
-      <div className="template-local-note">
-        <Bot aria-hidden="true" size={19} />
-        <p><strong>BatasBot can map the format.</strong> Uploaded files are analyzed in this browser only. It identifies structure and style cues; it does not verify legal content or connect to an AI service.</p>
-      </div>
-
-      {uploadError && <p className="template-upload-error" role="alert">{uploadError}</p>}
+      {isUploadPromptOpen && (
+        <div
+          className="template-upload-overlay"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setIsUploadPromptOpen(false);
+          }}
+        >
+          <section
+            ref={uploadDialogRef}
+            className="template-upload-dialog"
+            id="template-upload-prompt"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="template-upload-prompt-title"
+            aria-describedby="template-upload-prompt-description"
+          >
+            <header className="template-upload-dialog-header">
+              <h2 id="template-upload-prompt-title">Upload your file template and let BatasBot handle the rest.</h2>
+              <button type="button" className="template-upload-close" aria-label="Close upload dialog" onClick={() => setIsUploadPromptOpen(false)}>
+                <X aria-hidden="true" size={20} />
+              </button>
+            </header>
+            <p className="template-upload-dialog-description" id="template-upload-prompt-description">
+              BatasBot scans the document structure and formatting in this browser. Your file is not sent to a service.
+            </p>
+            <div
+              className={`template-upload-dropzone${isDraggingFile ? " is-dragging" : ""}`}
+              onDragEnter={(event) => { event.preventDefault(); setIsDraggingFile(true); }}
+              onDragOver={(event) => event.preventDefault()}
+              onDragLeave={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsDraggingFile(false);
+              }}
+              onDrop={handleTemplateDrop}
+            >
+              <span className="template-upload-dropzone-icon"><CloudUpload aria-hidden="true" size={34} /></span>
+              <strong>{isAnalyzing ? "Reading your template..." : "Drop your template file here"}</strong>
+              <span>DOCX, HTML, or TXT · Up to 10 MB</span>
+              <button ref={browseButtonRef} className="template-upload-browse" type="button" onClick={() => uploadRef.current?.click()} disabled={isAnalyzing}>
+                <Upload aria-hidden="true" size={17} />
+                Browse files
+              </button>
+            </div>
+            {uploadError && <p className="template-upload-error" role="alert">{uploadError}</p>}
+          </section>
+        </div>
+      )}
 
       {analysisPreview?.analysis && (
         <section className="template-analysis" aria-labelledby="template-analysis-title">
@@ -274,6 +458,12 @@ export default function DocumentTemplatePicker({ templates, onSelect }: Document
         </section>
       )}
 
+      <label className="template-search">
+        <Search aria-hidden="true" size={19} />
+        <span className="sr-only">Search templates</span>
+        <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search templates" />
+      </label>
+
       <div className="template-library-controls">
         <div className="template-categories" role="group" aria-label="Filter document templates">
           {CATEGORIES.map((item) => (
@@ -288,11 +478,6 @@ export default function DocumentTemplatePicker({ templates, onSelect }: Document
             </button>
           ))}
         </div>
-        <label className="template-search">
-          <Search aria-hidden="true" size={18} />
-          <span className="sr-only">Search templates</span>
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search templates" />
-        </label>
       </div>
 
       <div className="template-library-heading">
@@ -309,6 +494,10 @@ export default function DocumentTemplatePicker({ templates, onSelect }: Document
                   <span className="document-template-mark" />
                   <span className="document-template-preview-title">{template.name}</span>
                   <span className="document-template-rule" />
+                  <span className="document-template-line document-template-line--wide" />
+                  <span className="document-template-line" />
+                  <span className="document-template-line document-template-line--short" />
+                  <span className="document-template-preview-section" />
                   <span className="document-template-line document-template-line--wide" />
                   <span className="document-template-line" />
                   <span className="document-template-line document-template-line--short" />
