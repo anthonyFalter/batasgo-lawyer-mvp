@@ -18,65 +18,81 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { type CSSProperties, type FormEvent, useEffect, useId, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  apiErrorResponseSchema,
+  intakeListResponseSchema,
+  intakeResponseSchema,
+  type IntakeDTO,
+} from "@/lib/intakes/validation";
+import { getRiskFromScore, suggestIntakeDetails } from "@/lib/intakes/triage";
 import WorkspaceShell from "../workspace/workspace-shell";
 
-type Risk = "Critical" | "High" | "Medium";
-type Intake = {
-  id: string;
-  domain: string;
-  risk: Risk;
-  client: string;
-  summary: string;
-  received: string;
-  receivedOrder: number;
-  deadline: string;
-  deadlineOrder: number;
-  documents?: string[];
-  priorityScore?: number;
-};
+type Risk = IntakeDTO["risk"];
+type Intake = IntakeDTO;
 type Decision = { intake: Intake; result: "accepted" | "declined" };
 type IntakeReview = { intake: Intake; summary: string; signals: string[] };
 type DecisionFilter = "all" | Decision["result"];
 type RankedIntake = { intake: Intake; score: number; reasons: string[]; specialtyMatch: boolean };
-const initialIntakes: Intake[] = [
-  {
-    id: "INTAKE-2024-0847",
-    domain: "Labor & Employment",
-    risk: "Critical",
-    client: "Anonymized Client (OFW / placeholder)",
-    summary:
-      "Unpaid compensation, passport withholding, and constructive dismissal by an employer under a placement-based agency. Seeking urgent legal counsel.",
-    received: "3 minutes ago",
-    receivedOrder: 3,
-    deadline: "Review now",
-    deadlineOrder: 0,
-  },
-  {
-    id: "INTAKE-2024-0932",
-    domain: "Family Law",
-    risk: "Medium",
-    client: "Anonymized Client",
-    summary:
-      "Request for guidance on a family property matter and the documents needed before an initial consultation.",
-    received: "21 minutes ago",
-    receivedOrder: 2,
-    deadline: "Closing in 3 hours",
-    deadlineOrder: 3,
-  },
-  {
-    id: "INTAKE-2024-0918",
-    domain: "Civil Disputes",
-    risk: "High",
-    client: "Anonymized Client",
-    summary:
-      "A payment dispute is approaching a filing deadline. The client has shared a contract and requests an urgent case assessment.",
-    received: "1 hour ago",
-    receivedOrder: 1,
-    deadline: "Closing in 1 hour",
-    deadlineOrder: 1,
-  },
-];
+type AiSummaryBlock = { type: "paragraph"; text: string } | { type: "list"; items: string[] };
+type AiSummarySection = { heading: string; blocks: AiSummaryBlock[] };
+
+const aiSummaryHeadings = [
+  "Reported issue",
+  "Time-sensitive facts",
+  "Key unknowns",
+  "Triage note",
+] as const;
+
+function parseAiSummary(summary: string): AiSummarySection[] {
+  const sections: AiSummarySection[] = [];
+
+  for (const line of summary.split(/\r?\n/)) {
+    const headingMatch = line.match(
+      /^\s*\**\s*(Reported issue|Time-sensitive facts|Key unknowns|Triage note)\s*\**\s*:?\s*(.*)$/i,
+    );
+
+    if (headingMatch) {
+      const heading = aiSummaryHeadings.find(
+        (item) => item.toLowerCase() === headingMatch[1].toLowerCase(),
+      );
+      if (!heading) continue;
+      sections.push({ heading, blocks: [] });
+      if (headingMatch[2]) {
+        sections[sections.length - 1].blocks.push({ type: "paragraph", text: headingMatch[2] });
+      }
+      continue;
+    }
+
+    const text = line.trim();
+    if (!text) continue;
+
+    const section = sections[sections.length - 1];
+    if (!section) {
+      sections.push({ heading: "", blocks: [{ type: "paragraph", text }] });
+      continue;
+    }
+
+    const bulletMatch = text.match(/^(?:[-*•]|\d+[.)])\s+(.+)$/);
+    if (bulletMatch) {
+      const lastBlock = section.blocks[section.blocks.length - 1];
+      if (lastBlock?.type === "list") lastBlock.items.push(bulletMatch[1]);
+      else section.blocks.push({ type: "list", items: [bulletMatch[1]] });
+    } else {
+      const lastBlock = section.blocks[section.blocks.length - 1];
+      if (lastBlock?.type === "paragraph") lastBlock.text += ` ${text}`;
+      else section.blocks.push({ type: "paragraph", text });
+    }
+  }
+
+  return sections;
+}
+
+async function getResponseError(response: Response, fallback: string) {
+  const payload: unknown = await response.json().catch(() => null);
+  const parsed = apiErrorResponseSchema.safeParse(payload);
+  return parsed.success ? parsed.data.error : fallback;
+}
 
 const riskRank: Record<Risk, number> = { Critical: 3, High: 2, Medium: 1 };
 const profileSpecialty = "Labor & Employment litigation";
@@ -89,61 +105,6 @@ const specialtyOptions = [
   "Corporate & Commercial",
   "Other",
 ];
-
-function getRiskFromScore(score: number): Risk {
-  if (score >= 80) return "Critical";
-  if (score >= 60) return "High";
-  return "Medium";
-}
-
-function suggestIntakeDetails(title: string, description: string, documentNames: string[]) {
-  const source = `${title} ${description} ${documentNames.join(" ")}`.toLowerCase();
-  const specialty = /employment|labor|workplace|wage|salary|dismissal|employer/.test(source)
-    ? "Labor & Employment"
-    : /divorce|custody|marriage|family|spouse|inheritance/.test(source)
-      ? "Family Law"
-      : /criminal|arrest|police|prosecution|bail/.test(source)
-        ? "Criminal Defense"
-        : /immigration|visa|deportation|citizenship/.test(source)
-          ? "Immigration"
-          : /contract|company|corporate|business|shareholder/.test(source)
-            ? "Corporate & Commercial"
-            : "Civil Disputes";
-  const topic = /passport|withheld/.test(source)
-    ? "passport withholding"
-    : /wage|salary|compensation|unpaid/.test(source)
-      ? "unpaid compensation"
-      : /dismiss|termination|fired/.test(source)
-        ? "an employment separation"
-        : /custody|divorce|spouse/.test(source)
-          ? "a family law concern"
-          : /contract|agreement|invoice|payment/.test(source)
-            ? "a contract or payment dispute"
-            : "a matter requiring legal review";
-  const suggestedTitle = title.trim() || `${specialty} matter`;
-  const suggestedDescription = description.trim()
-    || `Prospective ${specialty.toLowerCase()} matter involving ${topic}. Review the submitted materials, confirm the key parties and dates, and identify any upcoming deadlines.`;
-  const summary = description.trim()
-    ? description.trim().replace(/\s+/g, " ").split(/(?<=[.!?])\s/)[0].slice(0, 220)
-    : `A ${specialty.toLowerCase()} inquiry${documentNames.length ? ` with ${documentNames.length} supporting document${documentNames.length === 1 ? "" : "s"}` : ""}. Review key facts and deadlines before proceeding.`;
-  const signals = [
-    { pattern: /deadline|hearing|court|summons|urgent|today|overdue/, label: "Time-sensitive" },
-    { pattern: /threat|violence|safety|eviction|passport|withheld/, label: "Immediate impact" },
-    { pattern: /unpaid|wage|salary|dismiss|termination|filing/, label: "Employment or financial concern" },
-  ].filter(({ pattern }) => pattern.test(source)).map(({ label }) => label);
-  if (documentNames.length) signals.push(`${documentNames.length} document${documentNames.length === 1 ? "" : "s"} attached`);
-  if (signals.length === 0) signals.push("Initial review needed");
-  const score = Math.min(
-    98,
-    42
-      + (/deadline|hearing|court|summons|urgent|today|overdue/.test(source) ? 28 : 0)
-      + (/threat|violence|safety|eviction|passport|withheld/.test(source) ? 20 : 0)
-      + (/unpaid|wage|salary|dismiss|termination|filing/.test(source) ? 16 : 0)
-      + (documentNames.length > 0 ? 5 : 0),
-  );
-
-  return { title: suggestedTitle, description: suggestedDescription, specialty, summary, signals, score };
-}
 
 function rankIntakesForReview(intakes: Intake[]): RankedIntake | null {
   const needSignals = [
@@ -325,8 +286,13 @@ function FilterSelect({
 }
 
 export default function TriageDashboard() {
-  const [intakes, setIntakes] = useState(initialIntakes);
+  const [intakes, setIntakes] = useState<Intake[]>([]);
   const [decisions, setDecisions] = useState<Decision[]>([]);
+  const [isLoadingIntakes, setIsLoadingIntakes] = useState(true);
+  const [intakeLoadError, setIntakeLoadError] = useState("");
+  const [busyIntakeId, setBusyIntakeId] = useState<string | null>(null);
+  const [generatingSummaryId, setGeneratingSummaryId] = useState<string | null>(null);
+  const [isSavingIntake, setIsSavingIntake] = useState(false);
   const [domainFilter, setDomainFilter] = useState("all");
   const [riskFilter, setRiskFilter] = useState("all");
   const [sortBy, setSortBy] = useState("risk");
@@ -349,6 +315,32 @@ export default function TriageDashboard() {
   const decisionHistoryRef = useRef<HTMLDivElement>(null);
   const intakeDialogRef = useRef<HTMLDialogElement>(null);
   const documentInputRef = useRef<HTMLInputElement>(null);
+
+  const loadIntakes = useCallback(async () => {
+    setIsLoadingIntakes(true);
+    setIntakeLoadError("");
+
+    try {
+      const response = await fetch("/api/intakes", { cache: "no-store" });
+      if (!response.ok) throw new Error(await getResponseError(response, "Unable to load intakes."));
+      const parsed = intakeListResponseSchema.safeParse(await response.json());
+      if (!parsed.success) throw new Error("The intake service returned an invalid response.");
+
+      const allIntakes = parsed.data.intakes;
+      setIntakes(allIntakes.filter(({ status }) => status === "pending"));
+      setDecisions(allIntakes
+        .filter((intake): intake is Intake & { status: Decision["result"] } => intake.status !== "pending")
+        .map((intake) => ({ intake, result: intake.status })));
+    } catch (error) {
+      setIntakeLoadError(error instanceof Error ? error.message : "Unable to load intakes.");
+    } finally {
+      setIsLoadingIntakes(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadIntakes();
+  }, [loadIntakes]);
 
   useEffect(() => {
     if (newIntakeOpen && intakeDialogRef.current && !intakeDialogRef.current.open) {
@@ -403,7 +395,7 @@ export default function TriageDashboard() {
       const matchesRisk = riskFilter === "all" || intake.risk === riskFilter;
       const matchesSearch =
         !query ||
-        `${intake.id} ${intake.domain} ${intake.client} ${intake.summary}`
+        `${intake.reference} ${intake.domain} ${intake.client} ${intake.summary}`
           .toLowerCase()
           .includes(query);
       return matchesDomain && matchesRisk && matchesSearch;
@@ -424,24 +416,55 @@ export default function TriageDashboard() {
     setToastUndoable(undoable);
   };
 
-  const decide = (intake: Intake, result: Decision["result"]) => {
-    setIntakes((current) => current.filter((item) => item.id !== intake.id));
-    setDecisions((current) => [...current, { intake, result }]);
-    showToast(`${intake.id} ${result}.`, true);
+  const updateIntakeStatus = async (intake: Intake, status: Intake["status"]) => {
+    const response = await fetch(`/api/intakes/${intake.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    if (!response.ok) throw new Error(await getResponseError(response, "Unable to update intake."));
+    const parsed = intakeResponseSchema.safeParse(await response.json());
+    if (!parsed.success) throw new Error("The intake service returned an invalid response.");
+    return parsed.data.intake;
   };
 
-  const undoDecision = () => {
+  const decide = async (intake: Intake, result: Decision["result"]) => {
+    setBusyIntakeId(intake.id);
+    try {
+      const updated = await updateIntakeStatus(intake, result);
+      setIntakes((current) => current.filter((item) => item.id !== intake.id));
+      setDecisions((current) => [...current.filter(({ intake: item }) => item.id !== intake.id), {
+        intake: updated,
+        result,
+      }]);
+      showToast(`${intake.reference} ${result}.`, true);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Unable to save the intake decision.");
+    } finally {
+      setBusyIntakeId(null);
+    }
+  };
+
+  const undoDecision = async () => {
     const last = decisions[decisions.length - 1];
     if (!last) return;
-    setIntakes((current) => [...current, last.intake]);
-    setDecisions((current) => current.slice(0, -1));
-    showToast(`Restored ${last.intake.id} to the queue.`);
+    setBusyIntakeId(last.intake.id);
+    try {
+      const restored = await updateIntakeStatus(last.intake, "pending");
+      setIntakes((current) => [restored, ...current]);
+      setDecisions((current) => current.filter(({ intake }) => intake.id !== last.intake.id));
+      showToast(`Restored ${last.intake.reference} to the queue.`);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Unable to undo the intake decision.");
+    } finally {
+      setBusyIntakeId(null);
+    }
   };
 
   const importAcceptedMatter = (intake: Intake) => {
     try {
       window.sessionStorage.setItem("batasgo-accepted-intake", JSON.stringify({
-        id: intake.id,
+        id: intake.reference,
         client: intake.client,
         domain: intake.domain,
         risk: intake.risk,
@@ -469,7 +492,7 @@ export default function TriageDashboard() {
 
     try {
       window.sessionStorage.setItem("batasbot-triage-handoff", JSON.stringify({
-        id: recommendation.intake.id,
+        id: recommendation.intake.reference,
         domain: recommendation.intake.domain,
         risk: recommendation.intake.risk,
         deadline: recommendation.intake.deadline,
@@ -528,6 +551,24 @@ export default function TriageDashboard() {
     setIntakeSpecialty(suggestions.specialty);
   };
 
+  const generateSampleSummary = async (intake: Intake) => {
+    if (!intake.isSample || intake.aiSummary || generatingSummaryId === intake.id) return;
+    setGeneratingSummaryId(intake.id);
+    try {
+      const response = await fetch(`/api/intakes/${intake.id}/summary`, { method: "POST" });
+      if (!response.ok) throw new Error(await getResponseError(response, "Unable to generate summary."));
+      const parsed = intakeResponseSchema.safeParse(await response.json());
+      if (!parsed.success) throw new Error("The summary service returned an invalid response.");
+      const updated = parsed.data.intake;
+      setIntakes((current) => current.map((item) => item.id === updated.id ? updated : item));
+      showToast("Gemini summarized the synthetic sample intake.");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Unable to generate summary.");
+    } finally {
+      setGeneratingSummaryId(null);
+    }
+  };
+
   const submitManualIntake = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const suggestions = suggestIntakeDetails(
@@ -535,34 +576,59 @@ export default function TriageDashboard() {
       intakeDescription,
       selectedFiles.map((file) => file.name),
     );
-    const id = `INTAKE-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
     const specialty = intakeSpecialty || suggestions.specialty;
     const newIntake: Intake = {
-      id,
+      id: "00000000-0000-4000-8000-000000000000",
+      reference: "Intake preview",
       domain: specialty,
       risk: getRiskFromScore(suggestions.score),
       client: intakeTitle.trim() || suggestions.title,
       summary: intakeDescription.trim() || suggestions.description,
       received: "Just now",
-      receivedOrder: Math.max(0, ...intakes.map((intake) => intake.receivedOrder)) + 1,
+      receivedOrder: 3,
       deadline: "No deadline set",
       deadlineOrder: 99,
+      deadlineAt: null,
       documents: selectedFiles.map((file) => file.name),
       priorityScore: suggestions.score,
+      status: "pending",
+      isSample: false,
+      aiSummary: null,
     };
 
     setIntakeReview({ intake: newIntake, summary: suggestions.summary, signals: suggestions.signals });
     setIntakeStage("calculating");
   };
 
-  const proceedWithManualIntake = () => {
+  const proceedWithManualIntake = async () => {
     if (!intakeReview) return;
-    setIntakes((current) => [intakeReview.intake, ...current]);
-    setDecisionHistoryOpen(false);
-    resetFilters();
-    setSortBy("newest");
-    closeNewIntake();
-    showToast("New intake added to the queue.");
+    setIsSavingIntake(true);
+    try {
+      const response = await fetch("/api/intakes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: intakeTitle,
+          description: intakeDescription,
+          domain: intakeSpecialty,
+          documents: selectedFiles.map((file) => file.name),
+        }),
+      });
+      if (!response.ok) throw new Error(await getResponseError(response, "Unable to save intake."));
+      const parsed = intakeResponseSchema.safeParse(await response.json());
+      if (!parsed.success) throw new Error("The intake service returned an invalid response.");
+
+      setIntakes((current) => [parsed.data.intake, ...current]);
+      setDecisionHistoryOpen(false);
+      resetFilters();
+      setSortBy("newest");
+      closeNewIntake();
+      showToast("Intake saved to your workspace.");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Unable to save intake.");
+    } finally {
+      setIsSavingIntake(false);
+    }
   };
 
   const unavailable = (label: string) => showToast(`${label} is not part of this demo yet.`);
@@ -602,12 +668,19 @@ export default function TriageDashboard() {
             </div>
           </div>
 
+          {intakeLoadError && (
+            <div className="intake-load-error" role="alert">
+              <span>{intakeLoadError}</span>
+              <button type="button" onClick={() => void loadIntakes()}>Retry</button>
+            </div>
+          )}
+
           {decisionHistoryOpen && (
             <section className="decision-history-panel" id="reviewed-matters-panel" aria-label="Reviewed matters">
               <div className="decision-history-heading">
                 <div>
                   <h2>Reviewed matters</h2>
-                  <span>Current browser session only</span>
+                  <span>Saved in your workspace</span>
                 </div>
                 <strong>{decisions.length}</strong>
               </div>
@@ -631,10 +704,11 @@ export default function TriageDashboard() {
                 {visibleDecisions.length > 0 ? visibleDecisions.map(({ intake, result }) => (
                   <article className="decision-history-item" key={intake.id}>
                     <div className="decision-history-item-heading">
-                      <strong>{intake.id}</strong>
+                      <strong>{intake.reference}</strong>
                       <span className={`decision-history-status decision-history-status--${result}`}>
                         {result === "accepted" ? "Accepted" : "Declined"}
                       </span>
+                      {intake.isSample && <span className="intake-sample-badge">SAMPLE</span>}
                     </div>
                     <p className="decision-history-client">{intake.client}</p>
                     <p className="decision-history-context">{intake.domain} · {intake.risk} risk</p>
@@ -712,7 +786,8 @@ export default function TriageDashboard() {
               </div>
 
               <div className="intake-list" aria-live="polite">
-                {visibleIntakes.map((intake) => (
+              {isLoadingIntakes && <p className="intake-loading" role="status">Loading your workspace intakes…</p>}
+              {visibleIntakes.map((intake) => (
                   <article
                     className="intake-card"
                     id={`intake-${intake.id}`}
@@ -720,7 +795,8 @@ export default function TriageDashboard() {
                   >
                     <div className="intake-card-top">
                       <div className="intake-tags">
-                        <span className="intake-id">{intake.id}</span>
+                        <span className="intake-id">{intake.reference}</span>
+                        {intake.isSample && <span className="intake-sample-badge">SAMPLE</span>}
                         <span className="domain-tag">{intake.domain}</span>
                       </div>
                       <span className={`risk-label risk-label--${intake.risk.toLowerCase()}`}>
@@ -729,10 +805,49 @@ export default function TriageDashboard() {
                     </div>
                     <h3>{intake.client}</h3>
                     <p className="intake-summary">{intake.summary}</p>
+                    {intake.isSample && (
+                      <section className="sample-ai-summary" aria-label="Synthetic sample AI summary">
+                        {intake.aiSummary ? (
+                          <details className="sample-ai-summary-details">
+                            <summary>
+                              <span className="sample-ai-summary-title">
+                                <Sparkles aria-hidden="true" size={13.4} fill="currentColor" strokeWidth={1.7} />
+                                <strong>AI Summary</strong>
+                              </span>
+                              <ChevronDown aria-hidden="true" size={12} />
+                            </summary>
+                            <div className="sample-ai-summary-content">
+                              {parseAiSummary(intake.aiSummary).map((section, sectionIndex) => (
+                                <section className="sample-ai-summary-section" key={`${section.heading}-${sectionIndex}`}>
+                                  {section.heading && <h4>{section.heading}</h4>}
+                                  {section.blocks.map((block, blockIndex) => block.type === "list" ? (
+                                    <ul key={blockIndex}>
+                                      {block.items.map((item, itemIndex) => <li key={itemIndex}>{item}</li>)}
+                                    </ul>
+                                  ) : (
+                                    <p key={blockIndex}>{block.text}</p>
+                                  ))}
+                                </section>
+                              ))}
+                            </div>
+                            <small>AI-generated from synthetic text only. Verify all facts.</small>
+                          </details>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={generatingSummaryId === intake.id}
+                            onClick={() => void generateSampleSummary(intake)}
+                          >
+                            <Sparkles aria-hidden="true" size={9.38} />
+                            {generatingSummaryId === intake.id ? "Generating summary…" : "AI Summary"}
+                          </button>
+                        )}
+                      </section>
+                    )}
                     {intake.documents && intake.documents.length > 0 && (
                       <div className="intake-document-summary" title={intake.documents.join(", ")}>
                         <Paperclip aria-hidden="true" size={9.38} />
-                        {intake.documents.length} attached {intake.documents.length === 1 ? "document" : "documents"}
+                        {intake.documents.length} selected file {intake.documents.length === 1 ? "name" : "names"}
                       </div>
                     )}
                     <div className="intake-card-footer">
@@ -748,23 +863,23 @@ export default function TriageDashboard() {
                         )}
                       </div>
                       <div className="decision-actions">
-                        <button className="decision-button decision-button--decline" type="button" onClick={() => decide(intake, "declined")}>
+                        <button className="decision-button decision-button--decline" type="button" disabled={busyIntakeId === intake.id} onClick={() => void decide(intake, "declined")}>
                           <X size={10.05} aria-hidden="true" /> Decline
                         </button>
-                        <button className="decision-button decision-button--accept" type="button" onClick={() => decide(intake, "accepted")}>
+                        <button className="decision-button decision-button--accept" type="button" disabled={busyIntakeId === intake.id} onClick={() => void decide(intake, "accepted")}>
                           <Check size={10.05} aria-hidden="true" /> Accept matter
                         </button>
                       </div>
                     </div>
                   </article>
                 ))}
-                {visibleIntakes.length === 0 && (
+                {!isLoadingIntakes && !intakeLoadError && visibleIntakes.length === 0 && (
                   <div className="empty-queue">
                     <span className="empty-icon"><Inbox size={14.74} /></span>
                     <h3>{intakes.length === 0 ? "Your queue is clear" : "No matching requests"}</h3>
                     <p>
                       {intakes.length === 0
-                        ? "New client inquiries will appear here when they arrive."
+                        ? "Create an intake to start building your workspace queue."
                         : "Try another search or adjust your filters to see more matters."}
                     </p>
                     {(search || domainFilter !== "all" || riskFilter !== "all") && (
@@ -773,7 +888,9 @@ export default function TriageDashboard() {
                   </div>
                 )}
               </div>
-              <div className="sample-note">Showing sample records for interface preview. No client data is connected.</div>
+              {intakes.some(({ isSample }) => isSample) && (
+                <div className="sample-note">Synthetic sample records are for demonstration only and do not represent real clients.</div>
+              )}
             </section>
 
             <aside
@@ -792,7 +909,7 @@ export default function TriageDashboard() {
                   <>
                     <div className="triage-ai-client">
                       <h3>{recommendation.intake.client}</h3>
-                      <p>{recommendation.intake.id} · {recommendation.intake.domain}</p>
+                      <p>{recommendation.intake.reference} · {recommendation.intake.domain}</p>
                     </div>
                     <div className="triage-ai-reasons">
                       <h4>Why review this intake first</h4>
@@ -873,7 +990,7 @@ export default function TriageDashboard() {
               <header className="new-intake-dialog-header">
                 <div>
                   <h2 id="new-intake-heading">Create an intake</h2>
-                  <p>Enter matter details and attach supporting documents.</p>
+                  <p>Enter matter details. Selected file names are saved; file contents are not uploaded.</p>
                 </div>
                 <button className="quiet-icon-button" type="button" aria-label="Close new intake" onClick={closeNewIntake}>
                   <X aria-hidden="true" size={13.4} />
@@ -911,7 +1028,7 @@ export default function TriageDashboard() {
                   }}
                 >
                   <span className="intake-dropzone-icon"><Upload aria-hidden="true" size={13.4} /></span>
-                  <span><strong>Choose documents</strong><small>or drag and drop · PDF, Word, text, or image</small></span>
+                  <span><strong>Choose documents</strong><small>Names only · file contents stay in your browser</small></span>
                 </button>
                 {selectedFiles.length > 0 && (
                   <ul className="intake-file-list" aria-label="Selected documents">
@@ -1026,7 +1143,7 @@ export default function TriageDashboard() {
                     <strong>{intakeReview.signals.length}</strong>
                   </div>
                   <div className="intake-review-stat">
-                    <span>Documents</span>
+                    <span>Selected file names</span>
                     <strong>{intakeReview.intake.documents?.length ?? 0}</strong>
                   </div>
                 </div>
@@ -1045,8 +1162,8 @@ export default function TriageDashboard() {
 
                 <footer className="intake-review-footer">
                   <button className="intake-cancel-button" type="button" onClick={() => setIntakeStage("form")}>Edit details</button>
-                  <button className="intake-submit-button" type="button" onClick={proceedWithManualIntake}>
-                    Proceed <ArrowRight aria-hidden="true" size={12.06} />
+                  <button className="intake-submit-button" type="button" disabled={isSavingIntake} onClick={() => void proceedWithManualIntake()}>
+                    {isSavingIntake ? "Saving…" : "Save intake"} <ArrowRight aria-hidden="true" size={12.06} />
                   </button>
                 </footer>
               </section>
