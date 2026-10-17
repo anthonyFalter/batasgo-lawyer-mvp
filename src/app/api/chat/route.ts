@@ -1,4 +1,10 @@
 import { GoogleGenAI } from "@google/genai";
+import { auth } from "@clerk/nextjs/server";
+import { getOrCreatePersonalWorkspace } from "@/lib/db/workspace";
+import { appendMessages, assertSessionOwnership, createSession } from "@/lib/chat/sessions";
+import { db } from "@/lib/db/client";
+import { chatMessages } from "@/lib/db/schema";
+import { asc, eq } from "drizzle-orm";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,6 +41,17 @@ type ConversationMessage = {
   parts: { text: string }[];
 };
 
+/**
+ * POST /api/chat
+ *
+ * Body (JSON):
+ *   sessionId?: string   — if provided, load history from DB and persist reply
+ *   message:   string    — the new user message
+ *   title?:    string    — only used when creating a new session (first message)
+ *
+ * Response: text/plain streaming (Gemini reply chunks)
+ * Headers:  X-Session-Id — the session id (new or existing)
+ */
 export async function POST(request: Request) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -44,7 +61,17 @@ export async function POST(request: Request) {
     );
   }
 
-  let body: { messages?: { role: string; content: string }[] };
+  // ── Auth ──────────────────────────────────────────────────────────────────
+  const { userId } = await auth();
+  if (!userId) {
+    return new Response(
+      JSON.stringify({ error: "Unauthorized." }),
+      { status: 401, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  // ── Parse body ────────────────────────────────────────────────────────────
+  let body: { sessionId?: string; message?: string; title?: string };
   try {
     body = await request.json();
   } catch {
@@ -54,30 +81,49 @@ export async function POST(request: Request) {
     );
   }
 
-  const incomingMessages = body.messages ?? [];
-  if (incomingMessages.length === 0) {
+  const userMessage = typeof body.message === "string" ? body.message.trim() : "";
+  if (!userMessage) {
     return new Response(
-      JSON.stringify({ error: "No messages provided." }),
+      JSON.stringify({ error: "message is required." }),
       { status: 400, headers: { "Content-Type": "application/json" } },
     );
   }
 
-  // Build conversation history (all but the last message) and extract the latest user prompt
-  const history: ConversationMessage[] = incomingMessages
-    .slice(0, -1)
-    .map((msg) => ({
-      role: msg.role === "assistant" ? "model" : "user",
-      parts: [{ text: msg.content }],
-    }));
+  // ── Resolve workspace + session ───────────────────────────────────────────
+  const workspaceId = await getOrCreatePersonalWorkspace(userId);
 
-  const latestMessage = incomingMessages[incomingMessages.length - 1];
-  if (!latestMessage || latestMessage.role !== "user") {
-    return new Response(
-      JSON.stringify({ error: "Last message must be from the user." }),
-      { status: 400, headers: { "Content-Type": "application/json" } },
-    );
+  let sessionId = typeof body.sessionId === "string" ? body.sessionId.trim() : "";
+  if (!sessionId) {
+    // First message — create a new session named after the prompt
+    const title = typeof body.title === "string" && body.title.trim()
+      ? body.title.trim().slice(0, 255)
+      : userMessage.slice(0, 80);
+    sessionId = await createSession(workspaceId, userId, title);
+  } else {
+    // Existing session — verify ownership
+    try {
+      await assertSessionOwnership(sessionId, workspaceId, userId);
+    } catch {
+      return new Response(
+        JSON.stringify({ error: "Session not found or access denied." }),
+        { status: 404, headers: { "Content-Type": "application/json" } },
+      );
+    }
   }
 
+  // ── Load history from DB ──────────────────────────────────────────────────
+  const historyRows = await db
+    .select({ role: chatMessages.role, content: chatMessages.content })
+    .from(chatMessages)
+    .where(eq(chatMessages.sessionId, sessionId))
+    .orderBy(asc(chatMessages.createdAt));
+
+  const history: ConversationMessage[] = historyRows.map((row) => ({
+    role: row.role === "assistant" ? "model" : "user",
+    parts: [{ text: row.content }],
+  }));
+
+  // ── Call Gemini ───────────────────────────────────────────────────────────
   const ai = new GoogleGenAI({ apiKey });
 
   try {
@@ -91,18 +137,25 @@ export async function POST(request: Request) {
       history,
     });
 
-    const stream = await chat.sendMessageStream({ message: latestMessage.content });
+    const stream = await chat.sendMessageStream({ message: userMessage });
 
+    // ── Stream reply, collect full text for persistence ───────────────────
     const encoder = new TextEncoder();
+    const resolvedSessionId = sessionId; // captured for closure
+
     const readableStream = new ReadableStream({
       async start(controller) {
+        let fullText = "";
         try {
           for await (const chunk of stream) {
             const text = chunk.text;
             if (text) {
+              fullText += text;
               controller.enqueue(encoder.encode(text));
             }
           }
+          // Persist both turns after streaming completes
+          await appendMessages(resolvedSessionId, userMessage, fullText);
         } catch (error) {
           const message = error instanceof Error ? error.message : "Stream error";
           controller.enqueue(encoder.encode(`\n\n[Error: ${message}]`));
@@ -117,6 +170,7 @@ export async function POST(request: Request) {
         "Content-Type": "text/plain; charset=utf-8",
         "Transfer-Encoding": "chunked",
         "X-Content-Type-Options": "nosniff",
+        "X-Session-Id": resolvedSessionId,
       },
     });
   } catch (error) {
