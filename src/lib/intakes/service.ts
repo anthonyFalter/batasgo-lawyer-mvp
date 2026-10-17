@@ -71,7 +71,6 @@ export async function seedDevelopmentIntakes(workspaceId: string) {
     .limit(1);
 
   if (!workspace) throw new Error("Workspace was not found while seeding demo intakes.");
-  if (workspace.demoDataSeededAt) return;
 
   const now = Date.now();
   const fixtures = [
@@ -79,48 +78,77 @@ export async function seedDevelopmentIntakes(workspaceId: string) {
       reference: "DEMO-INTAKE-001",
       domain: "Labor & Employment",
       risk: "critical" as const,
-      client: "Synthetic Sample Client A",
-      summary: "Synthetic example: a worker reports unpaid compensation and an upcoming filing deadline. Verify all facts and dates before making a decision.",
-      receivedAt: new Date(now - 3 * 60_000),
-      deadlineAt: new Date(now),
-      priorityScore: 96,
+      client: "Former BPO employee · Pasig",
+      summary: "Synthetic example: A former BPO employee in Pasig reports that final pay has not been released after separation. They say the employer sent a quitclaim and requested a signature by tomorrow. They want a lawyer to review the documents before signing; dates and amounts are unverified.",
+      receivedAt: new Date(now - 8 * 60_000),
+      deadlineAt: new Date(now + 24 * 3_600_000),
+      priorityScore: 93,
     },
     {
       reference: "DEMO-INTAKE-002",
       domain: "Family Law",
       risk: "medium" as const,
-      client: "Synthetic Sample Client B",
-      summary: "Synthetic example: a person requests guidance about a family property matter and asks which records to prepare for an initial consultation.",
-      receivedAt: new Date(now - 21 * 60_000),
-      deadlineAt: new Date(now + 3 * 3_600_000),
-      priorityScore: 57,
+      client: "Parent · Quezon City",
+      summary: "Synthetic example: A parent in Quezon City says they and the other parent disagree about their child's school pick-up schedule and regular expenses. They are not sure whether their written messages form part of a formal agreement and want to prepare for a consultation. No hearing or filing deadline was mentioned.",
+      receivedAt: new Date(now - 45 * 60_000),
+      deadlineAt: null,
+      priorityScore: 56,
     },
     {
       reference: "DEMO-INTAKE-003",
       domain: "Civil Disputes",
       risk: "high" as const,
-      client: "Synthetic Sample Client C",
-      summary: "Synthetic example: a payment dispute involves a contract and a filing deadline that the prospective client says is approaching.",
-      receivedAt: new Date(now - 60 * 60_000),
-      deadlineAt: new Date(now + 60 * 60_000),
-      priorityScore: 78,
+      client: "Small business owner · Cebu City",
+      summary: "Synthetic example: A small business owner in Cebu City reports paying PHP 85,000 toward a store renovation. The agreed completion date has passed, some work remains unfinished, and the contractor has not replied to two written follow-ups. The owner says they have a quotation and transfer record and wants a lawyer consultation about available options. Dates and documents have not been verified.",
+      receivedAt: new Date(now - 2 * 3_600_000),
+      deadlineAt: null,
+      priorityScore: 76,
     },
   ];
 
-  await db
-    .insert(intakes)
-    .values(fixtures.map((fixture) => ({
-      ...fixture,
-      workspaceId,
-      documents: [],
-      isSample: true,
-    })))
-    .onConflictDoNothing();
+  if (!workspace.demoDataSeededAt) {
+    await db
+      .insert(intakes)
+      .values(fixtures.map((fixture) => ({
+        ...fixture,
+        workspaceId,
+        documents: [],
+        isSample: true,
+      })))
+      .onConflictDoNothing();
 
-  await db
-    .update(workspaces)
-    .set({ demoDataSeededAt: new Date() })
-    .where(and(eq(workspaces.id, workspaceId), isNull(workspaces.demoDataSeededAt)));
+    await db
+      .update(workspaces)
+      .set({ demoDataSeededAt: new Date() })
+      .where(and(eq(workspaces.id, workspaceId), isNull(workspaces.demoDataSeededAt)));
+    return;
+  }
+
+  const previousSummaries: Record<string, string> = {
+    "DEMO-INTAKE-001": "Synthetic example: a worker reports unpaid compensation and an upcoming filing deadline. Verify all facts and dates before making a decision.",
+    "DEMO-INTAKE-002": "Synthetic example: a person requests guidance about a family property matter and asks which records to prepare for an initial consultation.",
+    "DEMO-INTAKE-003": "Synthetic example: a payment dispute involves a contract and a filing deadline that the prospective client says is approaching.",
+  };
+
+  await Promise.all(fixtures.map((fixture) => db
+    .update(intakes)
+    .set({
+      domain: fixture.domain,
+      risk: fixture.risk,
+      client: fixture.client,
+      summary: fixture.summary,
+      receivedAt: fixture.receivedAt,
+      deadlineAt: fixture.deadlineAt,
+      priorityScore: fixture.priorityScore,
+      aiSummary: null,
+      updatedAt: new Date(),
+    })
+    .where(and(
+      eq(intakes.workspaceId, workspaceId),
+      eq(intakes.reference, fixture.reference),
+      eq(intakes.isSample, true),
+      eq(intakes.summary, previousSummaries[fixture.reference]),
+    ))));
 }
 
 export async function listWorkspaceIntakes(clerkUserId: string) {

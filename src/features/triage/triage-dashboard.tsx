@@ -808,7 +808,7 @@ export default function TriageDashboard() {
                     {intake.isSample && (
                       <section className="sample-ai-summary" aria-label="Synthetic sample AI summary">
                         {intake.aiSummary ? (
-                          <details className="sample-ai-summary-details" open>
+                          <details className="sample-ai-summary-details">
                             <summary>
                               <span className="sample-ai-summary-title">
                                 <Sparkles aria-hidden="true" size={13.4} fill="currentColor" strokeWidth={1.7} />
