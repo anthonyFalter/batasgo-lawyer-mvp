@@ -371,7 +371,7 @@ export default function DocumentAssemblyWorkspace() {
         <div className="document-editor-stage" hidden={workspaceStep !== "editor"}>
         <div className="document-contextline">
           <div className="document-breadcrumb" aria-label="Document location">
-            <button className="document-template-back" type="button" onClick={returnToTemplates}><ArrowLeft aria-hidden="true" size={16} /> Templates</button>
+            <button className="document-template-back" type="button" onClick={returnToTemplates}><ArrowLeft aria-hidden="true" size={10.72} /> Templates</button>
             <span aria-hidden="true">/</span><strong>{MATTER_ID}</strong>
           </div>
           <div className="document-context-title">
@@ -393,7 +393,7 @@ export default function DocumentAssemblyWorkspace() {
                 {referenceMode === "matter" && (
                   <button type="button" className="document-text-action" onClick={() => setSummaryExpanded((expanded) => !expanded)} aria-expanded={summaryExpanded}>
                     {summaryExpanded ? "Collapse summary" : "Show summary"}
-                    <ChevronDown aria-hidden="true" size={14} className={summaryExpanded ? "document-chevron--open" : ""} />
+                    <ChevronDown aria-hidden="true" size={9.38} className={summaryExpanded ? "document-chevron--open" : ""} />
                   </button>
                 )}
                 <button
@@ -405,7 +405,7 @@ export default function DocumentAssemblyWorkspace() {
                   aria-expanded={!referenceCollapsed}
                   title={referenceCollapsed ? "Expand Document Reference" : "Collapse Document Reference"}
                 >
-                  {referenceCollapsed ? <PanelLeftOpen aria-hidden="true" size={16} /> : <PanelLeftClose aria-hidden="true" size={16} />}
+                  {referenceCollapsed ? <PanelLeftOpen aria-hidden="true" size={10.72} /> : <PanelLeftClose aria-hidden="true" size={10.72} />}
                 </button>
               </div>
             </header>
@@ -437,7 +437,7 @@ export default function DocumentAssemblyWorkspace() {
                 onKeyDown={handleReferenceTabKeyDown}
                 onClick={() => setReferenceMode("chat")}
               >
-                <Bot aria-hidden="true" size={13} />
+                <Bot aria-hidden="true" size={8.71} />
                 BatasBot
               </button>
             </div>
@@ -473,7 +473,7 @@ export default function DocumentAssemblyWorkspace() {
                   <div className="claim-total"><dt>Total monetary claim</dt><dd>{TOTAL_CLAIM}</dd></div>
                 </dl>
                 <button type="button" onClick={insertComputedTotal}>
-                  <ClipboardCopy aria-hidden="true" size={14} />
+                  <ClipboardCopy aria-hidden="true" size={9.38} />
                   Insert computed sum into draft
                 </button>
               </section>
@@ -482,7 +482,7 @@ export default function DocumentAssemblyWorkspace() {
                 <div className="exhibits-heading">
                   <h3 id="exhibits-title">Evidentiary exhibits <span>({filteredAttachments.length})</span></h3>
                   <button type="button" className="document-text-action" onClick={() => fileInputRef.current?.click()}>
-                    <Paperclip aria-hidden="true" size={13} />
+                    <Paperclip aria-hidden="true" size={8.71} />
                     Attach files
                   </button>
                   <input
@@ -502,7 +502,7 @@ export default function DocumentAssemblyWorkspace() {
                         <span className={`exhibit-file-type exhibit-file-type--${attachment.kind.toLowerCase()}`}>{attachment.kind}</span>
                         <span className="exhibit-file-copy"><strong title={attachment.name}>{attachment.name}</strong><small>{attachment.detail}</small></span>
                         <button type="button" className="exhibit-preview-button" aria-label={`Preview ${attachment.name}`} onClick={() => setToast(`Preview for ${attachment.name} is not connected in this demo.`)}>
-                          <Eye aria-hidden="true" size={16} />
+                          <Eye aria-hidden="true" size={10.72} />
                         </button>
                       </li>
                     ))}
@@ -527,14 +527,14 @@ export default function DocumentAssemblyWorkspace() {
                     {chatMessages.map((message) => (
                       <div className={`batasbot-message batasbot-message--${message.role}`} key={message.id}>
                         {message.role === "assistant" && (
-                          <span className="batasbot-avatar" aria-hidden="true"><Bot size={15} /></span>
+                          <span className="batasbot-avatar" aria-hidden="true"><Bot size={10.05} /></span>
                         )}
                         <p>{message.content}</p>
                       </div>
                     ))}
                     {chatTypingPhase === "thinking" && (
                       <div className="batasbot-message batasbot-message--assistant">
-                        <span className="batasbot-avatar" aria-hidden="true"><Bot size={15} /></span>
+                        <span className="batasbot-avatar" aria-hidden="true"><Bot size={10.05} /></span>
                         <div className="batasbot-typing" role="status" aria-label="BatasBot is generating a reply">
                           <span aria-hidden="true"><i /><i /><i /></span>
                           <span className="sr-only">BatasBot is typing</span>
@@ -543,7 +543,7 @@ export default function DocumentAssemblyWorkspace() {
                     )}
                     {chatTypingPhase === "typing" && (
                       <div className="batasbot-message batasbot-message--assistant">
-                        <span className="batasbot-avatar" aria-hidden="true"><Bot size={15} /></span>
+                        <span className="batasbot-avatar" aria-hidden="true"><Bot size={10.05} /></span>
                         <p className="batasbot-streaming-text" aria-live="off">{chatStreamingText}</p>
                       </div>
                     )}
@@ -580,7 +580,7 @@ export default function DocumentAssemblyWorkspace() {
                       rows={1}
                     />
                     <button type="submit" aria-label="Send message" disabled={!chatInput.trim() || isChatGenerating}>
-                      <Send aria-hidden="true" size={15} />
+                      <Send aria-hidden="true" size={10.05} />
                     </button>
                   </form>
                   <p className="batasbot-disclaimer">BatasBot preview · Replies are sample text, not legal advice.</p>
@@ -591,7 +591,7 @@ export default function DocumentAssemblyWorkspace() {
 
           <section className={`document-editor${mobilePane === "draft" ? " document-editor--mobile-active" : ""}`} aria-label="Draft document editor">
             <header className="document-editor-heading">
-              <div className="document-file-icon"><FileText aria-hidden="true" size={17} /></div>
+              <div className="document-file-icon"><FileText aria-hidden="true" size={11.39} /></div>
               <div className="document-name">
                 <h2>{currentDocumentTitle}</h2>
                 <span>{MATTER_ID}</span>
@@ -622,8 +622,8 @@ export default function DocumentAssemblyWorkspace() {
               {activeTab === "Home" && (
                 <>
                   <div className="editor-tool-group">
-                    <button type="button" className="editor-tool-button" title="Undo" aria-label="Undo" onMouseDown={(event) => event.preventDefault()} onClick={() => runEditorCommand("undo")}><Undo2 size={15} /></button>
-                    <button type="button" className="editor-tool-button" title="Redo" aria-label="Redo" onMouseDown={(event) => event.preventDefault()} onClick={() => runEditorCommand("redo")}><Redo2 size={15} /></button>
+                    <button type="button" className="editor-tool-button" title="Undo" aria-label="Undo" onMouseDown={(event) => event.preventDefault()} onClick={() => runEditorCommand("undo")}><Undo2 size={10.05} /></button>
+                    <button type="button" className="editor-tool-button" title="Redo" aria-label="Redo" onMouseDown={(event) => event.preventDefault()} onClick={() => runEditorCommand("redo")}><Redo2 size={10.05} /></button>
                   </div>
                   <span className="editor-tool-divider" />
                   <label className="editor-select-wrap">
@@ -633,31 +633,31 @@ export default function DocumentAssemblyWorkspace() {
                       <option value="Arial">Arial</option>
                       <option value="Times New Roman">Times New Roman</option>
                     </select>
-                    <ChevronDown size={13} aria-hidden="true" />
+                    <ChevronDown size={8.71} aria-hidden="true" />
                   </label>
                   <label className="editor-select-wrap editor-font-size">
                     <span className="sr-only">Font size</span>
                     <select defaultValue="3" onChange={(event) => runEditorCommand("fontSize", event.target.value)}>
                       <option value="2">10 pt</option><option value="3">12 pt</option><option value="4">14 pt</option><option value="5">18 pt</option>
                     </select>
-                    <ChevronDown size={13} aria-hidden="true" />
+                    <ChevronDown size={8.71} aria-hidden="true" />
                   </label>
                   <span className="editor-tool-divider" />
                   <div className="editor-tool-group">
-                    <button type="button" className="editor-tool-button" title="Bold" aria-label="Bold" onMouseDown={(event) => event.preventDefault()} onClick={() => runEditorCommand("bold")}><Bold size={15} /></button>
-                    <button type="button" className="editor-tool-button" title="Italic" aria-label="Italic" onMouseDown={(event) => event.preventDefault()} onClick={() => runEditorCommand("italic")}><Italic size={15} /></button>
-                    <button type="button" className="editor-tool-button" title="Underline" aria-label="Underline" onMouseDown={(event) => event.preventDefault()} onClick={() => runEditorCommand("underline")}><Underline size={15} /></button>
+                    <button type="button" className="editor-tool-button" title="Bold" aria-label="Bold" onMouseDown={(event) => event.preventDefault()} onClick={() => runEditorCommand("bold")}><Bold size={10.05} /></button>
+                    <button type="button" className="editor-tool-button" title="Italic" aria-label="Italic" onMouseDown={(event) => event.preventDefault()} onClick={() => runEditorCommand("italic")}><Italic size={10.05} /></button>
+                    <button type="button" className="editor-tool-button" title="Underline" aria-label="Underline" onMouseDown={(event) => event.preventDefault()} onClick={() => runEditorCommand("underline")}><Underline size={10.05} /></button>
                   </div>
                   <span className="editor-tool-divider" />
                   <div className="editor-tool-group">
-                    <button type="button" className="editor-tool-button" title="Align left" aria-label="Align left" onMouseDown={(event) => event.preventDefault()} onClick={() => runEditorCommand("justifyLeft")}><AlignLeft size={15} /></button>
-                    <button type="button" className="editor-tool-button" title="Align center" aria-label="Align center" onMouseDown={(event) => event.preventDefault()} onClick={() => runEditorCommand("justifyCenter")}><AlignCenter size={15} /></button>
-                    <button type="button" className="editor-tool-button" title="Align right" aria-label="Align right" onMouseDown={(event) => event.preventDefault()} onClick={() => runEditorCommand("justifyRight")}><AlignRight size={15} /></button>
+                    <button type="button" className="editor-tool-button" title="Align left" aria-label="Align left" onMouseDown={(event) => event.preventDefault()} onClick={() => runEditorCommand("justifyLeft")}><AlignLeft size={10.05} /></button>
+                    <button type="button" className="editor-tool-button" title="Align center" aria-label="Align center" onMouseDown={(event) => event.preventDefault()} onClick={() => runEditorCommand("justifyCenter")}><AlignCenter size={10.05} /></button>
+                    <button type="button" className="editor-tool-button" title="Align right" aria-label="Align right" onMouseDown={(event) => event.preventDefault()} onClick={() => runEditorCommand("justifyRight")}><AlignRight size={10.05} /></button>
                   </div>
                 </>
               )}
               {activeTab === "File" && (
-                <button type="button" className="editor-tool-button editor-tool-labeled" onClick={saveDraft}><Save size={15} /> Save draft</button>
+                <button type="button" className="editor-tool-button editor-tool-labeled" onClick={saveDraft}><Save size={10.05} /> Save draft</button>
               )}
               {activeTab === "Insert" && (
                 <>
@@ -672,12 +672,12 @@ export default function DocumentAssemblyWorkspace() {
                   <select defaultValue="p" onChange={(event) => runEditorCommand("formatBlock", event.target.value)}>
                     <option value="p">Paragraph</option><option value="h2">Heading</option><option value="blockquote">Quotation</option>
                   </select>
-                  <ChevronDown size={13} aria-hidden="true" />
+                  <ChevronDown size={8.71} aria-hidden="true" />
                 </label>
               )}
               {activeTab === "Review Changes" && (
                 <button type="button" className="editor-tool-button editor-tool-labeled" onClick={() => setReviewOpen(true)}>
-                  <Check size={15} /> Review &amp; export draft
+                  <Check size={10.05} /> Review &amp; export draft
                 </button>
               )}
               {activeTab === "View" && (
@@ -730,7 +730,7 @@ export default function DocumentAssemblyWorkspace() {
                 <button type="button" className="document-icon-button" aria-label="Close review" onClick={() => {
                   setReviewOpen(false);
                   reviewTriggerRef.current?.focus();
-                }}><X size={18} /></button>
+                }}><X size={12.06} /></button>
               </header>
               <div className="document-review-context">
                 <span>{currentDocumentTitle}</span><span>Matter: <strong>{MATTER_ID}</strong></span>
@@ -755,7 +755,7 @@ export default function DocumentAssemblyWorkspace() {
                   reviewTriggerRef.current?.focus();
                 }}>Back to draft</button>
                 <button type="button" className="new-intake-button document-export-button" disabled={!allChecksComplete} onClick={exportDraft}>
-                  <Download aria-hidden="true" size={15} />
+                  <Download aria-hidden="true" size={10.05} />
                   Export review copy
                 </button>
               </footer>
@@ -766,9 +766,9 @@ export default function DocumentAssemblyWorkspace() {
 
         {toast && (
           <div className="document-toast" role="status">
-            <Check aria-hidden="true" size={15} />
+            <Check aria-hidden="true" size={10.05} />
             <span>{toast}</span>
-            <button type="button" aria-label="Dismiss notification" onClick={() => setToast("")}><X size={15} /></button>
+            <button type="button" aria-label="Dismiss notification" onClick={() => setToast("")}><X size={10.05} /></button>
           </div>
         )}
       </main>

@@ -287,14 +287,14 @@ export default function BatasBotWorkspace() {
       <main className={`batasbot-page${messages.length ? " batasbot-page--conversation" : ""}`}>
         <header className="batasbot-page-header">
           <div className="batasbot-page-brand">
-            <span className="batasbot-page-mark"><Bot aria-hidden="true" size={19} /></span>
+            <span className="batasbot-page-mark"><Bot aria-hidden="true" size={12.73} /></span>
             <div>
               <h1>BatasBot</h1>
               <p>Your workspace assistant</p>
             </div>
           </div>
           <button className="batasbot-new-chat" type="button" onClick={startNewChat}>
-            <Plus aria-hidden="true" size={15} />
+            <Plus aria-hidden="true" size={10.05} />
             <span>New chat</span>
           </button>
         </header>
@@ -304,15 +304,15 @@ export default function BatasBotWorkspace() {
             <section className="batasbot-chat-area" aria-label="BatasBot conversation">
               {messages.length === 0 ? (
                 <div className="batasbot-welcome">
-                  <div className="batasbot-welcome-mark"><Bot aria-hidden="true" size={25} /></div>
+                  <div className="batasbot-welcome-mark"><Bot aria-hidden="true" size={16.75} /></div>
                   <h2>What can I help you with?</h2>
                   <p>Ask about your workspace, get help preparing a draft, or find the right place to continue your work.</p>
                   <div className="batasbot-starters" aria-label="Suggested prompts">
                     {STARTER_PROMPTS.map(({ label, icon: Icon }) => (
                       <button type="button" key={label} onClick={() => sendMessage(label)}>
-                        <Icon aria-hidden="true" size={16} />
+                        <Icon aria-hidden="true" size={10.72} />
                         <span>{label}</span>
-                        <ArrowUp aria-hidden="true" className="batasbot-starter-arrow" size={14} />
+                        <ArrowUp aria-hidden="true" className="batasbot-starter-arrow" size={9.38} />
                       </button>
                     ))}
                   </div>
@@ -321,14 +321,14 @@ export default function BatasBotWorkspace() {
                 <div className="batasbot-thread" role="log" aria-live="polite" aria-relevant="additions text" aria-label="Chat history">
                   {messages.map((message) => (
                     <article className={`batasbot-thread-message batasbot-thread-message--${message.role}`} key={message.id}>
-                      {message.role === "assistant" && <span className="batasbot-thread-avatar" aria-hidden="true"><Bot size={15} /></span>}
+                      {message.role === "assistant" && <span className="batasbot-thread-avatar" aria-hidden="true"><Bot size={10.05} /></span>}
                       <div className="batasbot-thread-body">
                         <p>{message.content}</p>
                         {message.links && (
                           <div className="batasbot-thread-links">
                             {message.links.map(({ label, href, icon: Icon }) => (
                               <Link href={href} key={href}>
-                                <Icon aria-hidden="true" size={14} />
+                                <Icon aria-hidden="true" size={9.38} />
                                 {label}
                               </Link>
                             ))}
@@ -339,7 +339,7 @@ export default function BatasBotWorkspace() {
                   ))}
                   {replyPhase === "thinking" && (
                     <div className="batasbot-thread-message batasbot-thread-message--assistant">
-                      <span className="batasbot-thread-avatar" aria-hidden="true"><Bot size={15} /></span>
+                      <span className="batasbot-thread-avatar" aria-hidden="true"><Bot size={10.05} /></span>
                       <div className="batasbot-thread-typing" role="status" aria-label="BatasBot is generating a reply">
                         <span aria-hidden="true"><i /><i /><i /></span>
                         <span className="sr-only">BatasBot is typing</span>
@@ -348,7 +348,7 @@ export default function BatasBotWorkspace() {
                   )}
                   {replyPhase === "typing" && (
                     <article className="batasbot-thread-message batasbot-thread-message--assistant">
-                      <span className="batasbot-thread-avatar" aria-hidden="true"><Bot size={15} /></span>
+                      <span className="batasbot-thread-avatar" aria-hidden="true"><Bot size={10.05} /></span>
                       <div className="batasbot-thread-body">
                         <p className="batasbot-streaming-text" aria-live="off">{streamedReply}</p>
                       </div>
@@ -377,7 +377,7 @@ export default function BatasBotWorkspace() {
                   rows={1}
                 />
                 <button type="submit" aria-label="Send message" disabled={!input.trim() || isGenerating}>
-                  <ArrowUp aria-hidden="true" size={17} />
+                  <ArrowUp aria-hidden="true" size={11.39} />
                 </button>
               </form>
               <p className="batasbot-main-disclaimer">BatasBot is a demo assistant. Replies use sample text and are not legal advice.</p>
@@ -390,7 +390,7 @@ export default function BatasBotWorkspace() {
                 <h2 id="batasbot-sessions-title">Sessions</h2>
                 <span>{completedSessionCount} conversations</span>
               </div>
-              <MessageSquare aria-hidden="true" size={18} />
+              <MessageSquare aria-hidden="true" size={12.06} />
             </div>
             <div className="batasbot-session-list" aria-label="Chat sessions">
               {visibleSessions.map((session) => {
@@ -426,7 +426,7 @@ export default function BatasBotWorkspace() {
         {notice && (
           <div className="batasbot-notice" role="status">
             <span>{notice}</span>
-            <button type="button" aria-label="Dismiss notice" onClick={() => setNotice("")}><X size={15} /></button>
+            <button type="button" aria-label="Dismiss notice" onClick={() => setNotice("")}><X size={10.05} /></button>
           </div>
         )}
       </main>

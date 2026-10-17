@@ -2,8 +2,8 @@
   position: relative;
   display: flex;
   width: 100%;
-  height: calc(100vh - 94px);
-  min-height: 440px;
+  height: calc(100vh - 62.98px);
+  min-height: 294.8px;
   flex-direction: column;
   overflow: hidden;
   background: var(--surface);
@@ -11,14 +11,14 @@
 
 .batasbot-page-header {
   display: flex;
-  min-height: 58px;
+  min-height: 38.86px;
   flex: 0 0 auto;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 0 24px;
+  gap: 10.72px;
+  padding: 0 16.08px;
   background: var(--surface);
-  border-bottom: 1px solid var(--line-soft);
+  border-bottom: 0.67px solid var(--line-soft);
 }
 
 .batasbot-content-grid {
@@ -26,9 +26,9 @@
   min-width: 0;
   min-height: 0;
   flex: 1;
-  grid-template-columns: minmax(0, 1fr) minmax(250px, 320px);
+  grid-template-columns: minmax(0, 1fr) minmax(167.5px, 214.4px);
   grid-template-areas: "chat sessions";
-  padding: 14px 18px 0;
+  padding: 9.38px 12.06px 0;
 }
 
 .batasbot-sessions-panel {
@@ -40,30 +40,30 @@
 .batasbot-sessions-panel {
   display: flex;
   flex-direction: column;
-  padding: 3px 0 12px 16px;
-  border-left: 1px solid var(--line-soft);
+  padding: 2.01px 0 8.04px 10.72px;
+  border-left: 0.67px solid var(--line-soft);
 }
 
 .batasbot-panel-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 13px;
+  gap: 6.7px;
+  margin-bottom: 8.71px;
 }
 
 .batasbot-panel-heading h2 {
   margin: 0;
   color: var(--heading);
-  font-size: 18px;
+  font-size: 12.06px;
   font-weight: 700;
 }
 
 .batasbot-panel-heading > div > span {
   display: block;
-  margin-top: 3px;
+  margin-top: 2.01px;
   color: var(--muted);
-  font-size: 16px;
+  font-size: 10.72px;
 }
 
 .batasbot-panel-heading > svg {
@@ -76,9 +76,9 @@
   min-height: 0;
   flex: 1;
   flex-direction: column;
-  gap: 5px;
+  gap: 3.35px;
   overflow-y: auto;
-  padding: 0 3px 6px 0;
+  padding: 0 2.01px 4.02px 0;
 }
 
 .batasbot-session-item {
@@ -86,12 +86,12 @@
   min-width: 0;
   flex-direction: column;
   align-items: stretch;
-  gap: 5px;
-  padding: 10px 10px 9px;
+  gap: 3.35px;
+  padding: 6.7px 6.7px 6.03px;
   color: #3c4656;
   background: transparent;
-  border: 1px solid transparent;
-  border-radius: 7px;
+  border: 0.67px solid transparent;
+  border-radius: 4.69px;
   cursor: pointer;
   text-align: left;
 }
@@ -114,13 +114,13 @@
   min-width: 0;
   align-items: baseline;
   justify-content: space-between;
-  gap: 7px;
+  gap: 4.69px;
 }
 
 .batasbot-session-title-row strong {
   overflow: hidden;
   color: #303842;
-  font-size: 16px;
+  font-size: 10.72px;
   font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -129,14 +129,14 @@
 .batasbot-session-title-row time {
   flex: 0 0 auto;
   color: #7b879b;
-  font-size: 16px;
+  font-size: 10.72px;
 }
 
 .batasbot-session-preview {
   display: -webkit-box;
   overflow: hidden;
   color: #748198;
-  font-size: 16px;
+  font-size: 10.72px;
   line-height: 1.35;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -145,21 +145,21 @@
 .batasbot-session-sample {
   align-self: flex-start;
   color: #657188;
-  font-size: 16px;
+  font-size: 10.72px;
 }
 
 .batasbot-session-empty,
 .batasbot-sessions-note {
   margin: 0;
   color: #748198;
-  font-size: 16px;
+  font-size: 10.72px;
   line-height: 1.4;
 }
 
 .batasbot-sessions-note {
   flex: 0 0 auto;
-  padding-top: 10px;
-  border-top: 1px solid var(--line-soft);
+  padding-top: 6.7px;
+  border-top: 0.67px solid var(--line-soft);
 }
 
 .batasbot-main-column {
@@ -174,13 +174,13 @@
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 9px;
+  gap: 6.03px;
 }
 
 .batasbot-page-mark {
   display: grid;
-  width: 34px;
-  height: 34px;
+  width: 22.78px;
+  height: 22.78px;
   flex: 0 0 auto;
   place-items: center;
   color: var(--blue-ink);
@@ -191,29 +191,29 @@
 .batasbot-page-brand h1 {
   margin: 0;
   color: var(--heading);
-  font-size: 18px;
+  font-size: 12.06px;
   font-weight: 700;
 }
 
 .batasbot-page-brand p {
-  margin: 2px 0 0;
+  margin: 1.34px 0 0;
   color: var(--muted);
-  font-size: 18px;
+  font-size: 12.06px;
 }
 
 .workspace .batasbot-new-chat {
   display: inline-flex;
-  min-height: 32px;
+  min-height: 21.44px;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 0 10px;
+  gap: 4.02px;
+  padding: 0 6.7px;
   color: #47566e;
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 0.67px solid var(--line);
   border-radius: var(--radius-control);
   cursor: pointer;
-  font-size: 18px;
+  font-size: 12.06px;
   font-weight: 600;
 }
 
@@ -227,8 +227,8 @@
 .batasbot-starters button:focus-visible,
 .batasbot-thread-links a:focus-visible,
 .batasbot-main-composer button:focus-visible {
-  outline: 2px solid #86a7ff;
-  outline-offset: 2px;
+  outline: 1.34px solid #86a7ff;
+  outline-offset: 1.34px;
 }
 
 .batasbot-chat-area {
@@ -243,60 +243,60 @@
 
 .batasbot-welcome {
   display: flex;
-  width: min(100% - 36px, 760px);
+  width: min(100% - 24.12px, 509.2px);
   flex: 1;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 24px 0;
+  padding: 16.08px 0;
   text-align: center;
 }
 
 .batasbot-welcome-mark {
   display: grid;
-  width: 56px;
-  height: 56px;
+  width: 37.52px;
+  height: 37.52px;
   place-items: center;
   color: var(--blue-ink);
   background: var(--blue-pale);
-  border: 1px solid #dce7ff;
+  border: 0.67px solid #dce7ff;
   border-radius: var(--radius-panel);
 }
 
 .batasbot-welcome h2 {
-  margin: 17px 0 0;
+  margin: 11.39px 0 0;
   color: var(--heading);
-  font-size: 24px;
+  font-size: 16.08px;
   font-weight: 680;
   letter-spacing: -0.025em;
 }
 
 .batasbot-welcome > p {
-  max-width: 560px;
-  margin: 8px 0 0;
+  max-width: 375.2px;
+  margin: 5.36px 0 0;
   color: var(--body-ink);
-  font-size: 18px;
+  font-size: 12.06px;
   line-height: 1.55;
 }
 
 .batasbot-starters {
   display: grid;
-  width: min(100%, 680px);
+  width: min(100%, 455.6px);
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 28px;
+  gap: 6.7px;
+  margin-top: 18.76px;
 }
 
 .batasbot-starters button {
   display: flex;
   min-width: 0;
-  min-height: 56px;
+  min-height: 37.52px;
   align-items: center;
-  gap: 9px;
-  padding: 8px 14px;
+  gap: 6.03px;
+  padding: 5.36px 9.38px;
   color: #475166;
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 0.67px solid var(--line);
   border-radius: var(--radius-control);
   cursor: pointer;
   text-align: left;
@@ -317,7 +317,7 @@
 .batasbot-starters button span {
   min-width: 0;
   flex: 1;
-  font-size: 18px;
+  font-size: 12.06px;
   font-weight: 500;
   line-height: 1.4;
 }
@@ -330,12 +330,12 @@
 
 .batasbot-thread {
   display: flex;
-  width: min(100%, 920px);
+  width: min(100%, 616.4px);
   min-height: 0;
   flex: 1;
   flex-direction: column;
-  gap: 24px;
-  padding: 28px 28px;
+  gap: 16.08px;
+  padding: 18.76px 18.76px;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-color: #c6ceda transparent;
@@ -346,7 +346,7 @@
   display: flex;
   max-width: 92%;
   align-items: flex-start;
-  gap: 10px;
+  gap: 6.7px;
 }
 
 .batasbot-thread-message--user {
@@ -360,8 +360,8 @@
 
 .batasbot-thread-avatar {
   display: grid;
-  width: 29px;
-  height: 29px;
+  width: 19.43px;
+  height: 19.43px;
   flex: 0 0 auto;
   place-items: center;
   color: var(--blue-ink);
@@ -375,11 +375,11 @@
 
 .batasbot-thread-body > p {
   margin: 0;
-  padding: 14px 18px;
+  padding: 9.38px 12.06px;
   color: var(--ink);
   background: #f1f4f9;
   border-radius: var(--radius-panel) var(--radius-panel) var(--radius-panel) var(--radius-small);
-  font-size: 18px;
+  font-size: 12.06px;
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
@@ -393,21 +393,21 @@
 .batasbot-thread-links {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
-  margin-top: 9px;
+  gap: 4.69px;
+  margin-top: 6.03px;
 }
 
 .batasbot-thread-links a {
   display: inline-flex;
-  min-height: 38px;
+  min-height: 25.46px;
   align-items: center;
-  gap: 6px;
-  padding: 4px 12px;
+  gap: 4.02px;
+  padding: 2.68px 8.04px;
   color: var(--blue-ink);
   background: var(--surface);
-  border: 1px solid #dce7ff;
+  border: 0.67px solid #dce7ff;
   border-radius: var(--radius-control);
-  font-size: 18px;
+  font-size: 12.06px;
   font-weight: 620;
   text-decoration: none;
 }
@@ -418,10 +418,10 @@
 
 .batasbot-thread-typing {
   display: flex;
-  min-width: 58px;
-  min-height: 37px;
+  min-width: 38.86px;
+  min-height: 24.79px;
   align-items: center;
-  padding: 0 13px;
+  padding: 0 8.71px;
   background: #f1f4f9;
   border-radius: var(--radius-panel) var(--radius-panel) var(--radius-panel) var(--radius-small);
 }
@@ -429,12 +429,12 @@
 .batasbot-thread-typing > span:first-child {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 2.68px;
 }
 
 .batasbot-thread-typing i {
-  width: 5px;
-  height: 5px;
+  width: 3.35px;
+  height: 3.35px;
   background: #72819a;
   border-radius: 50%;
   animation: batasbot-main-typing 1s ease-in-out infinite;
@@ -457,45 +457,45 @@
   }
   30% {
     opacity: 1;
-    transform: translateY(-3px);
+    transform: translateY(-2.01px);
   }
 }
 
 .batasbot-compose-area {
-  width: min(100% - 48px, 920px);
+  width: min(100% - 32.16px, 616.4px);
   flex: 0 0 auto;
   margin: 0 auto;
-  padding: 10px 0 12px;
+  padding: 6.7px 0 8.04px;
 }
 
 .batasbot-main-composer {
   display: flex;
-  min-height: 60px;
+  min-height: 40.2px;
   align-items: flex-end;
-  gap: 8px;
-  padding: 7px 8px 7px 15px;
+  gap: 5.36px;
+  padding: 4.69px 5.36px 4.69px 10.05px;
   background: var(--surface);
-  border: 1px solid #d6dce6;
+  border: 0.67px solid #d6dce6;
   border-radius: var(--radius-panel);
-  box-shadow: 0 3px 12px rgb(29 40 60 / 7%);
+  box-shadow: 0 2.01px 8.04px rgb(29 40 60 / 7%);
 }
 
 .batasbot-main-composer:focus-within {
   border-color: #99b2fb;
-  box-shadow: 0 0 0 3px rgb(75 120 255 / 10%);
+  box-shadow: 0 0 0 2.01px rgb(75 120 255 / 10%);
 }
 
 .batasbot-main-composer textarea {
   width: 100%;
-  min-height: 42px;
-  max-height: 140px;
+  min-height: 28.14px;
+  max-height: 93.8px;
   resize: none;
-  padding: 8px 0;
+  padding: 5.36px 0;
   color: var(--input-ink);
   background: transparent;
   border: 0;
   font: inherit;
-  font-size: 18px;
+  font-size: 12.06px;
   line-height: 1.5;
   outline: 0;
 }
@@ -507,8 +507,8 @@
 
 .batasbot-main-composer > button {
   display: grid;
-  width: 40px;
-  height: 40px;
+  width: 26.8px;
+  height: 26.8px;
   flex: 0 0 auto;
   place-items: center;
   color: #fff;
@@ -529,28 +529,28 @@
 }
 
 .batasbot-main-disclaimer {
-  margin: 7px 0 0;
+  margin: 4.69px 0 0;
   color: var(--muted);
-  font-size: 18px;
+  font-size: 12.06px;
   line-height: 1.4;
   text-align: center;
 }
 
 .batasbot-notice {
   position: absolute;
-  right: 18px;
-  bottom: 72px;
+  right: 12.06px;
+  bottom: 48.24px;
   display: flex;
-  max-width: min(390px, calc(100% - 36px));
+  max-width: min(261.3px, calc(100% - 24.12px));
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
+  gap: 8.04px;
+  padding: 6.7px 8.04px;
   color: #fff;
   background: #262c37;
-  border: 1px solid #3d4656;
+  border: 0.67px solid #3d4656;
   border-radius: var(--radius-control);
-  box-shadow: 0 4px 12px rgb(19 27 41 / 18%);
-  font-size: 18px;
+  box-shadow: 0 2.68px 8.04px rgb(19 27 41 / 18%);
+  font-size: 12.06px;
 }
 
 .batasbot-notice > span {
@@ -559,8 +559,8 @@
 
 .batasbot-notice button {
   display: grid;
-  width: 25px;
-  height: 25px;
+  width: 16.75px;
+  height: 16.75px;
   flex: 0 0 auto;
   place-items: center;
   color: #fff;
@@ -574,15 +574,15 @@
   background: rgb(255 255 255 / 12%);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 428.8px) {
   .batasbot-page {
-    height: calc(100dvh - 76px);
-    min-height: 400px;
+    height: calc(100dvh - 50.92px);
+    min-height: 268px;
   }
 
   .batasbot-page-header {
-    min-height: 52px;
-    padding: 0 12px;
+    min-height: 34.84px;
+    padding: 0 8.04px;
   }
 
   .batasbot-content-grid {
@@ -590,52 +590,52 @@
     grid-template-rows: auto minmax(0, 1fr);
     grid-template-areas: "sessions" "chat";
     gap: 0;
-    padding: 5px 10px 0;
+    padding: 3.35px 6.7px 0;
   }
 
   .batasbot-sessions-panel {
     grid-row: 1;
-    max-height: 132px;
-    padding: 0 0 8px;
+    max-height: 88.44px;
+    padding: 0 0 5.36px;
     border-left: 0;
-    border-bottom: 1px solid var(--line-soft);
+    border-bottom: 0.67px solid var(--line-soft);
   }
 
   .batasbot-sessions-panel .batasbot-panel-heading {
-    margin-bottom: 7px;
+    margin-bottom: 4.69px;
   }
 
   .batasbot-panel-heading h2 {
-    font-size: 16px;
+    font-size: 10.72px;
   }
 
   .batasbot-panel-heading > div > span {
-    font-size: 16px;
+    font-size: 10.72px;
   }
 
   .batasbot-session-list {
     display: grid;
-    min-height: 62px;
+    min-height: 41.54px;
     flex: 0 0 auto;
-    grid-auto-columns: minmax(190px, 70vw);
+    grid-auto-columns: minmax(127.3px, 70vw);
     grid-auto-flow: column;
     grid-template-rows: minmax(0, 1fr);
-    gap: 7px;
+    gap: 4.69px;
     overflow-x: auto;
     overflow-y: hidden;
-    padding: 0 0 4px;
+    padding: 0 0 2.68px;
   }
 
   .batasbot-session-item {
     min-width: 0;
-    padding: 7px 9px;
+    padding: 4.69px 6.03px;
   }
 
   .batasbot-session-title-row strong,
   .batasbot-session-title-row time,
   .batasbot-session-preview,
   .batasbot-session-sample {
-    font-size: 16px;
+    font-size: 10.72px;
   }
 
   .batasbot-sessions-note {
@@ -648,63 +648,63 @@
   }
 
   .batasbot-page-mark {
-    width: 31px;
-    height: 31px;
+    width: 20.77px;
+    height: 20.77px;
   }
 
   .batasbot-page-brand h1 {
-    font-size: 18px;
+    font-size: 12.06px;
   }
 
   .batasbot-new-chat {
-    min-height: 31px;
-    padding: 0 8px;
+    min-height: 20.77px;
+    padding: 0 5.36px;
   }
 
   .batasbot-welcome {
-    width: calc(100% - 28px);
-    padding: 20px 0;
+    width: calc(100% - 18.76px);
+    padding: 13.4px 0;
   }
 
   .batasbot-welcome h2 {
-    margin-top: 14px;
-    font-size: 22px;
+    margin-top: 9.38px;
+    font-size: 14.74px;
   }
 
   .batasbot-welcome > p {
-    max-width: 330px;
-    font-size: 18px;
+    max-width: 221.1px;
+    font-size: 12.06px;
   }
 
   .batasbot-starters {
-    width: min(100%, 390px);
+    width: min(100%, 261.3px);
     grid-template-columns: minmax(0, 1fr);
-    gap: 7px;
-    margin-top: 18px;
+    gap: 4.69px;
+    margin-top: 12.06px;
   }
 
   .batasbot-starters button {
-    min-height: 56px;
+    min-height: 37.52px;
   }
 
   .batasbot-thread {
-    padding: 18px 12px;
-    gap: 16px;
+    padding: 12.06px 8.04px;
+    gap: 10.72px;
   }
 
   .batasbot-thread-message {
     max-width: 96%;
-    gap: 7px;
+    gap: 4.69px;
   }
 
   .batasbot-thread-body > p {
-    padding: 12px 14px;
-    font-size: 18px;
+    padding: 8.04px 9.38px;
+    font-size: 12.06px;
   }
 
   .batasbot-compose-area {
-    width: calc(100% - 22px);
-    padding-bottom: 9px;
+    width: calc(100% - 14.74px);
+    padding-bottom: 6.03px;
   }
 }
 

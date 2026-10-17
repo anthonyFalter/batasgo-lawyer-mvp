@@ -137,7 +137,7 @@ export default function MessagesWorkspace() {
               <h2>Direct Messages</h2>
             </div>
             <label className="conversation-search">
-              <Search aria-hidden="true" size={15} />
+              <Search aria-hidden="true" size={10.05} />
               <span className="sr-only">Filter conversations</span>
               <input
                 type="search"
@@ -167,7 +167,7 @@ export default function MessagesWorkspace() {
               ))}
               {visibleConversations.length === 0 && (
                 <div className="conversation-empty">
-                  <Search aria-hidden="true" size={18} />
+                  <Search aria-hidden="true" size={12.06} />
                   <p>No conversations match your search.</p>
                 </div>
               )}
@@ -179,7 +179,7 @@ export default function MessagesWorkspace() {
               <>
                 <header className="thread-header">
                   <button className="messages-icon-button thread-back-button" type="button" aria-label="Back to inbox" onClick={() => setShowThreadOnMobile(false)}>
-                    <ArrowLeft size={18} />
+                    <ArrowLeft size={12.06} />
                   </button>
                   <div className="thread-contact">
                     <h2>{selectedConversation.threadTitle}</h2>
@@ -194,7 +194,7 @@ export default function MessagesWorkspace() {
                         {message.text && <p>{message.text}</p>}
                         <span className="thread-message-meta">
                           {message.time}
-                          {message.direction === "outbound" && <CheckCheck aria-label="Sent" size={11} />}
+                          {message.direction === "outbound" && <CheckCheck aria-label="Sent" size={7.37} />}
                         </span>
                       </div>
                     </article>
@@ -206,7 +206,7 @@ export default function MessagesWorkspace() {
                 <form className="message-composer" onSubmit={sendMessage}>
                   <div className="composer-input-wrap">
                     <button className="messages-icon-button composer-attachment" type="button" aria-label="Attach a file" onClick={() => unavailable("File attachments")}>
-                      <Paperclip size={16} />
+                      <Paperclip size={10.72} />
                     </button>
                     <span className="sr-only">Write a message</span>
                     <input
@@ -222,7 +222,7 @@ export default function MessagesWorkspace() {
                       placeholder="Type a message..."
                     />
                     <button className="composer-send" type="submit" aria-label="Send message" disabled={!messageDraft.trim()}>
-                      <Send aria-hidden="true" size={17} />
+                      <Send aria-hidden="true" size={11.39} />
                     </button>
                   </div>
                   <p className="composer-hint">Demo only · Replies are not sent.</p>
@@ -230,7 +230,7 @@ export default function MessagesWorkspace() {
               </>
             ) : (
               <div className="thread-empty">
-                <span className="thread-empty-icon"><Mail aria-hidden="true" size={21} /></span>
+                <span className="thread-empty-icon"><Mail aria-hidden="true" size={14.07} /></span>
                 <h2>{search ? "Conversation not found" : "Select a conversation"}</h2>
                 <p>{search ? "Clear or change your search to see this conversation." : "Choose a conversation from your inbox to read and reply."}</p>
                 {search && <button type="button" onClick={() => setSearch("")}>Clear search</button>}
@@ -241,10 +241,10 @@ export default function MessagesWorkspace() {
       </main>
       {toast && (
         <div className="toast messages-toast" role="status">
-          <span className="toast-check"><Check size={16} /></span>
+          <span className="toast-check"><Check size={10.72} /></span>
           <span>{toast}</span>
           <button className="toast-close" type="button" aria-label="Dismiss notification" onClick={() => setToast("")}>
-            <X size={16} />
+            <X size={10.72} />
           </button>
         </div>
       )}

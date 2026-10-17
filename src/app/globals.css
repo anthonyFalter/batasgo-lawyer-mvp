@@ -34,3 +34,20 @@ select {
 a {
   color: inherit;
 }
+
+@media (max-width: 657px) {
+  .workspace button:not(.calendar-day),
+  .workspace input,
+  .workspace select,
+  .workspace .sidebar .nav-item,
+  .workspace .sidebar .brand,
+  .workspace .task-select-wrap {
+    min-height: 44px;
+  }
+
+  .workspace .icon-button,
+  .workspace .calendar-icon-button,
+  .workspace .document-icon-button {
+    min-width: 44px;
+  }
+}

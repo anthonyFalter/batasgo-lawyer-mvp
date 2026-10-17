@@ -200,10 +200,10 @@ function CalendarEventTooltip({ event }: { event: CalendarEvent }) {
       <p className="calendar-tooltip-matter">{event.matter}</p>
       <p className="calendar-tooltip-description">{event.details}</p>
       <div className="calendar-tooltip-meta">
-        <span><CalendarDays aria-hidden="true" size={14} />{dateLabel}</span>
-        <span><Clock3 aria-hidden="true" size={14} />{formatClock(event.startTime)} – {eventEndTime(event)}</span>
-        <span><MapPin aria-hidden="true" size={14} />{event.location}</span>
-        <span><MessageCircle aria-hidden="true" size={14} />{event.attendees}</span>
+        <span><CalendarDays aria-hidden="true" size={9.38} />{dateLabel}</span>
+        <span><Clock3 aria-hidden="true" size={9.38} />{formatClock(event.startTime)} – {eventEndTime(event)}</span>
+        <span><MapPin aria-hidden="true" size={9.38} />{event.location}</span>
+        <span><MessageCircle aria-hidden="true" size={9.38} />{event.attendees}</span>
       </div>
     </div>
   );
@@ -276,10 +276,10 @@ export default function CalendarWorkspace() {
               <div className="calendar-month-switcher">
                 <h1 aria-live="polite">{monthLabel}</h1>
                 <button className="calendar-icon-button" type="button" aria-label={view === "month" ? "Previous month" : "Previous period"} onClick={() => moveDate(-1)}>
-                  <ChevronLeft size={18} />
+                  <ChevronLeft size={12.06} />
                 </button>
                 <button className="calendar-icon-button" type="button" aria-label={view === "month" ? "Next month" : "Next period"} onClick={() => moveDate(1)}>
-                  <ChevronRight size={18} />
+                  <ChevronRight size={12.06} />
                 </button>
               </div>
               <div className="calendar-toolbar-actions">
@@ -464,10 +464,10 @@ export default function CalendarWorkspace() {
       </main>
       {toast && (
         <div className="toast calendar-toast" role="status">
-          <span className="toast-check"><Check size={16} /></span>
+          <span className="toast-check"><Check size={10.72} /></span>
           <span>{toast}</span>
           <button className="toast-close" type="button" aria-label="Dismiss notification" onClick={() => setToast("")}>
-            <X size={16} />
+            <X size={10.72} />
           </button>
         </div>
       )}

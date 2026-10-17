@@ -259,7 +259,7 @@ export default function TasksWorkspace() {
         <div className="dashboard-heading">
           <h1>Tasks</h1>
           <button className="new-intake-button task-create-trigger" type="button" onClick={toggleCreateForm} aria-expanded={isCreating}>
-            {isCreating ? <Check aria-hidden="true" size={15} /> : <Plus aria-hidden="true" size={16} />}
+            {isCreating ? <Check aria-hidden="true" size={10.05} /> : <Plus aria-hidden="true" size={10.72} />}
             {isCreating ? "Close form" : "New task"}
           </button>
         </div>
@@ -294,7 +294,7 @@ export default function TasksWorkspace() {
                   <option value="medium">Medium priority</option>
                   <option value="low">Low priority</option>
                 </select>
-                <ChevronDown aria-hidden="true" size={14} />
+                <ChevronDown aria-hidden="true" size={9.38} />
               </label>
               <label className="task-select-wrap task-sort-select">
                 <span className="sr-only">Sort tasks</span>
@@ -304,7 +304,7 @@ export default function TasksWorkspace() {
                   <option value="due-date">Due date</option>
                   <option value="priority">Priority</option>
                 </select>
-                <ChevronDown aria-hidden="true" size={14} />
+                <ChevronDown aria-hidden="true" size={9.38} />
               </label>
             </div>
           </div>
@@ -387,7 +387,7 @@ export default function TasksWorkspace() {
                       {formatDueDate(task.dueDate, today)}
                     </time>
                     <span className={`task-status${task.completed ? " task-status--completed" : ""}`}>
-                      {task.completed ? <><Check aria-hidden="true" size={13} />Complete</> : "Open"}
+                      {task.completed ? <><Check aria-hidden="true" size={8.71} />Complete</> : "Open"}
                     </span>
                     <button
                       className="task-delete-button"
@@ -395,7 +395,7 @@ export default function TasksWorkspace() {
                       aria-label={`Delete task: ${task.title}`}
                       onClick={() => deleteTask(task)}
                     >
-                      <Trash2 aria-hidden="true" size={15} />
+                      <Trash2 aria-hidden="true" size={10.05} />
                     </button>
                   </li>
                 );
@@ -403,7 +403,7 @@ export default function TasksWorkspace() {
             </ul>
           ) : (
             <div className="task-empty-state" role="status">
-              <span className="task-empty-mark"><RotateCcw aria-hidden="true" size={18} /></span>
+              <span className="task-empty-mark"><RotateCcw aria-hidden="true" size={12.06} /></span>
               <h2>{search.trim() ? "No matching tasks" : "No tasks in this view"}</h2>
               <p>{search.trim() ? "Try a different search or clear the current filters." : "Change the status or priority filter to see other tasks."}</p>
               <button type="button" onClick={clearFilters}>Clear filters</button>
@@ -416,10 +416,10 @@ export default function TasksWorkspace() {
       </main>
       {toast && (
         <div className="toast" role="status">
-          <span className="toast-check"><Check size={16} /></span>
+          <span className="toast-check"><Check size={10.72} /></span>
           <span>{toast}</span>
           <button className="toast-close" type="button" aria-label="Dismiss notification" onClick={() => setToast("")}>
-            <X size={16} />
+            <X size={10.72} />
           </button>
         </div>
       )}

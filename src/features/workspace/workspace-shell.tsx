@@ -98,7 +98,7 @@ export default function WorkspaceShell({
                 onClick={closeSidebar}
                 title={compactNavigation ? label : undefined}
               >
-                <Icon aria-hidden="true" size={18} strokeWidth={2.5} />
+                <Icon aria-hidden="true" size={12.06} strokeWidth={2.5} />
                 <span>{label}</span>
               </Link>
             ) : (
@@ -112,7 +112,7 @@ export default function WorkspaceShell({
                   onUnavailable(label);
                 }}
               >
-                <Icon aria-hidden="true" size={18} strokeWidth={2.5} />
+                <Icon aria-hidden="true" size={12.06} strokeWidth={2.5} />
                 <span>{label}</span>
               </button>
             );
@@ -132,10 +132,10 @@ export default function WorkspaceShell({
       <div className="app-column">
         <header className="topbar">
           <button className="icon-button mobile-menu" type="button" aria-label="Open navigation" onClick={() => setSidebarOpen(true)}>
-            <Menu size={20} />
+            <Menu size={13.4} />
           </button>
           <label className="global-search">
-            <Search aria-hidden="true" size={18} />
+            <Search aria-hidden="true" size={12.06} />
             <span className="sr-only">{searchLabel}</span>
             <input
               ref={searchInputRef}
@@ -155,7 +155,7 @@ export default function WorkspaceShell({
                 aria-expanded={popover === "notifications"}
                 onClick={() => setPopover(popover === "notifications" ? null : "notifications")}
               >
-                <Bell size={19} />
+                <Bell size={12.73} />
                 <span className="notification-count">3</span>
               </button>
               {popover === "notifications" && (
@@ -174,16 +174,16 @@ export default function WorkspaceShell({
                 aria-expanded={popover === "profile"}
                 onClick={() => setPopover(popover === "profile" ? null : "profile")}
               >
-                <span className="profile-avatar"><UserRound size={17} /></span>
+                <span className="profile-avatar"><UserRound size={11.39} /></span>
                 <span>Atty. Juan Dela Cruz</span>
-                <ChevronDown aria-hidden="true" size={15} />
+                <ChevronDown aria-hidden="true" size={10.05} />
               </button>
               {popover === "profile" && (
                 <div className="popover profile-popover" role="region" aria-label="Account menu">
                   <strong>Atty. Juan Dela Cruz</strong>
                   <span>Sample lawyer account</span>
                   <button type="button" onClick={() => { setPopover(null); onUnavailable("Account settings"); }}>
-                    <Settings size={15} /> Account settings
+                    <Settings size={10.05} /> Account settings
                   </button>
                 </div>
               )}

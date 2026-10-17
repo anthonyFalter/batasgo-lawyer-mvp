@@ -200,7 +200,7 @@ function FilterSelect({
         }}
       >
         <span>{options[Math.max(selectedIndex, 0)]?.label}</span>
-        <ChevronDown aria-hidden="true" size={15} />
+        <ChevronDown aria-hidden="true" size={10.05} />
       </button>
       {open && (
         <div
@@ -241,7 +241,7 @@ function FilterSelect({
               tabIndex={activeIndex === index ? 0 : -1}
             >
               <span>{option.label}</span>
-              {option.value === value && <Check aria-hidden="true" size={14} />}
+              {option.value === value && <Check aria-hidden="true" size={9.38} />}
             </div>
           ))}
         </div>
@@ -421,7 +421,7 @@ export default function TriageDashboard() {
                   />
                 </div>
                 <div className="results-count" aria-live="polite">
-                  <ArrowDownWideNarrow aria-hidden="true" size={15} />
+                  <ArrowDownWideNarrow aria-hidden="true" size={10.05} />
                   {visibleIntakes.length} requests
                 </div>
               </div>
@@ -446,22 +446,22 @@ export default function TriageDashboard() {
                     <p className="intake-summary">{intake.summary}</p>
                     <div className="intake-card-footer">
                       <div className="intake-timing">
-                        <span><Clock3 size={15} aria-hidden="true" /> {intake.received}</span>
+                        <span><Clock3 size={10.05} aria-hidden="true" /> {intake.received}</span>
                         {intake.deadlineOrder <= 1 && (
                           <span className="deadline-urgent">
                             {intake.deadlineOrder === 0
-                              ? <ShieldAlert size={14} aria-hidden="true" />
-                              : <Clock3 size={14} aria-hidden="true" />}
+                              ? <ShieldAlert size={9.38} aria-hidden="true" />
+                              : <Clock3 size={9.38} aria-hidden="true" />}
                             {intake.deadline}
                           </span>
                         )}
                       </div>
                       <div className="decision-actions">
                         <button className="decision-button decision-button--decline" type="button" onClick={() => decide(intake, "declined")}>
-                          <X size={15} aria-hidden="true" /> Decline
+                          <X size={10.05} aria-hidden="true" /> Decline
                         </button>
                         <button className="decision-button decision-button--accept" type="button" onClick={() => decide(intake, "accepted")}>
-                          <Check size={15} aria-hidden="true" /> Accept matter
+                          <Check size={10.05} aria-hidden="true" /> Accept matter
                         </button>
                       </div>
                     </div>
@@ -469,7 +469,7 @@ export default function TriageDashboard() {
                 ))}
                 {visibleIntakes.length === 0 && (
                   <div className="empty-queue">
-                    <span className="empty-icon"><Inbox size={22} /></span>
+                    <span className="empty-icon"><Inbox size={14.74} /></span>
                     <h3>{intakes.length === 0 ? "Your queue is clear" : "No matching requests"}</h3>
                     <p>
                       {intakes.length === 0
@@ -492,7 +492,7 @@ export default function TriageDashboard() {
             >
               <section className="rail-panel triage-ai-panel" aria-labelledby="triage-ai-title">
                 <div className="triage-ai-heading">
-                  <span className="triage-ai-icon"><Sparkles aria-hidden="true" size={20} fill="currentColor" strokeWidth={1.7} /></span>
+                  <span className="triage-ai-icon"><Sparkles aria-hidden="true" size={13.4} fill="currentColor" strokeWidth={1.7} /></span>
                   <div>
                     <h2 id="triage-ai-title">BatasBot recommendation</h2>
                   </div>
@@ -506,12 +506,12 @@ export default function TriageDashboard() {
                     <div className="triage-ai-reasons">
                       <h4>Why review this intake first</h4>
                       <ul>
-                        {recommendation.reasons.map((reason) => <li key={reason}><Check aria-hidden="true" size={15} />{reason}</li>)}
+                        {recommendation.reasons.map((reason) => <li key={reason}><Check aria-hidden="true" size={10.05} />{reason}</li>)}
                       </ul>
                     </div>
                     <div className="triage-ai-footer">
                       <button type="button" onClick={reviewRecommendedIntake}>
-                        Review intake <ArrowRight aria-hidden="true" size={16} />
+                        Review intake <ArrowRight aria-hidden="true" size={10.72} />
                       </button>
                     </div>
                   </>
@@ -548,7 +548,7 @@ export default function TriageDashboard() {
                 <div className="rail-panel-heading">
                   <h2>Recent Messages</h2>
                   <button className="quiet-icon-button" type="button" aria-label="Open messages" onClick={() => unavailable("Messages")}>
-                    <Mail size={16} />
+                    <Mail size={10.72} />
                   </button>
                 </div>
                 <div className="message-list">
@@ -569,11 +569,11 @@ export default function TriageDashboard() {
         </main>
       {toast && (
         <div className="toast" role="status">
-          <span className="toast-check"><Check size={16} /></span>
+          <span className="toast-check"><Check size={10.72} /></span>
           <span>{toast}</span>
           {toastUndoable && <button type="button" onClick={undoDecision}>Undo</button>}
           <button className="toast-close" type="button" aria-label="Dismiss notification" onClick={() => setToast("")}>
-            <X size={16} />
+            <X size={10.72} />
           </button>
         </div>
       )}

@@ -378,7 +378,7 @@ export default function DocumentTemplatePicker({ templates, onSelect }: Document
               setIsUploadPromptOpen((open) => !open);
             }}
           >
-            <Upload aria-hidden="true" size={18} />
+            <Upload aria-hidden="true" size={12.06} />
             {isAnalyzing ? "Reading template..." : isUploadPromptOpen ? "Close upload" : "Upload a template"}
           </button>
         </div>
@@ -404,7 +404,7 @@ export default function DocumentTemplatePicker({ templates, onSelect }: Document
             <header className="template-upload-dialog-header">
               <h2 id="template-upload-prompt-title">Upload your file template and let BatasBot handle the rest.</h2>
               <button type="button" className="template-upload-close" aria-label="Close upload dialog" onClick={() => setIsUploadPromptOpen(false)}>
-                <X aria-hidden="true" size={20} />
+                <X aria-hidden="true" size={13.4} />
               </button>
             </header>
             <p className="template-upload-dialog-description" id="template-upload-prompt-description">
@@ -419,11 +419,11 @@ export default function DocumentTemplatePicker({ templates, onSelect }: Document
               }}
               onDrop={handleTemplateDrop}
             >
-              <span className="template-upload-dropzone-icon"><CloudUpload aria-hidden="true" size={34} /></span>
+              <span className="template-upload-dropzone-icon"><CloudUpload aria-hidden="true" size={22.78} /></span>
               <strong>{isAnalyzing ? "Reading your template..." : "Drop your template file here"}</strong>
               <span>DOCX, HTML, or TXT · Up to 10 MB</span>
               <button ref={browseButtonRef} className="template-upload-browse" type="button" onClick={() => uploadRef.current?.click()} disabled={isAnalyzing}>
-                <Upload aria-hidden="true" size={17} />
+                <Upload aria-hidden="true" size={11.39} />
                 Browse files
               </button>
             </div>
@@ -434,7 +434,7 @@ export default function DocumentTemplatePicker({ templates, onSelect }: Document
 
       {analysisPreview?.analysis && (
         <section className="template-analysis" aria-labelledby="template-analysis-title">
-          <div className="template-analysis-icon"><Sparkles aria-hidden="true" size={19} /></div>
+          <div className="template-analysis-icon"><Sparkles aria-hidden="true" size={12.73} /></div>
           <div className="template-analysis-copy">
             <div className="template-analysis-heading">
               <h2 id="template-analysis-title">BatasBot format scan</h2>
@@ -449,17 +449,17 @@ export default function DocumentTemplatePicker({ templates, onSelect }: Document
           </div>
           <div className="template-analysis-actions">
             <button type="button" className="template-analysis-use" onClick={() => onSelect(analysisPreview)}>
-              Use analyzed template <ArrowRight aria-hidden="true" size={16} />
+              Use analyzed template <ArrowRight aria-hidden="true" size={10.72} />
             </button>
             <button type="button" className="template-analysis-dismiss" aria-label="Dismiss format scan" onClick={() => setAnalysisPreview(null)}>
-              <X aria-hidden="true" size={18} />
+              <X aria-hidden="true" size={12.06} />
             </button>
           </div>
         </section>
       )}
 
       <label className="template-search">
-        <Search aria-hidden="true" size={19} />
+        <Search aria-hidden="true" size={12.73} />
         <span className="sr-only">Search templates</span>
         <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search templates" />
       </label>
@@ -510,13 +510,13 @@ export default function DocumentTemplatePicker({ templates, onSelect }: Document
               <div className="document-template-card-body">
                 <div className="document-template-card-heading">
                   <h3>{template.name}</h3>
-                  {template.source === "uploaded" && <span className="document-template-own-label"><Check aria-hidden="true" size={13} /> Yours</span>}
+                  {template.source === "uploaded" && <span className="document-template-own-label"><Check aria-hidden="true" size={8.71} /> Yours</span>}
                 </div>
                 <p>{template.description}</p>
                 <div className="document-template-card-footer">
                   <span>{template.category}</span>
                   <button type="button" onClick={() => onSelect(template)}>
-                    Use template <ArrowRight aria-hidden="true" size={15} />
+                    Use template <ArrowRight aria-hidden="true" size={10.05} />
                   </button>
                 </div>
               </div>
@@ -525,12 +525,12 @@ export default function DocumentTemplatePicker({ templates, onSelect }: Document
         </div>
       ) : (
         <div className="template-library-empty">
-          <FileText aria-hidden="true" size={24} />
+          <FileText aria-hidden="true" size={16.08} />
           <h3>{category === "My templates" ? "No personal templates yet" : "No matching templates"}</h3>
           <p>{category === "My templates" ? "Upload a DOCX, HTML, or TXT file to scan its structure and formatting." : "Try a different search or category."}</p>
           {category === "My templates" && (
             <button type="button" onClick={() => uploadRef.current?.click()}>
-              Upload a template <Upload aria-hidden="true" size={16} />
+              Upload a template <Upload aria-hidden="true" size={10.72} />
             </button>
           )}
         </div>

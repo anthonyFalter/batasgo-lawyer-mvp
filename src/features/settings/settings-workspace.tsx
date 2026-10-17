@@ -99,17 +99,17 @@ export default function SettingsWorkspace() {
                   className={`settings-nav-item${activeSection === key ? " is-active" : ""}`}
                   onClick={() => setActiveSection(key)}
                 >
-                  <span className="settings-nav-icon"><Icon aria-hidden="true" size={15} /></span>
+                  <span className="settings-nav-icon"><Icon aria-hidden="true" size={10.05} /></span>
                   <span>
                     <strong>{title}</strong>
                     <small>{description}</small>
                   </span>
-                  <ChevronRight aria-hidden="true" size={15} />
+                  <ChevronRight aria-hidden="true" size={10.05} />
                 </button>
               ))
             ) : (
               <div className="settings-empty">
-                <Sparkles aria-hidden="true" size={17} />
+                <Sparkles aria-hidden="true" size={11.39} />
                 <p>No matching settings.</p>
               </div>
             )}
@@ -311,10 +311,10 @@ export default function SettingsWorkspace() {
 
       {toast && (
         <div className="toast" role="status">
-          <span className="toast-check"><Check size={16} /></span>
+          <span className="toast-check"><Check size={10.72} /></span>
           <span>{toast}</span>
           <button className="toast-close" type="button" aria-label="Dismiss notification" onClick={() => setToast("")}>
-            <X size={16} />
+            <X size={10.72} />
           </button>
         </div>
       )}
