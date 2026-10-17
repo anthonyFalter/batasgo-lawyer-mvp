@@ -17,10 +17,10 @@ export default function HomePage() {
           sizes="(max-width: 600px) 78vw, 420px"
         />
         <p className="launch-screen-notice">
-          For demo purposes only, features are not yet final.
+          Lawyer workspace preview. Features are not yet final.
         </p>
         <Link className="launch-screen-proceed" href="/dashboard">
-          Proceed to demo
+          Sign in to workspace
         </Link>
       </div>
     </main>
