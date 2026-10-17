@@ -241,7 +241,7 @@
   position: absolute;
   left: 50%;
   display: flex;
-  width: min(495.8px, calc(100% - 426.12px));
+  width: min(495.8px, calc(100% - 442.2px));
   height: 30.82px;
   align-items: center;
   gap: 6.7px;
@@ -322,18 +322,26 @@
 
 .notification-count {
   position: absolute;
-  top: -1.34px;
-  right: -0.67px;
+  top: -2.68px;
+  right: -2.01px;
   display: grid;
-  width: 12.06px;
-  height: 12.06px;
+  min-width: 16.08px;
+  height: 16.08px;
   place-items: center;
+  padding: 0 2.68px;
   color: white;
   background: var(--red);
   border: 1.34px solid white;
   border-radius: 50%;
-  font-size: 10.72px;
+  font-size: 9.38px;
   font-weight: 700;
+  line-height: 1;
+}
+
+@media (max-width: 657px) {
+  .notification-count {
+    right: 3.35px;
+  }
 }
 
 .profile-button {
@@ -1565,7 +1573,7 @@
   }
 
   .global-search {
-    width: min(495.8px, calc(100% - 154.1px));
+    width: min(495.8px, calc(100% - 202.2px));
   }
 
   .topbar-actions {
@@ -1651,7 +1659,7 @@
   }
 
   .global-search {
-    width: calc(100% - 124.62px);
+    width: calc(100% - 180.4px);
     height: 26.8px;
     gap: 4.69px;
     padding: 0 6.7px;
