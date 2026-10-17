@@ -806,7 +806,11 @@ export default function TriageDashboard() {
                     <h3>{intake.client}</h3>
                     <p className="intake-summary">{intake.summary}</p>
                     {intake.isSample && (
-                      <section className="sample-ai-summary" aria-label="Synthetic sample AI summary">
+                      <section
+                        className={`sample-ai-summary${generatingSummaryId === intake.id ? " is-generating" : ""}`}
+                        aria-label="Synthetic sample AI summary"
+                        aria-busy={generatingSummaryId === intake.id}
+                      >
                         {intake.aiSummary ? (
                           <details className="sample-ai-summary-details">
                             <summary>
