@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { type FormEvent, useEffect, useRef, useState } from "react";
+import { useTypingStream } from "@/hooks/use-typing-stream";
 import WorkspaceShell from "../workspace/workspace-shell";
 import "./batasbot-workspace.css";
 
@@ -77,36 +78,29 @@ export default function BatasBotWorkspace() {
   const [search, setSearch] = useState("");
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const { text: streamedReply, phase: replyPhase, startTyping, cancelTyping } = useTypingStream();
+  const isGenerating = replyPhase !== "idle";
   const [notice, setNotice] = useState("");
   const nextMessageId = useRef(0);
-  const replyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [isGenerating, messages]);
-
-  useEffect(() => () => {
-    if (replyTimeoutRef.current) clearTimeout(replyTimeoutRef.current);
-  }, []);
+    messagesEndRef.current?.scrollIntoView({ behavior: replyPhase === "idle" ? "smooth" : "auto", block: "end" });
+  }, [isGenerating, messages, replyPhase, streamedReply]);
 
   const sendMessage = (rawMessage: string) => {
     const content = rawMessage.trim();
-    if (!content || replyTimeoutRef.current) return;
+    if (!content || isGenerating) return;
 
     const reply = getAssistantReply(content);
     const userMessage: ChatMessage = { id: nextMessageId.current++, role: "user", content };
     const assistantMessage: ChatMessage = { id: nextMessageId.current++, role: "assistant", ...reply };
     setMessages((current) => [...current, userMessage]);
     setInput("");
-    setIsGenerating(true);
-    replyTimeoutRef.current = setTimeout(() => {
+    startTyping(assistantMessage.content, () => {
       setMessages((current) => [...current, assistantMessage]);
-      setIsGenerating(false);
-      replyTimeoutRef.current = null;
-    }, 950);
+    });
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -115,13 +109,9 @@ export default function BatasBotWorkspace() {
   };
 
   const startNewChat = () => {
-    if (replyTimeoutRef.current) {
-      clearTimeout(replyTimeoutRef.current);
-      replyTimeoutRef.current = null;
-    }
+    cancelTyping();
     setMessages([]);
     setInput("");
-    setIsGenerating(false);
     setNotice("");
     inputRef.current?.focus();
   };
@@ -186,7 +176,7 @@ export default function BatasBotWorkspace() {
                   </div>
                 </article>
               ))}
-              {isGenerating && (
+              {replyPhase === "thinking" && (
                 <div className="batasbot-thread-message batasbot-thread-message--assistant">
                   <span className="batasbot-thread-avatar" aria-hidden="true"><Bot size={15} /></span>
                   <div className="batasbot-thread-typing" role="status" aria-label="BatasBot is generating a reply">
@@ -194,6 +184,14 @@ export default function BatasBotWorkspace() {
                     <span className="sr-only">BatasBot is typing</span>
                   </div>
                 </div>
+              )}
+              {replyPhase === "typing" && (
+                <article className="batasbot-thread-message batasbot-thread-message--assistant">
+                  <span className="batasbot-thread-avatar" aria-hidden="true"><Bot size={15} /></span>
+                  <div className="batasbot-thread-body">
+                    <p className="batasbot-streaming-text" aria-live="off">{streamedReply}</p>
+                  </div>
+                </article>
               )}
               <div ref={messagesEndRef} />
             </div>

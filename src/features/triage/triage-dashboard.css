@@ -57,6 +57,29 @@
   background: #dce7ff;
 }
 
+.batasbot-streaming-text::after {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  background: currentColor;
+  content: "";
+  vertical-align: text-bottom;
+  animation: batasbot-stream-caret 720ms steps(2, start) infinite;
+}
+
+@keyframes batasbot-stream-caret {
+  to {
+    visibility: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .batasbot-streaming-text::after {
+    animation: none;
+  }
+}
+
 .sr-only {
   position: absolute;
   width: 1px;

@@ -24,6 +24,7 @@ import {
   X,
 } from "lucide-react";
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useTypingStream } from "@/hooks/use-typing-stream";
 import WorkspaceShell from "../workspace/workspace-shell";
 import "./document-assembly-workspace.css";
 
@@ -132,7 +133,8 @@ export default function DocumentAssemblyWorkspace() {
   const [referenceMode, setReferenceMode] = useState<ReferenceMode>("matter");
   const [mobilePane, setMobilePane] = useState<MobilePane>("draft");
   const [chatInput, setChatInput] = useState("");
-  const [isChatGenerating, setIsChatGenerating] = useState(false);
+  const { text: chatStreamingText, phase: chatTypingPhase, startTyping: startChatTyping } = useTypingStream();
+  const isChatGenerating = chatTypingPhase !== "idle";
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
       id: 0,
@@ -158,7 +160,6 @@ export default function DocumentAssemblyWorkspace() {
   const nextAttachmentId = useRef(0);
   const nextChatMessageId = useRef(1);
   const chatMessagesEndRef = useRef<HTMLDivElement>(null);
-  const chatReplyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const matterReferenceTabRef = useRef<HTMLButtonElement>(null);
   const batasbotTabRef = useRef<HTMLButtonElement>(null);
 
@@ -167,12 +168,8 @@ export default function DocumentAssemblyWorkspace() {
   }, [reviewOpen]);
 
   useEffect(() => {
-    chatMessagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [chatMessages, isChatGenerating]);
-
-  useEffect(() => () => {
-    if (chatReplyTimeoutRef.current) clearTimeout(chatReplyTimeoutRef.current);
-  }, []);
+    chatMessagesEndRef.current?.scrollIntoView({ behavior: chatTypingPhase === "idle" ? "smooth" : "auto", block: "end" });
+  }, [chatMessages, isChatGenerating, chatStreamingText, chatTypingPhase]);
 
   const filteredAttachments = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -233,7 +230,7 @@ export default function DocumentAssemblyWorkspace() {
 
   const sendChatMessage = (message: string) => {
     const content = message.trim();
-    if (!content || chatReplyTimeoutRef.current) return;
+    if (!content || isChatGenerating) return;
 
     const query = content.toLowerCase();
     let response = "I can help you organize a review checklist. This preview is not connected to matter records or legal sources, so verify all facts, calculations, and legal authorities independently.";
@@ -248,13 +245,10 @@ export default function DocumentAssemblyWorkspace() {
     const userMessage = { id: nextChatMessageId.current++, role: "user" as const, content };
     const assistantMessage = { id: nextChatMessageId.current++, role: "assistant" as const, content: response };
     setChatMessages((current) => [...current, userMessage]);
-    setIsChatGenerating(true);
     setChatInput("");
-    chatReplyTimeoutRef.current = setTimeout(() => {
+    startChatTyping(assistantMessage.content, () => {
       setChatMessages((current) => [...current, assistantMessage]);
-      setIsChatGenerating(false);
-      chatReplyTimeoutRef.current = null;
-    }, 1100);
+    });
   };
 
   const handleReferenceTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
@@ -460,13 +454,19 @@ export default function DocumentAssemblyWorkspace() {
                         <p>{message.content}</p>
                       </div>
                     ))}
-                    {isChatGenerating && (
+                    {chatTypingPhase === "thinking" && (
                       <div className="batasbot-message batasbot-message--assistant">
                         <span className="batasbot-avatar" aria-hidden="true"><Bot size={15} /></span>
                         <div className="batasbot-typing" role="status" aria-label="BatasBot is generating a reply">
                           <span aria-hidden="true"><i /><i /><i /></span>
                           <span className="sr-only">BatasBot is typing</span>
                         </div>
+                      </div>
+                    )}
+                    {chatTypingPhase === "typing" && (
+                      <div className="batasbot-message batasbot-message--assistant">
+                        <span className="batasbot-avatar" aria-hidden="true"><Bot size={15} /></span>
+                        <p className="batasbot-streaming-text" aria-live="off">{chatStreamingText}</p>
                       </div>
                     )}
                     <div ref={chatMessagesEndRef} />
