@@ -262,7 +262,6 @@ export default function TriageDashboard() {
   const [toastUndoable, setToastUndoable] = useState(false);
   const [recommendationOffset, setRecommendationOffset] = useState(0);
   const queueToolbarRef = useRef<HTMLDivElement>(null);
-  const recommendedCardRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const toolbar = queueToolbarRef.current;
@@ -331,8 +330,23 @@ export default function TriageDashboard() {
 
   const reviewRecommendedIntake = () => {
     if (!recommendation) return;
-    if (!visibleIntakes.some(({ id }) => id === recommendation.intake.id)) resetFilters();
-    window.setTimeout(() => recommendedCardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 0);
+
+    try {
+      window.sessionStorage.setItem("batasbot-triage-handoff", JSON.stringify({
+        id: recommendation.intake.id,
+        domain: recommendation.intake.domain,
+        risk: recommendation.intake.risk,
+        deadline: recommendation.intake.deadline,
+        summary: recommendation.intake.summary,
+        reasons: recommendation.reasons,
+        specialty: profileSpecialty,
+      }));
+    } catch {
+      showToast("BatasBot could not start a local chat in this browser.");
+      return;
+    }
+
+    window.location.assign("/batasbot?source=triage");
   };
 
   const unavailable = (label: string) => showToast(`${label} is not part of this demo yet.`);
@@ -418,7 +432,6 @@ export default function TriageDashboard() {
                     className="intake-card"
                     id={`intake-${intake.id}`}
                     key={intake.id}
-                    ref={intake.id === recommendation?.intake.id ? recommendedCardRef : undefined}
                   >
                     <div className="intake-card-top">
                       <div className="intake-tags">

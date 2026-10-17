@@ -28,11 +28,41 @@ type ChatMessage = {
   links?: ChatLink[];
 };
 
+type TriageChatHandoff = {
+  id: string;
+  domain: string;
+  risk: string;
+  deadline: string;
+  summary: string;
+  reasons: string[];
+  specialty: string;
+};
+
 const STARTER_PROMPTS = [
   { label: "Help me draft a document", icon: FileText },
   { label: "Find a matter in my workspace", icon: Search },
   { label: "What should I prepare for a hearing?", icon: CalendarDays },
 ];
+
+function isTriageChatHandoff(value: unknown): value is TriageChatHandoff {
+  if (!value || typeof value !== "object") return false;
+  const handoff = value as Partial<TriageChatHandoff>;
+  return typeof handoff.id === "string"
+    && typeof handoff.domain === "string"
+    && typeof handoff.risk === "string"
+    && typeof handoff.deadline === "string"
+    && typeof handoff.summary === "string"
+    && Array.isArray(handoff.reasons)
+    && handoff.reasons.every((reason) => typeof reason === "string")
+    && typeof handoff.specialty === "string";
+}
+
+function explainTriageHandoff(handoff: TriageChatHandoff) {
+  const needSignals = handoff.reasons.filter((reason) =>
+    !/risk indicators$/.test(reason) && !/^(Fits|Outside profile specialty:)/.test(reason),
+  );
+  return `This intake may merit prompt review because it is marked ${handoff.risk.toLowerCase()} risk, with a deadline of ${handoff.deadline.toLowerCase()}. The intake describes: ${handoff.summary} Signals from the local preview: ${needSignals.join("; ")}. The profile lists ${handoff.specialty}; the matter is ${handoff.domain}. This is a sample-based demo explanation, not a live AI assessment. Verify the source records and deadline before deciding.`;
+}
 
 function getAssistantReply(prompt: string): Pick<ChatMessage, "content" | "links"> {
   const query = prompt.toLowerCase();
@@ -88,6 +118,44 @@ export default function BatasBotWorkspace() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: replyPhase === "idle" ? "smooth" : "auto", block: "end" });
   }, [isGenerating, messages, replyPhase, streamedReply]);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("source") !== "triage") return;
+
+    let handoff: TriageChatHandoff | null = null;
+    try {
+      const rawHandoff = window.sessionStorage.getItem("batasbot-triage-handoff");
+      const parsed: unknown = rawHandoff ? JSON.parse(rawHandoff) : null;
+      if (isTriageChatHandoff(parsed)) handoff = parsed;
+    } catch {
+      handoff = null;
+    }
+
+    if (!handoff) {
+      window.sessionStorage.removeItem("batasbot-triage-handoff");
+      window.history.replaceState(null, "", window.location.pathname);
+      return;
+    }
+
+    const userMessage: ChatMessage = {
+      id: nextMessageId.current++,
+      role: "user",
+      content: `Why should ${handoff.id} be reviewed now?`,
+    };
+    const assistantMessage: ChatMessage = {
+      id: nextMessageId.current++,
+      role: "assistant",
+      content: explainTriageHandoff(handoff),
+    };
+
+    setMessages([userMessage]);
+    setNotice("");
+    startTyping(assistantMessage.content, () => {
+      setMessages([userMessage, assistantMessage]);
+      window.sessionStorage.removeItem("batasbot-triage-handoff");
+      window.history.replaceState(null, "", window.location.pathname);
+    });
+  }, [startTyping]);
 
   const sendMessage = (rawMessage: string) => {
     const content = rawMessage.trim();

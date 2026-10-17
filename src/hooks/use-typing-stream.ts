@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export type TypingPhase = "idle" | "thinking" | "typing";
 
@@ -14,7 +14,7 @@ export function useTypingStream() {
   const thinkingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const clearTimers = () => {
+  const clearTimers = useCallback(() => {
     if (thinkingTimeoutRef.current) {
       clearTimeout(thinkingTimeoutRef.current);
       thinkingTimeoutRef.current = null;
@@ -23,9 +23,9 @@ export function useTypingStream() {
       clearInterval(typingIntervalRef.current);
       typingIntervalRef.current = null;
     }
-  };
+  }, []);
 
-  const startTyping = (fullText: string, onComplete: () => void) => {
+  const startTyping = useCallback((fullText: string, onComplete: () => void) => {
     clearTimers();
     setText("");
     setPhase("thinking");
@@ -47,15 +47,15 @@ export function useTypingStream() {
         }
       }, TYPING_TICK_MS);
     }, THINKING_DELAY_MS);
-  };
+  }, [clearTimers]);
 
-  const cancelTyping = () => {
+  const cancelTyping = useCallback(() => {
     clearTimers();
     setText("");
     setPhase("idle");
-  };
+  }, [clearTimers]);
 
-  useEffect(() => clearTimers, []);
+  useEffect(() => clearTimers, [clearTimers]);
 
   return { text, phase, startTyping, cancelTyping };
 }
