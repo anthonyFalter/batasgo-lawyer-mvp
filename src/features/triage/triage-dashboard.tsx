@@ -555,15 +555,21 @@ export default function TriageDashboard() {
     if (!intake.isSample || intake.aiSummary || generatingSummaryId === intake.id) return;
     setGeneratingSummaryId(intake.id);
     try {
-      const response = await fetch(`/api/intakes/${intake.id}/summary`, { method: "POST" });
+      const response = await fetch(`/api/intakes/${intake.id}/summary`, {
+        method: "POST",
+        signal: AbortSignal.timeout(40_000),
+      });
       if (!response.ok) throw new Error(await getResponseError(response, "Unable to generate summary."));
       const parsed = intakeResponseSchema.safeParse(await response.json());
       if (!parsed.success) throw new Error("The summary service returned an invalid response.");
       const updated = parsed.data.intake;
       setIntakes((current) => current.map((item) => item.id === updated.id ? updated : item));
-      showToast("Gemini summarized the synthetic sample intake.");
+      showToast("AI summary generated.");
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Unable to generate summary.");
+      const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
+      showToast(timedOut
+        ? "AI summary generation timed out. Please try again."
+        : error instanceof Error ? error.message : "Unable to generate summary.");
     } finally {
       setGeneratingSummaryId(null);
     }
