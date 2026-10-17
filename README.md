@@ -14,7 +14,7 @@ This project uses Next.js. Clerk-authenticated intake records and accept/decline
 - Clerk authentication with protected workspace routes
 - Neon Postgres and Drizzle ORM for persistent intake and workspace data
 - Zod for server-side request validation
-- Google Gemini API, restricted to explicitly synthetic demo intakes
+- Google Gemini API with optional Groq fallback, restricted to explicitly synthetic demo intakes
 
 ### Planned for a backend-enabled MVP
 
@@ -33,7 +33,7 @@ You'll need Node.js and npm installed.
 npm ci
 ```
 
-For a fresh local setup, run `npx -y clerk@latest init` to configure Clerk and create local development credentials in `.env.local`. Keep that file private and do not overwrite the generated Clerk values. Set `DATABASE_URL` in `.env.local` to your Neon connection string and `GEMINI_API_KEY` to your Gemini key; never commit or share `.env.local`. If you need to create `.env.local` manually, copy `.env.example` first and configure Clerk keys through your Clerk account.
+For a fresh local setup, run `npx -y clerk@latest init` to configure Clerk and create local development credentials in `.env.local`. Keep that file private and do not overwrite the generated Clerk values. Set `DATABASE_URL` in `.env.local` to your Neon connection string and `GEMINI_API_KEY` to your Gemini key. Optionally set `GROQ_API_KEY` to enable Groq as a fallback; intake summaries default to `openai/gpt-oss-20b` (overridable with `GROQ_MODEL`), and BatasBot defaults to `openai/gpt-oss-20b` (overridable with `GROQ_CHAT_MODEL`). Never commit or share `.env.local`. If you need to create `.env.local` manually, copy `.env.example` first and configure Clerk keys through your Clerk account.
 
 Apply the existing schema migration to your Neon database with:
 
@@ -56,7 +56,7 @@ Open [http://localhost:3000](http://localhost:3000) for the BatasGO intro and wo
 | Route | Page |
 | --- | --- |
 | `/dashboard` | Case Overview: search, filter, sort, persist intake decisions, undo, and create intakes. |
-| `/batasbot` | BatasBot: sample chat replies and links to workspace screens. |
+| `/batasbot` | BatasBot: AI chat with persisted conversation sessions and links to workspace screens. |
 | `/documents` | Document Assembly: edit a draft, review it, and export an HTML review copy. |
 | `/calendar` | Calendar: browse months, select dates, and search appointments. |
 | `/messages` | Messages: search conversations and compose local replies. |
@@ -66,14 +66,14 @@ Open [http://localhost:3000](http://localhost:3000) for the BatasGO intro and wo
 | `/sign-in` | Clerk sign-in page. |
 | `/sign-up` | Clerk sign-up page. |
 
-Case Overview intake records and decisions persist in Neon. The other workspace screens use demo data in the browser and are not saved to a server. Intake document selection currently saves file names only; file contents are not uploaded.
+Case Overview intake records and decisions and BatasBot conversation sessions persist in Neon; BatasBot sessions can be deleted from the session list. Document Assembly, Messages, Calendar, and Tasks use demo data in the browser and are not saved to a server. Intake document selection currently saves file names only; file contents are not uploaded.
 
 ## Intake API
 
 - `GET /api/intakes` — list intakes for the authenticated user's workspace.
 - `POST /api/intakes` — create a workspace intake; risk and priority are calculated on the server.
 - `PATCH /api/intakes/:intakeId` — update an intake's status (`pending`, `accepted`, or `declined`).
-- `POST /api/intakes/:intakeId/summary` — generate and save a Gemini summary **only for synthetic sample records**.
+- `POST /api/intakes/:intakeId/summary` — generate and save an AI summary **only for synthetic sample records**. It tries Gemini first, then Groq when `GROQ_API_KEY` is configured and Gemini fails.
 
 The intake endpoints require Clerk authentication and resolve workspace membership server-side; callers cannot select another workspace by sending an ID. The Gemini API key stays server-side, and manually created intakes are not sent to Gemini.
 
@@ -87,7 +87,7 @@ The citizen-app submission path is not connected. Manually entered intake detail
 - **Handle client data carefully.** Collect only what the feature needs, enforce access checks for database records and uploaded files, and avoid logging message contents, documents, credentials, or other sensitive personal information.
 - **Review third-party services.** Before sending client data to AI, hosting, storage, or other providers, review their security, privacy, retention, and data-location practices.
 
-The Gemini summary route checks the database `isSample` flag and does not accept intake text from the browser. It is intentionally unavailable for manually created intakes until data-processing approval is made.
+The AI summary route checks the database `isSample` flag and does not accept intake text from the browser. It is intentionally unavailable for manually created intakes until data-processing approval is made. Configured providers receive the synthetic intake text; provider availability and free-tier quotas are not guaranteed.
 
 ## Available commands
 
