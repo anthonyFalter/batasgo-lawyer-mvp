@@ -24,11 +24,11 @@ import "../triage/triage-dashboard.css";
 
 const navItems = [
   { label: "Case Overview", icon: Inbox, href: "/dashboard" },
-  { label: "BatasBot", icon: Bot, href: "/batasbot" },
-  { label: "Document Assembly", icon: FilePenLine, href: "/documents" },
-  { label: "Calendar", icon: CalendarDays, href: "/calendar" },
   { label: "Messages", icon: Mail, href: "/messages" },
+  { label: "Calendar", icon: CalendarDays, href: "/calendar" },
   { label: "Tasks", icon: ListChecks, href: "/tasks" },
+  { label: "Document Assembly", icon: FilePenLine, href: "/documents" },
+  { label: "BatasBot", icon: Bot, href: "/batasbot" },
   { label: "Settings", icon: Settings },
 ];
 
