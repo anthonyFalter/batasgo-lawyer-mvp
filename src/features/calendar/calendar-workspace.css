@@ -1531,11 +1531,16 @@
   }
 
   body .workspace .calendar-week-schedule:not(.is-day-view) .calendar-week-head {
-    grid-template-columns: 53.6px minmax(0, 1fr);
+    grid-template-columns: 58px minmax(0, 1fr);
   }
 
-  body .workspace .calendar-week-schedule:not(.is-day-view) .calendar-week-body {
-    grid-template-columns: 53.6px minmax(0, 1fr);
+  body .workspace .calendar-week-schedule .calendar-week-body {
+    grid-template-columns: 58px minmax(0, 1fr);
+  }
+
+  body .workspace .calendar-time-axis span {
+    right: 4px;
+    font-size: 11px !important;
   }
 
   body .workspace .calendar-week-schedule:not(.is-day-view) .calendar-day-columns {
