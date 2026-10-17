@@ -33,7 +33,7 @@ You'll need Node.js and npm installed.
 npm ci
 ```
 
-For a fresh local setup, run `npx -y clerk@latest init` to configure Clerk and create local development credentials in `.env.local`. Keep that file private and do not overwrite the generated Clerk values. Set `DATABASE_URL` in `.env.local` to your Neon connection string and `GEMINI_API_KEY` to your Gemini key. Optionally set `GROQ_API_KEY` to enable Groq as a fallback; `GROQ_MODEL` can override its default model. Never commit or share `.env.local`. If you need to create `.env.local` manually, copy `.env.example` first and configure Clerk keys through your Clerk account.
+For a fresh local setup, run `npx -y clerk@latest init` to configure Clerk and create local development credentials in `.env.local`. Keep that file private and do not overwrite the generated Clerk values. Set `DATABASE_URL` in `.env.local` to your Neon connection string and `GEMINI_API_KEY` to your Gemini key. Optionally set `GROQ_API_KEY` to enable Groq as a fallback; it defaults to `openai/gpt-oss-20b`, and `GROQ_MODEL` can override that model. Never commit or share `.env.local`. If you need to create `.env.local` manually, copy `.env.example` first and configure Clerk keys through your Clerk account.
 
 Apply the existing schema migration to your Neon database with:
 
