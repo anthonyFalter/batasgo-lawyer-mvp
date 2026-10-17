@@ -942,6 +942,7 @@
 }
 
 .rail-panel.triage-ai-panel {
+  --triage-ai-gradient: linear-gradient(45deg, #e0f8e9 0%, #a6eac0 56%, #78d9a0 100%);
   display: grid;
   grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.35fr) minmax(210px, 0.85fr);
   align-items: center;
@@ -949,6 +950,13 @@
   background: #f7fff3;
   border-color: #d3e9c8;
   box-shadow: 0 3px 10px rgb(70 132 61 / 8%);
+}
+
+.insights-rail .triage-ai-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
 }
 
 .triage-ai-heading {
@@ -966,7 +974,7 @@
   flex: 0 0 auto;
   place-items: center;
   color: #fff;
-  background: linear-gradient(45deg, #8fdda2 0%, #43b96d 100%);
+  background: var(--triage-ai-gradient);
   border-radius: 50%;
   box-shadow: 0 3px 8px rgb(52 157 105 / 20%);
 }
@@ -980,15 +988,6 @@
   color: #3f7d32;
   font-size: 18px;
   font-weight: 700;
-}
-
-.triage-ai-local-label {
-  display: inline-flex;
-  margin-top: 3px;
-  color: #58864c;
-  font-size: 16px;
-  font-weight: 650;
-  letter-spacing: 0.04em;
 }
 
 .triage-ai-client {
@@ -1051,14 +1050,17 @@
   display: flex;
   height: 100%;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 11px;
   margin-top: 0;
   padding-top: 0;
   border-top: 0;
 }
 
-.triage-ai-footer p,
+.insights-rail .triage-ai-footer {
+  height: auto;
+}
+
 .triage-ai-empty p {
   margin: 0;
   color: #748198;
@@ -1073,18 +1075,22 @@
   justify-content: center;
   gap: 8px;
   padding: 0 14px;
-  color: #fff;
-  background: linear-gradient(45deg, #25834d 0%, #17613c 100%);
+  color: #145333;
+  background: var(--triage-ai-gradient);
   border: 0;
   border-radius: 999px;
   cursor: pointer;
   font-size: 16px;
   font-weight: 650;
-  transition: background-color 140ms ease, transform 140ms ease;
+  transition: box-shadow 140ms ease, transform 140ms ease;
+}
+
+.insights-rail .triage-ai-footer button {
+  width: 100%;
 }
 
 .triage-ai-footer button:hover {
-  background: linear-gradient(45deg, #1f7444 0%, #105334 100%);
+  box-shadow: 0 3px 9px rgb(52 157 105 / 22%);
   transform: translateY(-1px);
 }
 

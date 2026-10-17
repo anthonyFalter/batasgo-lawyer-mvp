@@ -340,40 +340,6 @@ export default function TriageDashboard() {
 
           <div className="dashboard-grid">
             <section className="queue-section" aria-labelledby="queue-heading">
-              <section className="rail-panel triage-ai-panel" aria-labelledby="triage-ai-title">
-                <div className="triage-ai-heading">
-                  <span className="triage-ai-icon"><Sparkles aria-hidden="true" size={20} fill="currentColor" strokeWidth={1.7} /></span>
-                  <div>
-                    <h2 id="triage-ai-title">BatasBot recommendation</h2>
-                    <span className="triage-ai-local-label">LOCAL PREVIEW</span>
-                  </div>
-                </div>
-                {recommendation ? (
-                  <>
-                    <div className="triage-ai-client">
-                      <h3>{recommendation.intake.client}</h3>
-                      <p>{recommendation.intake.id} · {recommendation.intake.domain}</p>
-                    </div>
-                    <div className="triage-ai-reasons">
-                      <h4>Why review this intake first</h4>
-                      <ul>
-                        {recommendation.reasons.map((reason) => <li key={reason}><Check aria-hidden="true" size={15} />{reason}</li>)}
-                      </ul>
-                    </div>
-                    <div className="triage-ai-footer">
-                      <p>Local preview scores risk, deadline text, urgency and need cues in the intake description, and fit with the profile specialty. It is not connected to live AI or client records.</p>
-                      <button type="button" onClick={reviewRecommendedIntake}>
-                        Review intake <ArrowRight aria-hidden="true" size={16} />
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <div className="triage-ai-empty">
-                    <h3>No open intakes to rank</h3>
-                    <p>New requests will appear in this local priority preview.</p>
-                  </div>
-                )}
-              </section>
               <div className="queue-toolbar">
                 <h2 id="queue-heading" className="sr-only">Incoming intake requests</h2>
                 <div className="filters">
@@ -489,6 +455,38 @@ export default function TriageDashboard() {
             </section>
 
             <aside className="insights-rail" aria-label="Practice overview">
+              <section className="rail-panel triage-ai-panel" aria-labelledby="triage-ai-title">
+                <div className="triage-ai-heading">
+                  <span className="triage-ai-icon"><Sparkles aria-hidden="true" size={20} fill="currentColor" strokeWidth={1.7} /></span>
+                  <div>
+                    <h2 id="triage-ai-title">BatasBot recommendation</h2>
+                  </div>
+                </div>
+                {recommendation ? (
+                  <>
+                    <div className="triage-ai-client">
+                      <h3>{recommendation.intake.client}</h3>
+                      <p>{recommendation.intake.id} · {recommendation.intake.domain}</p>
+                    </div>
+                    <div className="triage-ai-reasons">
+                      <h4>Why review this intake first</h4>
+                      <ul>
+                        {recommendation.reasons.map((reason) => <li key={reason}><Check aria-hidden="true" size={15} />{reason}</li>)}
+                      </ul>
+                    </div>
+                    <div className="triage-ai-footer">
+                      <button type="button" onClick={reviewRecommendedIntake}>
+                        Review intake <ArrowRight aria-hidden="true" size={16} />
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="triage-ai-empty">
+                    <h3>No open intakes to rank</h3>
+                    <p>New requests will appear in this local priority preview.</p>
+                  </div>
+                )}
+              </section>
               <section className="rail-panel diagnostics-panel">
                 <div className="rail-panel-heading"><h2>Queue Diagnostics</h2><span className="live-indicator"><span /> DEMO</span></div>
                 <div className="stat-grid">
