@@ -100,6 +100,24 @@ export async function appendMessages(
     .where(eq(chatSessions.id, sessionId));
 }
 
+/** Delete a session owned by the specified workspace + user pair. */
+export async function deleteSession(
+  sessionId: string,
+  workspaceId: string,
+  clerkUserId: string,
+): Promise<boolean> {
+  const [deleted] = await db
+    .delete(chatSessions)
+    .where(and(
+      eq(chatSessions.id, sessionId),
+      eq(chatSessions.workspaceId, workspaceId),
+      eq(chatSessions.clerkUserId, clerkUserId),
+    ))
+    .returning({ id: chatSessions.id });
+
+  return Boolean(deleted);
+}
+
 /** Verify that a session belongs to the specified workspace + user pair. */
 export async function assertSessionOwnership(
   sessionId: string,

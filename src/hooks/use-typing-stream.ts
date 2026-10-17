@@ -23,7 +23,11 @@ export function useTypingStream() {
    * Appends each chunk to `text` as it arrives.
    */
   const startStream = useCallback(
-    (response: Response, onComplete: (fullText: string) => void) => {
+    (
+      response: Response,
+      onComplete: (fullText: string) => void,
+      onError?: (error: unknown, partialText: string) => void,
+    ) => {
       clearStream();
       setText("");
       setPhase("thinking");
@@ -34,12 +38,14 @@ export function useTypingStream() {
 
       (async () => {
         if (!response.body) {
+          onError?.(new Error("Response stream is unavailable."), "");
           setPhase("idle");
           return;
         }
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let accumulated = "";
+        let streamError: unknown;
 
         setPhase("typing");
         try {
@@ -51,15 +57,16 @@ export function useTypingStream() {
             accumulated += chunk;
             if (activeRef.current) setText(accumulated);
           }
-        } catch {
-          // stream cancelled or network error – stop silently
+        } catch (error) {
+          streamError = error;
         } finally {
           reader.releaseLock();
           if (activeRef.current) {
             activeRef.current = false;
             setText("");
             setPhase("idle");
-            onComplete(accumulated);
+            if (streamError !== undefined) onError?.(streamError, accumulated);
+            else onComplete(accumulated);
           }
         }
       })();

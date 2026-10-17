@@ -12,6 +12,7 @@ import {
   Plus,
   Search,
   ShieldAlert,
+  Trash2,
   X,
 } from "lucide-react";
 import Link from "next/link";
@@ -179,13 +180,16 @@ export default function BatasBotWorkspace() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
+  const [isSending, setIsSending] = useState(false);
   // Messages for the active session are fetched from the DB, then updated optimistically
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const { text: streamedReply, phase: replyPhase, startTyping, startStream, cancelTyping } = useTypingStream();
-  const isGenerating = replyPhase !== "idle";
+  const isGenerating = isSending || replyPhase !== "idle";
   const [notice, setNotice] = useState("");
   const tempIdRef = useRef(0);
+  const skipSessionLoadRef = useRef(new Set<string>());
   const triageHandoffRef = useRef<{ sessionId: string; assistantMessage: ChatMessage } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -218,22 +222,31 @@ export default function BatasBotWorkspace() {
   useEffect(() => {
     if (!activeSessionId) {
       setMessages([]);
+      setMessagesLoading(false);
       return;
     }
+
+    if (skipSessionLoadRef.current.delete(activeSessionId)) return;
+
+    const controller = new AbortController();
     setMessagesLoading(true);
+    setMessages([]);
     void (async () => {
       try {
-        const res = await fetch(`/api/chat/sessions/${activeSessionId}`);
+        const res = await fetch(`/api/chat/sessions/${activeSessionId}`, { signal: controller.signal });
         if (res.ok) {
           const data = (await res.json()) as { id: string; role: "user" | "assistant"; content: string }[];
-          setMessages(data.map((m) => ({ id: m.id, role: m.role, content: m.content })));
+          if (!controller.signal.aborted) {
+            setMessages(data.map((m) => ({ id: m.id, role: m.role, content: m.content })));
+          }
         }
       } catch {
-        setMessages([]);
+        if (!controller.signal.aborted) setMessages([]);
       } finally {
-        setMessagesLoading(false);
+        if (!controller.signal.aborted) setMessagesLoading(false);
       }
     })();
+    return () => controller.abort();
   }, [activeSessionId]);
 
   // ── Scroll to bottom ───────────────────────────────────────────────────
@@ -315,6 +328,7 @@ export default function BatasBotWorkspace() {
     }
 
     setInput("");
+    setIsSending(true);
 
     let response: Response;
     try {
@@ -328,12 +342,16 @@ export default function BatasBotWorkspace() {
         }),
       });
     } catch {
+      setIsSending(false);
+      if (isNewSession) setSessions((current) => current.filter((session) => session.id !== "__new__"));
       const errorMsg: ChatMessage = { id: `temp-e-${tempIdRef.current++}`, role: "assistant", content: "BatasBot could not reach the server. Please check your connection and try again." };
       setMessages((current) => [...current, errorMsg]);
       return;
     }
 
     if (!response.ok) {
+      setIsSending(false);
+      if (isNewSession) setSessions((current) => current.filter((session) => session.id !== "__new__"));
       const errData = (await response.json().catch(() => ({}))) as { error?: string };
       const errorMsg: ChatMessage = { id: `temp-e-${tempIdRef.current++}`, role: "assistant", content: errData.error || "BatasBot encountered an error. Please try again shortly." };
       setMessages((current) => [...current, errorMsg]);
@@ -343,6 +361,7 @@ export default function BatasBotWorkspace() {
     // If server created a new session, update the sidebar with the real ID
     const resolvedSessionId = response.headers.get("X-Session-Id") ?? currentSessionId ?? "";
     if (isNewSession && resolvedSessionId) {
+      skipSessionLoadRef.current.add(resolvedSessionId);
       setActiveSessionId(resolvedSessionId);
       setSessions((current) => current.map((s) =>
         s.id === "__new__" ? { ...s, id: resolvedSessionId } : s,
@@ -350,13 +369,31 @@ export default function BatasBotWorkspace() {
     }
 
     startStream(response, (fullText) => {
+      if (!fullText.trim()) {
+        setMessages((current) => [...current, {
+          id: `temp-e-${tempIdRef.current++}`,
+          role: "assistant",
+          content: "BatasBot returned an empty response. Please try again.",
+        }]);
+        return;
+      }
       const assistantMsg: ChatMessage = { id: `temp-a-${tempIdRef.current++}`, role: "assistant", content: fullText };
       setMessages((current) => [...current, assistantMsg]);
       // Update sidebar preview
       setSessions((current) => current.map((s) =>
         s.id === resolvedSessionId ? { ...s, preview: fullText.slice(0, 80), updatedAt: new Date().toISOString() } : s,
       ));
+    }, (_error, partialText) => {
+      const content = partialText.trim()
+        ? `${partialText.trim()}\n\n[BatasBot could not finish this response. Please try again.]`
+        : "BatasBot could not generate a response. Please try again.";
+      setMessages((current) => [...current, {
+        id: `temp-e-${tempIdRef.current++}`,
+        role: "assistant",
+        content,
+      }]);
     });
+    setIsSending(false);
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -371,6 +408,38 @@ export default function BatasBotWorkspace() {
     setInput("");
     setNotice("");
     inputRef.current?.focus();
+  };
+
+  const deleteChatSession = async (session: ChatSession) => {
+    if (isGenerating || deletingSessionId) return;
+    if (!window.confirm(`Delete "${session.title}" and its messages? This cannot be undone.`)) return;
+
+    setDeletingSessionId(session.id);
+    setNotice("");
+    try {
+      const response = await fetch(`/api/chat/sessions/${session.id}`, { method: "DELETE" });
+      const payload: unknown = await response.json().catch(() => null);
+      if (!response.ok) {
+        const error = payload && typeof payload === "object" && "error" in payload
+          && typeof payload.error === "string"
+          ? payload.error
+          : "Unable to delete this conversation right now.";
+        setNotice(error);
+        return;
+      }
+
+      setSessions((current) => current.filter(({ id }) => id !== session.id));
+      if (activeSessionId === session.id) {
+        cancelTyping();
+        setActiveSessionId(null);
+        setMessages([]);
+        triageHandoffRef.current = null;
+      }
+    } catch {
+      setNotice("Could not reach the server. Please try deleting the conversation again.");
+    } finally {
+      setDeletingSessionId(null);
+    }
   };
 
   return (
@@ -391,7 +460,7 @@ export default function BatasBotWorkspace() {
               <p>Your workspace assistant</p>
             </div>
           </div>
-          <button className="batasbot-new-chat" type="button" onClick={startNewChat}>
+          <button className="batasbot-new-chat" type="button" onClick={startNewChat} disabled={isGenerating}>
             <Plus aria-hidden="true" size={10.05} />
             <span>New chat</span>
           </button>
@@ -495,7 +564,7 @@ export default function BatasBotWorkspace() {
                   <ArrowUp aria-hidden="true" size={11.39} />
                 </button>
               </form>
-              <p className="batasbot-main-disclaimer">BatasBot is powered by Gemini AI. Responses are for professional reference only — not legal advice. Always verify citations.</p>
+              <p className="batasbot-main-disclaimer">BatasBot uses Gemini AI with Groq as a fallback. Responses are for professional reference only — not legal advice. Always verify citations.</p>
             </div>
           </div>
 
@@ -510,25 +579,39 @@ export default function BatasBotWorkspace() {
             <div className="batasbot-session-list" aria-label="Chat sessions">
               {sessionsLoading && <p className="batasbot-session-empty">Loading…</p>}
               {!sessionsLoading && visibleSessions.map((session) => (
-                <button
-                  className={`batasbot-session-item${activeSessionId === session.id ? " is-active" : ""}`}
-                  type="button"
+                <div
+                  className={`batasbot-session-row${activeSessionId === session.id ? " is-active" : ""}`}
                   key={session.id}
-                  aria-pressed={activeSessionId === session.id}
-                  disabled={isGenerating}
-                  onClick={() => {
-                    if (activeSessionId === session.id) return;
-                    setActiveSessionId(session.id);
-                    setInput("");
-                    setNotice("");
-                  }}
                 >
-                  <span className="batasbot-session-title-row">
-                    <strong>{session.title}</strong>
-                    <time>{new Date(session.updatedAt).toLocaleDateString()}</time>
-                  </span>
-                  <span className="batasbot-session-preview">{session.preview ?? "Start a new conversation"}</span>
-                </button>
+                  <button
+                    className="batasbot-session-item"
+                    type="button"
+                    aria-pressed={activeSessionId === session.id}
+                    disabled={isGenerating || deletingSessionId !== null}
+                    onClick={() => {
+                      if (activeSessionId === session.id) return;
+                      setActiveSessionId(session.id);
+                      setInput("");
+                      setNotice("");
+                    }}
+                  >
+                    <span className="batasbot-session-title-row">
+                      <strong>{session.title}</strong>
+                      <time>{new Date(session.updatedAt).toLocaleDateString()}</time>
+                    </span>
+                    <span className="batasbot-session-preview">{session.preview ?? "Start a new conversation"}</span>
+                  </button>
+                  <button
+                    className="batasbot-session-delete"
+                    type="button"
+                    aria-label={`Delete conversation: ${session.title}`}
+                    title="Delete conversation"
+                    disabled={isGenerating || deletingSessionId !== null}
+                    onClick={() => void deleteChatSession(session)}
+                  >
+                    <Trash2 aria-hidden="true" size={10.72} />
+                  </button>
+                </div>
               ))}
               {!sessionsLoading && visibleSessions.length === 0 && <p className="batasbot-session-empty">{sessions.length === 0 ? "No conversations yet." : "No matching sessions."}</p>}
             </div>

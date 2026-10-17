@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const PROVIDER_TIMEOUT_MS = 18_000;
-const GROQ_CHAT_MODEL = process.env.GROQ_CHAT_MODEL || "moonshotai/kimi-k2-instruct";
+const GROQ_CHAT_MODEL = process.env.GROQ_CHAT_MODEL || "openai/gpt-oss-20b";
 
 // ── System prompt ─────────────────────────────────────────────────────────────
 
@@ -117,13 +117,13 @@ async function streamWithGemini(
         for await (const chunk of stream) {
           if (chunk.text) controller.enqueue(encoder.encode(chunk.text));
         }
+        controller.close();
       } catch (error) {
         const status = error instanceof Error && "status" in error && typeof error.status === "number"
           ? error.status
           : undefined;
-        throw new ChatProviderError("Gemini", status);
-      } finally {
-        controller.close();
+        const timedOut = status === 504 || (error instanceof Error && /timed?\s*out|timeout/i.test(error.message));
+        controller.error(new ChatProviderError("Gemini", status, timedOut));
       }
     },
   });
@@ -206,15 +206,101 @@ async function streamWithGroq(
             }
           }
         }
+        buffer += decoder.decode();
+        if (buffer.trim().startsWith("data:")) {
+          const jsonStr = buffer.trim().slice(5).trim();
+          if (jsonStr && jsonStr !== "[DONE]") {
+            const chunk = groqStreamChunkSchema.parse(JSON.parse(jsonStr));
+            const text = chunk.choices[0]?.delta?.content;
+            if (text) controller.enqueue(encoder.encode(text));
+          }
+        }
+        controller.close();
       } catch (error) {
         const status = error instanceof Error && "status" in error && typeof error.status === "number"
           ? error.status : undefined;
-        // Surface error as inline text so the client isn't left hanging
-        controller.enqueue(encoder.encode(`\n\n[BatasBot error: ${error instanceof Error ? error.message : "stream interrupted"}]`));
-        throw new ChatProviderError("Groq", status);
+        const timedOut = status === 504 || (error instanceof Error && /timed?\s*out|timeout/i.test(error.message));
+        controller.error(new ChatProviderError("Groq", status, timedOut));
       } finally {
         reader.releaseLock();
+      }
+    },
+  });
+}
+
+async function readProviderChunk(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  provider: string,
+) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      reader.read(),
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => {
+          reject(new ChatProviderError(provider, undefined, true, "Provider response timed out."));
+        }, PROVIDER_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+async function primeProviderStream(
+  stream: ReadableStream<Uint8Array>,
+  provider: string,
+): Promise<ReadableStream<Uint8Array>> {
+  const reader = stream.getReader();
+  let firstChunk: Uint8Array;
+  try {
+    const first = await readProviderChunk(reader, provider);
+    if (first.done || !first.value?.length) {
+      throw new ChatProviderError(provider, undefined, false, "Provider returned an empty response.");
+    }
+    firstChunk = first.value;
+  } catch (error) {
+    void reader.cancel(error).catch(() => {});
+    try {
+      reader.releaseLock();
+    } catch {
+      // The provider may still have an outstanding read when its timeout fires.
+    }
+    if (error instanceof ChatProviderError) throw error;
+
+    const status = error instanceof Error && "status" in error && typeof error.status === "number"
+      ? error.status
+      : undefined;
+    const timedOut = status === 504 || (error instanceof Error && /timed?\s*out|timeout/i.test(error.message));
+    throw new ChatProviderError(provider, status, timedOut);
+  }
+
+  return new ReadableStream<Uint8Array>({
+    async start(controller) {
+      try {
+        controller.enqueue(firstChunk);
+        while (true) {
+          const { done, value } = await readProviderChunk(reader, provider);
+          if (done) break;
+          controller.enqueue(value);
+        }
         controller.close();
+      } catch (error) {
+        controller.error(error);
+      } finally {
+        try {
+          reader.releaseLock();
+        } catch {
+          // The stream may have been cancelled while a provider read was pending.
+        }
+      }
+    },
+    async cancel(reason) {
+      await reader.cancel(reason);
+      try {
+        reader.releaseLock();
+      } catch {
+        // The stream may have an outstanding provider read during cancellation.
       }
     },
   });
@@ -329,7 +415,7 @@ export async function POST(request: Request) {
 
   for (const provider of providers) {
     try {
-      bodyStream = await provider.stream();
+      bodyStream = await primeProviderStream(await provider.stream(), provider.name);
       usedProvider = provider.name;
       break;
     } catch (error) {
@@ -337,12 +423,9 @@ export async function POST(request: Request) {
         ? error
         : new ChatProviderError(provider.name, undefined);
       failures.push(failure);
-      console.error("BatasBot AI provider failed.", {
-        provider: failure.provider,
-        status: failure.status,
-        timedOut: failure.timedOut,
-        reason: failure.message,
-      });
+      console.error(
+        `BatasBot AI provider failed: ${failure.provider}; status=${failure.status ?? "unknown"}; timedOut=${failure.timedOut}.`,
+      );
     }
   }
 

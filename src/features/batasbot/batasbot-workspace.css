@@ -83,6 +83,7 @@
 
 .batasbot-session-item {
   display: flex;
+  flex: 1;
   min-width: 0;
   flex-direction: column;
   align-items: stretch;
@@ -96,17 +97,60 @@
   text-align: left;
 }
 
-.batasbot-session-item:hover:not(:disabled) {
+.batasbot-session-row {
+  display: flex;
+  min-width: 0;
+  align-items: stretch;
+  gap: 2.68px;
+  border: 0.67px solid transparent;
+  border-radius: 4.69px;
+}
+
+.batasbot-session-row:hover {
   background: #f7f9fc;
 }
 
-.batasbot-session-item.is-active {
+.batasbot-session-row.is-active {
   background: #edf3ff;
   border-color: #d5e2fa;
 }
 
+.batasbot-session-item:hover:not(:disabled) {
+  background: transparent;
+}
+
+.batasbot-session-item.is-active {
+  background: transparent;
+}
+
 .batasbot-session-item:disabled {
   cursor: default;
+}
+
+.batasbot-session-delete {
+  display: grid;
+  width: 24px;
+  flex: 0 0 24px;
+  place-items: center;
+  align-self: flex-start;
+  margin: 4px 3px 0 0;
+  padding: 0;
+  color: #7b879b;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-small);
+  cursor: pointer;
+}
+
+.batasbot-session-delete:hover:not(:disabled),
+.batasbot-session-delete:focus-visible {
+  color: #b4232f;
+  background: #fff0f0;
+}
+
+.batasbot-session-delete:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .batasbot-session-title-row {
