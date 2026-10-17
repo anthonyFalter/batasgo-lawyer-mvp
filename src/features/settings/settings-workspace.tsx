@@ -132,9 +132,8 @@ export default function SettingsWorkspace() {
                   <div className="profile-avatar" aria-label="Lawyer initial">J</div>
                   <div className="profile-copy">
                     <strong>Atty. Juan Dela Cruz</strong>
-                    <span>Managing partner · BatasGO workspace</span>
+                    <span>BatasGO workspace</span>
                   </div>
-                  <div className="profile-badge">Active</div>
                 </div>
 
                 <div className="detail-grid">
@@ -147,8 +146,8 @@ export default function SettingsWorkspace() {
                     <p>Labor &amp; employment litigation</p>
                   </div>
                   <div>
-                    <label>Default intake queue</label>
-                    <p>Priority review · 24h turnaround</p>
+                    <label>Workspace role</label>
+                    <p>Managing partner</p>
                   </div>
                 </div>
               </div>
