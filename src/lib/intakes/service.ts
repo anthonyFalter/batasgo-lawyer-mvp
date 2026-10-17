@@ -45,7 +45,11 @@ export function toIntakeDTO(intake: typeof intakes.$inferSelect): IntakeDTO {
     id: intake.id,
     reference: intake.reference,
     domain: intake.domain,
-    risk: intake.risk === "critical" ? "Critical" : intake.risk === "high" ? "High" : "Medium",
+    risk: intake.risk === "critical"
+      ? "Critical"
+      : intake.risk === "high"
+        ? "High"
+        : intake.risk === "unassessed" ? "Unassessed" : "Medium",
     client: intake.client,
     summary: intake.summary,
     received: formatReceived(intake.receivedAt),

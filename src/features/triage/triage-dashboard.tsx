@@ -9,7 +9,6 @@ import {
   FileText,
   FilePenLine,
   Sparkles,
-  LoaderCircle,
   Clock3,
   Inbox,
   Mail,
@@ -21,6 +20,7 @@ import {
 import { type CSSProperties, type FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   apiErrorResponseSchema,
+  intakeAiReviewResponseSchema,
   intakeListResponseSchema,
   intakeResponseSchema,
   type IntakeDTO,
@@ -31,7 +31,21 @@ import WorkspaceShell from "../workspace/workspace-shell";
 type Risk = IntakeDTO["risk"];
 type Intake = IntakeDTO;
 type Decision = { intake: Intake; result: "accepted" | "declined" };
-type IntakeReview = { intake: Intake; summary: string; signals: string[] };
+type IntakeReviewFactor = { score: number; rationale: string };
+type IntakeReview = {
+  intake: Intake;
+  summary: string;
+  signals: string[];
+  source: "local" | "ai";
+  provider?: "Gemini" | "Groq";
+  documentReview?: { processedCount: number; truncated: boolean; visionUsed: boolean };
+  factors?: {
+    urgency: IntakeReviewFactor;
+    deadline: IntakeReviewFactor;
+    impact: IntakeReviewFactor;
+    unknowns: IntakeReviewFactor;
+  };
+};
 type DecisionFilter = "all" | Decision["result"];
 type RankedIntake = { intake: Intake; score: number; reasons: string[]; specialtyMatch: boolean };
 type AiSummaryBlock = { type: "paragraph"; text: string } | { type: "list"; items: string[] };
@@ -383,14 +397,17 @@ export default function TriageDashboard() {
   const [intakeSpecialty, setIntakeSpecialty] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
-  const [intakeStage, setIntakeStage] = useState<"form" | "calculating" | "review">("form");
+  const [intakeStage, setIntakeStage] = useState<"form" | "review">("form");
   const [intakeReview, setIntakeReview] = useState<IntakeReview | null>(null);
+  const [isGeneratingIntakeReview, setIsGeneratingIntakeReview] = useState(false);
+  const [intakeAiReviewError, setIntakeAiReviewError] = useState("");
   const queueToolbarRef = useRef<HTMLDivElement>(null);
   const decisionHistoryRef = useRef<HTMLDivElement>(null);
   const decisionHistoryButtonRef = useRef<HTMLButtonElement>(null);
   const intakeCardRefs = useRef(new Map<string, HTMLElement>());
   const intakeDialogRef = useRef<HTMLDialogElement>(null);
   const documentInputRef = useRef<HTMLInputElement>(null);
+  const intakeReviewRequestRef = useRef<AbortController | null>(null);
 
   const handleSummaryTypingComplete = useCallback((id: string) => {
     setTypingSummaryId((current) => current === id ? null : current);
@@ -443,12 +460,6 @@ export default function TriageDashboard() {
       intakeDialogRef.current.showModal();
     }
   }, [newIntakeOpen]);
-
-  useEffect(() => {
-    if (!newIntakeOpen || intakeStage !== "calculating") return;
-    const timer = window.setTimeout(() => setIntakeStage("review"), 2000);
-    return () => window.clearTimeout(timer);
-  }, [intakeStage, newIntakeOpen]);
 
   useEffect(() => {
     const toolbar = queueToolbarRef.current;
@@ -528,7 +539,7 @@ export default function TriageDashboard() {
     return parsed.data.intake;
   };
 
-  const animateIntakeToReviewed = async (intakeId: string) => {
+  const animateIntakeToReviewed = (intakeId: string): Animation | null => {
     const card = intakeCardRefs.current.get(intakeId);
     const destination = decisionHistoryButtonRef.current;
     if (
@@ -537,7 +548,7 @@ export default function TriageDashboard() {
       || typeof card.animate !== "function"
       || window.matchMedia("(prefers-reduced-motion: reduce)").matches
     ) {
-      return;
+      return null;
     }
 
     const cardBounds = card.getBoundingClientRect();
@@ -546,44 +557,30 @@ export default function TriageDashboard() {
       - (cardBounds.left + cardBounds.width / 2);
     const translateY = destinationBounds.top + destinationBounds.height / 2
       - (cardBounds.top + cardBounds.height / 2);
-    let animation: Animation;
-
     setWarpingIntakeIds((current) => new Set(current).add(intakeId));
     try {
-      animation = card.animate([
+      return card.animate([
         {
-          transform: "translate3d(0, 0, 0) scale(1) skewX(0deg)",
+          transform: "translate3d(0, 0, 0) scale(1)",
           opacity: 1,
-          filter: "blur(0px)",
         },
         {
-          transform: `translate3d(${translateX * 0.38}px, ${translateY * 0.38}px, 0) scale(.78) skewX(8deg) rotate(2deg)`,
-          opacity: 0.92,
-          filter: "blur(.4px)",
-          offset: 0.38,
+          transform: `translate3d(${translateX * 0.55}px, ${translateY * 0.55}px, 0) scale(.62) skewX(5deg)`,
+          opacity: 0.7,
+          offset: 0.45,
         },
         {
-          transform: `translate3d(${translateX}px, ${translateY}px, 0) scale(.06) skewX(-16deg) rotate(-10deg)`,
+          transform: `translate3d(${translateX}px, ${translateY}px, 0) scale(.08) skewX(-8deg)`,
           opacity: 0,
-          filter: "blur(3px)",
         },
       ], {
-        duration: 440,
+        duration: 180,
         easing: "cubic-bezier(.22, .7, .3, 1)",
         fill: "forwards",
       });
-      await new Promise<void>((resolve) => {
-        animation.onfinish = () => resolve();
-        animation.oncancel = () => resolve();
-      });
     } catch (error) {
       console.error("Unable to animate the reviewed intake transition.", error);
-    } finally {
-      setWarpingIntakeIds((current) => {
-        const next = new Set(current);
-        next.delete(intakeId);
-        return next;
-      });
+      return null;
     }
   };
 
@@ -605,9 +602,14 @@ export default function TriageDashboard() {
 
   const decide = async (intake: Intake, result: Decision["result"]) => {
     setBusyIntakeId(intake.id);
+    const animation = animateIntakeToReviewed(intake.id);
     try {
       const updated = await updateIntakeStatus(intake, result);
-      await animateIntakeToReviewed(intake.id);
+      if (animation) {
+        await animation.finished.catch((error: unknown) => {
+          if (!(error instanceof DOMException && error.name === "AbortError")) throw error;
+        });
+      }
       setIntakes((current) => current.filter((item) => item.id !== intake.id));
       setDecisions((current) => [...current.filter(({ intake: item }) => item.id !== intake.id), {
         intake: updated,
@@ -629,8 +631,14 @@ export default function TriageDashboard() {
       decisionHistoryButtonRef.current?.focus({ preventScroll: true });
       showToast(`${intake.reference} ${result}.`, true);
     } catch (error) {
+      animation?.cancel();
       showToast(error instanceof Error ? error.message : "Unable to save the intake decision.");
     } finally {
+      setWarpingIntakeIds((current) => {
+        const next = new Set(current);
+        next.delete(intake.id);
+        return next;
+      });
       setBusyIntakeId(null);
     }
   };
@@ -716,10 +724,14 @@ export default function TriageDashboard() {
     setSelectedFiles([]);
     setIntakeStage("form");
     setIntakeReview(null);
+    setIntakeAiReviewError("");
+    setIsGeneratingIntakeReview(false);
     setIsDraggingFiles(false);
   };
 
   const closeNewIntake = () => {
+    intakeReviewRequestRef.current?.abort();
+    intakeReviewRequestRef.current = null;
     if (intakeDialogRef.current?.open) intakeDialogRef.current.close();
     setNewIntakeOpen(false);
     clearManualIntake();
@@ -732,13 +744,33 @@ export default function TriageDashboard() {
 
   const addDocuments = (files: FileList | File[]) => {
     const incomingFiles = Array.from(files);
-    setSelectedFiles((current) => {
-      const existingFiles = new Set(current.map((file) => `${file.name}:${file.size}:${file.lastModified}`));
-      return [
-        ...current,
-        ...incomingFiles.filter((file) => !existingFiles.has(`${file.name}:${file.size}:${file.lastModified}`)),
-      ];
+    const supportedExtensions = new Set(["pdf", "docx", "txt", "jpg", "jpeg", "png"]);
+    const supportedFiles = incomingFiles.filter((file) => {
+      if (supportedExtensions.has(file.name.toLowerCase().split(".").pop() ?? "")) return true;
+      showToast(`${file.name} is not supported. Choose a PDF, DOCX, TXT, JPG, or PNG file.`);
+      return false;
     });
+    const sizeValidFiles = supportedFiles.filter((file) => {
+      if (file.size <= 5 * 1024 * 1024) return true;
+      showToast(`${file.name} is larger than the 5 MB per-file limit.`);
+      return false;
+    });
+    const existingKeys = new Set(selectedFiles.map((file) => `${file.name}:${file.size}:${file.lastModified}`));
+    const newFiles = sizeValidFiles.filter((file) => !existingKeys.has(`${file.name}:${file.size}:${file.lastModified}`));
+    const availableSlots = Math.max(0, 5 - selectedFiles.length);
+    if (newFiles.length > availableSlots) {
+      showToast("You can select up to 5 documents for one AI review.");
+    }
+    let totalSize = selectedFiles.reduce((size, file) => size + file.size, 0);
+    const filesWithinTotalLimit = newFiles.slice(0, availableSlots).filter((file) => {
+      if (totalSize + file.size > 10 * 1024 * 1024) {
+        showToast("Selected documents cannot exceed 10 MB in total.");
+        return false;
+      }
+      totalSize += file.size;
+      return true;
+    });
+    setSelectedFiles((current) => [...current, ...filesWithinTotalLimit]);
   };
 
   const generateIntakeSuggestions = () => {
@@ -805,8 +837,77 @@ export default function TriageDashboard() {
       aiSummary: null,
     };
 
-    setIntakeReview({ intake: newIntake, summary: suggestions.summary, signals: suggestions.signals });
-    setIntakeStage("calculating");
+    setIntakeAiReviewError("");
+    setIntakeReview({
+      intake: newIntake,
+      summary: suggestions.summary,
+      signals: suggestions.signals,
+      source: "local",
+    });
+    setIntakeStage("review");
+  };
+
+  const generateIntakeAiReview = async () => {
+    if (!intakeReview || isGeneratingIntakeReview) return;
+
+    const controller = new AbortController();
+    intakeReviewRequestRef.current?.abort();
+    intakeReviewRequestRef.current = controller;
+    setIsGeneratingIntakeReview(true);
+    setIntakeAiReviewError("");
+
+    try {
+      const formData = new FormData();
+      formData.append("intake", JSON.stringify({
+        title: intakeTitle,
+        description: intakeDescription,
+        domain: intakeSpecialty,
+        documents: selectedFiles.map((file) => file.name),
+      }));
+      selectedFiles.forEach((file) => formData.append("files", file, file.name));
+      const response = await fetch("/api/intakes/review", {
+        method: "POST",
+        body: formData,
+        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(12_000)]),
+      });
+      if (!response.ok) throw new Error(await getResponseError(response, "Unable to generate an AI review."));
+      const parsed = intakeAiReviewResponseSchema.safeParse(await response.json());
+      if (!parsed.success) throw new Error("The AI review service returned an invalid assessment.");
+      if (controller.signal.aborted) return;
+
+      const { review } = parsed.data;
+      setIntakeTitle(review.title);
+      setIntakeDescription(review.description);
+      setIntakeSpecialty(review.domain);
+      setIntakeReview({
+        intake: {
+          ...intakeReview.intake,
+          client: review.title,
+          domain: review.domain,
+          priorityScore: review.priorityScore,
+          risk: review.risk,
+          summary: review.description,
+        },
+        summary: review.summary,
+        signals: review.signals.length ? review.signals : ["No immediate urgency signals stated"],
+        source: "ai",
+        provider: review.provider,
+        documentReview: review.documentReview,
+        factors: review.factors,
+      });
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
+        setIntakeAiReviewError(timedOut
+          ? "AI review timed out. Your local score is still available; try again."
+          : error instanceof Error ? error.message : "Unable to generate an AI review.");
+      }
+    } finally {
+      if (intakeReviewRequestRef.current === controller) {
+        intakeReviewRequestRef.current = null;
+        setIsGeneratingIntakeReview(false);
+      }
+    }
   };
 
   const proceedWithManualIntake = async () => {
@@ -821,6 +922,7 @@ export default function TriageDashboard() {
           description: intakeDescription,
           domain: intakeSpecialty,
           documents: selectedFiles.map((file) => file.name),
+          priorityScore: intakeReview.intake.priorityScore,
         }),
       });
       if (!response.ok) throw new Error(await getResponseError(response, "Unable to save intake."));
@@ -1211,7 +1313,11 @@ export default function TriageDashboard() {
         <dialog
           ref={intakeDialogRef}
           className="new-intake-dialog"
-          aria-labelledby={intakeStage === "form" ? "new-intake-heading" : intakeStage === "calculating" ? "intake-calculating-heading" : "intake-review-heading"}
+          aria-labelledby={intakeStage === "form" ? "new-intake-heading" : "intake-review-heading"}
+          onCancel={(event) => {
+            event.preventDefault();
+            closeNewIntake();
+          }}
           onClose={() => setNewIntakeOpen(false)}
           onClick={(event) => {
             if (event.target === event.currentTarget) closeNewIntake();
@@ -1222,7 +1328,7 @@ export default function TriageDashboard() {
               <header className="new-intake-dialog-header">
                 <div>
                   <h2 id="new-intake-heading">Create an intake</h2>
-                  <p>Enter matter details. Selected file names are saved; file contents are not uploaded.</p>
+                  <p>Only file names are saved. Full contents are sent to AI providers only if you request an AI review.</p>
                 </div>
                 <button className="quiet-icon-button" type="button" aria-label="Close new intake" onClick={closeNewIntake}>
                   <X aria-hidden="true" size={13.4} />
@@ -1237,7 +1343,7 @@ export default function TriageDashboard() {
                   ref={documentInputRef}
                   className="intake-file-input"
                   type="file"
-                  accept=".pdf,.doc,.docx,.txt,.rtf,.jpg,.jpeg,.png"
+                  accept=".pdf,.docx,.txt,.jpg,.jpeg,.png"
                   multiple
                   onChange={(event) => {
                     if (event.currentTarget.files) addDocuments(event.currentTarget.files);
@@ -1260,7 +1366,7 @@ export default function TriageDashboard() {
                   }}
                 >
                   <span className="intake-dropzone-icon"><Upload aria-hidden="true" size={13.4} /></span>
-                  <span><strong>Choose documents</strong><small>Names only · file contents stay in your browser</small></span>
+                  <span><strong>Choose documents</strong><small>PDF, DOCX, TXT, JPG, PNG · up to 5 files, 10 MB total</small></span>
                 </button>
                 {selectedFiles.length > 0 && (
                   <ul className="intake-file-list" aria-label="Selected documents">
@@ -1320,32 +1426,25 @@ export default function TriageDashboard() {
                 </label>
               </div>
 
-              <section className="intake-ai-assist" aria-label="Optional BatasBot suggestions">
+              <section className="intake-ai-assist" aria-label="Local intake suggestions">
                 <button className="intake-ai-button" type="button" onClick={generateIntakeSuggestions}>
-                  <Sparkles aria-hidden="true" size={10.72} /> Suggest with BatasBot
+                  <Sparkles aria-hidden="true" size={10.72} /> Quick suggestions
                 </button>
               </section>
 
               <footer className="new-intake-form-footer">
-                <p>Fields can be left blank. Let BatasBot do the heavy lifting.</p>
+                <p>Review your details before requesting an optional AI assessment.</p>
                 <div className="new-intake-form-actions">
                   <button className="intake-cancel-button" type="button" onClick={closeNewIntake}>Cancel</button>
-                  <button className="intake-submit-button" type="submit"><Check aria-hidden="true" size={12.06} /> Add to queue</button>
+                  <button className="intake-submit-button" type="submit">Review intake <ArrowRight aria-hidden="true" size={12.06} /></button>
                 </div>
               </footer>
               </form>
-            ) : intakeStage === "calculating" ? (
-              <section className="intake-calculating" role="status" aria-live="polite">
-                <span className="intake-calculating-icon"><LoaderCircle aria-hidden="true" size={24.12} /></span>
-                <h2 id="intake-calculating-heading">Calculating metrics</h2>
-                <div className="intake-calculating-track" aria-hidden="true"><span /></div>
-                <p>Assessing urgency and key signals</p>
-              </section>
             ) : intakeReview && (
               <section className="intake-review" aria-labelledby="intake-review-heading">
                 <header className="intake-review-header">
                   <div>
-                    <h2 id="intake-review-heading">Urgency overview</h2>
+                    <h2 id="intake-review-heading">{intakeReview.source === "ai" ? "AI-assisted urgency review" : "Urgency overview"}</h2>
                     <p>{intakeReview.intake.client} <span aria-hidden="true">·</span> {intakeReview.intake.domain}</p>
                   </div>
                   <span className={`intake-review-risk intake-review-risk--${intakeReview.intake.risk.toLowerCase()}`}>
@@ -1353,12 +1452,38 @@ export default function TriageDashboard() {
                   </span>
                 </header>
 
+                <section className="intake-review-draft" aria-labelledby="intake-review-draft-heading">
+                  <div>
+                    <h3 id="intake-review-draft-heading">
+                      {intakeReview.source === "ai" ? "BatasBot suggestions" : "Intake details"}
+                    </h3>
+                    <button
+                      className="intake-review-edit"
+                      type="button"
+                      disabled={isGeneratingIntakeReview || isSavingIntake}
+                      onClick={() => setIntakeStage("form")}
+                    >
+                      Edit fields
+                    </button>
+                  </div>
+                  <dl>
+                    <div><dt>Title</dt><dd>{intakeTitle || "Not provided"}</dd></div>
+                    <div><dt>Specialty</dt><dd>{intakeSpecialty || "Not selected"}</dd></div>
+                    <div><dt>Description</dt><dd>{intakeDescription || "Not provided"}</dd></div>
+                  </dl>
+                </section>
+
                 <div className="intake-review-metrics">
                   <section className="intake-review-score" aria-label="Priority score">
                     <span>Priority score</span>
                     <div className="intake-review-score-value">
                       <strong>{intakeReview.intake.priorityScore}</strong><small>/100</small>
                     </div>
+                    <small className="intake-review-score-source">
+                      {intakeReview.source === "ai"
+                        ? `AI-assisted · ${intakeReview.provider}`
+                        : "Preliminary local score"}
+                    </small>
                     <div
                       className="intake-review-meter"
                       role="progressbar"
@@ -1380,6 +1505,33 @@ export default function TriageDashboard() {
                   </div>
                 </div>
 
+                {intakeReview.factors && (
+                  <section className="intake-review-breakdown" aria-labelledby="intake-review-breakdown-heading">
+                    <h3 id="intake-review-breakdown-heading">How this score was formed</h3>
+                    <dl>
+                      {([
+                        ["Urgency", intakeReview.factors.urgency, 35],
+                        ["Stated deadlines", intakeReview.factors.deadline, 30],
+                        ["Reported impact", intakeReview.factors.impact, 25],
+                        ["Urgency-critical unknowns", intakeReview.factors.unknowns, 10],
+                      ] as const).map(([label, factor, maximum]) => (
+                        <div className="intake-review-factor" key={label}>
+                          <dt>{label}<span>{factor.score}/{maximum}</span></dt>
+                          <dd>{factor.rationale}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                    <p>Component scores add to the priority score. Missing facts alone do not establish risk.</p>
+                  </section>
+                )}
+                {intakeReview.documentReview && (
+                  <p className="intake-review-document-note">
+                    Read {intakeReview.documentReview.processedCount} uploaded document{intakeReview.documentReview.processedCount === 1 ? "" : "s"}
+                    {intakeReview.documentReview.visionUsed ? " with Gemini Vision" : ""}.
+                    {intakeReview.documentReview.truncated ? " Some extracted text was shortened to fit the review." : ""}
+                  </p>
+                )}
+
                 <div className="intake-review-signals" aria-label="Urgency signals">
                   {intakeReview.signals.map((signal) => <span key={signal}>{signal}</span>)}
                 </div>
@@ -1387,14 +1539,47 @@ export default function TriageDashboard() {
                 <section className="intake-review-summary" aria-labelledby="intake-review-summary-heading">
                   <div>
                     <Sparkles aria-hidden="true" size={12.06} />
-                    <h3 id="intake-review-summary-heading">BatasBot summary</h3>
+                    <h3 id="intake-review-summary-heading">
+                      {intakeReview.source === "ai" ? "BatasBot triage note" : "Intake summary"}
+                    </h3>
                   </div>
                   <p>{intakeReview.summary}</p>
+                  {intakeReview.source === "ai" && <small>Reported facts are unverified; verify all details and deadlines.</small>}
+                </section>
+
+                <section
+                  className="intake-ai-disclosure"
+                  aria-label="Optional external AI review"
+                  aria-busy={isGeneratingIntakeReview}
+                >
+                  <span className="sr-only" role="status" aria-live="polite">
+                    {isGeneratingIntakeReview ? "Generating AI intake review." : ""}
+                  </span>
+                  <p>
+                    <strong>Optional AI review</strong>
+                    {" "}When you choose {intakeReview.source === "ai" ? "Regenerate AI review" : "Generate AI review"},
+                    your entered details and the full contents of selected documents are sent to configured AI
+                    providers (Gemini first; Groq can be used as fallback for text-readable files). Image and
+                    scanned-PDF review requires Gemini. BatasGO does not store uploaded file contents. Review
+                    provider privacy terms before using client data; verify all suggested fields and scoring.
+                  </p>
+                  {intakeAiReviewError && <p className="intake-ai-review-error" role="alert">{intakeAiReviewError}</p>}
+                  <button
+                    className="intake-ai-button"
+                    type="button"
+                    disabled={isGeneratingIntakeReview || isSavingIntake}
+                    onClick={() => void generateIntakeAiReview()}
+                  >
+                    <Sparkles aria-hidden="true" size={10.72} />
+                    {isGeneratingIntakeReview
+                      ? "Generating AI review…"
+                      : intakeReview.source === "ai" ? "Regenerate AI review" : "Generate AI review"}
+                  </button>
                 </section>
 
                 <footer className="intake-review-footer">
-                  <button className="intake-cancel-button" type="button" onClick={() => setIntakeStage("form")}>Edit details</button>
-                  <button className="intake-submit-button" type="button" disabled={isSavingIntake} onClick={() => void proceedWithManualIntake()}>
+                  <button className="intake-cancel-button" type="button" disabled={isGeneratingIntakeReview || isSavingIntake} onClick={() => setIntakeStage("form")}>Edit details</button>
+                  <button className="intake-submit-button" type="button" disabled={isSavingIntake || isGeneratingIntakeReview} onClick={() => void proceedWithManualIntake()}>
                     {isSavingIntake ? "Saving…" : "Save intake"} <ArrowRight aria-hidden="true" size={12.06} />
                   </button>
                 </footer>

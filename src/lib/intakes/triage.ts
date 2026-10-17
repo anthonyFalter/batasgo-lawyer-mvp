@@ -1,13 +1,14 @@
-export type IntakeRisk = "Critical" | "High" | "Medium";
+export type IntakeRisk = "Critical" | "High" | "Medium" | "Unassessed";
 
-export function getRiskFromScore(score: number): IntakeRisk {
+export function getRiskFromScore(score: number | null): IntakeRisk {
+  if (score === null) return "Unassessed";
   if (score >= 80) return "Critical";
   if (score >= 60) return "High";
   return "Medium";
 }
 
 export function suggestIntakeDetails(title: string, description: string, documentNames: string[]) {
-  const source = `${title} ${description} ${documentNames.join(" ")}`.toLowerCase();
+  const source = `${title} ${description}`.toLowerCase();
   const specialty = /employment|labor|workplace|wage|salary|dismissal|employer/.test(source)
     ? "Labor & Employment"
     : /divorce|custody|marriage|family|spouse|inheritance/.test(source)
@@ -18,39 +19,39 @@ export function suggestIntakeDetails(title: string, description: string, documen
           ? "Immigration"
           : /contract|company|corporate|business|shareholder/.test(source)
             ? "Corporate & Commercial"
-            : "Civil Disputes";
-  const topic = /passport|withheld/.test(source)
-    ? "passport withholding"
-    : /wage|salary|compensation|unpaid/.test(source)
-      ? "unpaid compensation"
-      : /dismiss|termination|fired/.test(source)
-        ? "an employment separation"
-        : /custody|divorce|spouse/.test(source)
-          ? "a family law concern"
-          : /contract|agreement|invoice|payment/.test(source)
-            ? "a contract or payment dispute"
-            : "a matter requiring legal review";
-  const suggestedTitle = title.trim() || `${specialty} matter`;
-  const suggestedDescription = description.trim()
-    || `Prospective ${specialty.toLowerCase()} matter involving ${topic}. Review the submitted materials, confirm the key parties and dates, and identify any upcoming deadlines.`;
+              : "Other";
+  const immediateDanger = /\b(immediate danger|physical danger|threatened|threat|violence|unsafe|safety risk)\b/.test(source);
+  const imminentTiming = /\b(today|tomorrow|immediately|right away|within 24 hours)\b/.test(source);
+  const statedDeadline = /\b(deadline|hearing|court date|filing date|file by|due by|summons)\b/.test(source);
+  const approachingDeadline = imminentTiming || /\bwithin\s+\d+\s+days?\b/.test(source);
+  const concreteImpact = /\b(unpaid wages|unpaid salary|job loss|lost (?:my )?job|eviction|injury|passport withheld|benefits withheld|locked out)\b/.test(source);
+  const urgencyScore = immediateDanger ? 35 : imminentTiming ? 20 : 0;
+  const deadlineScore = statedDeadline ? approachingDeadline ? 30 : 12 : 0;
+  const impactScore = concreteImpact ? 20 : 0;
+  const score = urgencyScore + deadlineScore + impactScore;
   const summary = description.trim()
     ? description.trim().replace(/\s+/g, " ").split(/(?<=[.!?])\s/)[0].slice(0, 220)
-    : `A ${specialty.toLowerCase()} inquiry${documentNames.length ? ` with ${documentNames.length} selected file name${documentNames.length === 1 ? "" : "s"}` : ""}. Review key facts and deadlines before proceeding.`;
+    : "No description entered. Add matter details or request an AI review of the selected documents.";
   const signals = [
-    { pattern: /deadline|hearing|court|summons|urgent|today|overdue/, label: "Time-sensitive" },
-    { pattern: /threat|violence|safety|eviction|passport|withheld/, label: "Immediate impact" },
-    { pattern: /unpaid|wage|salary|dismiss|termination|filing/, label: "Employment or financial concern" },
-  ].filter(({ pattern }) => pattern.test(source)).map(({ label }) => label);
-  if (documentNames.length) signals.push(`${documentNames.length} selected file name${documentNames.length === 1 ? "" : "s"}`);
-  if (signals.length === 0) signals.push("Initial review needed");
-  const score = Math.min(
-    98,
-    42
-      + (/deadline|hearing|court|summons|urgent|today|overdue/.test(source) ? 28 : 0)
-      + (/threat|violence|safety|eviction|passport|withheld/.test(source) ? 20 : 0)
-      + (/unpaid|wage|salary|dismiss|termination|filing/.test(source) ? 16 : 0)
-      + (documentNames.length > 0 ? 5 : 0),
-  );
+    ...(immediateDanger ? ["Immediate safety concern stated"] : []),
+    ...(imminentTiming ? ["Immediate timing stated"] : []),
+    ...(statedDeadline ? ["A legal deadline or hearing is mentioned"] : []),
+    ...(concreteImpact ? ["Concrete personal or financial impact stated"] : []),
+  ];
+  if (signals.length === 0) signals.push("No explicit urgency indicators found in entered details");
 
-  return { title: suggestedTitle, description: suggestedDescription, specialty, summary, signals, score };
+  return {
+    title: title.trim(),
+    description: description.trim(),
+    specialty,
+    summary,
+    signals,
+    score: score > 0 ? score : null,
+    factors: {
+      urgency: urgencyScore,
+      deadline: deadlineScore,
+      impact: impactScore,
+    },
+    documentsSelected: documentNames.length > 0,
+  };
 }

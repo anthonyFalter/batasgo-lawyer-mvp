@@ -13,7 +13,7 @@ import {
 import { sql } from "drizzle-orm";
 
 export const workspaceRole = pgEnum("workspace_role", ["owner", "lawyer", "staff"]);
-export const intakeRisk = pgEnum("intake_risk", ["critical", "high", "medium"]);
+export const intakeRisk = pgEnum("intake_risk", ["critical", "high", "medium", "unassessed"]);
 export const intakeStatus = pgEnum("intake_status", ["pending", "accepted", "declined"]);
 
 export const workspaces = pgTable("workspaces", {
@@ -55,7 +55,7 @@ export const intakes = pgTable(
     receivedAt: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
     deadlineAt: timestamp("deadline_at", { withTimezone: true }),
     status: intakeStatus("status").notNull().default("pending"),
-    priorityScore: integer("priority_score").notNull(),
+    priorityScore: integer("priority_score"),
     documents: text("documents").array().notNull().default(sql`ARRAY[]::text[]`),
     isSample: boolean("is_sample").notNull().default(false),
     aiSummary: text("ai_summary"),
