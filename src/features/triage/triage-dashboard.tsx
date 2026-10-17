@@ -825,7 +825,7 @@ export default function TriageDashboard() {
               <section className="rail-panel schedule-panel">
                 <div className="rail-panel-heading">
                   <h2>Today&apos;s Schedule</h2>
-                  <button className="text-link" type="button" onClick={() => unavailable("Calendar")}>
+                  <button className="text-link" type="button" onClick={() => window.location.assign("/calendar")}>
                     View calendar <span aria-hidden="true">→</span>
                   </button>
                 </div>
@@ -838,7 +838,7 @@ export default function TriageDashboard() {
               <section className="rail-panel messages-panel">
                 <div className="rail-panel-heading">
                   <h2>Recent Messages</h2>
-                  <button className="quiet-icon-button" type="button" aria-label="Open messages" onClick={() => unavailable("Messages")}>
+                  <button className="quiet-icon-button" type="button" aria-label="Open messages" onClick={() => window.location.assign("/messages")}>
                     <Mail size={10.72} />
                   </button>
                 </div>
@@ -848,7 +848,7 @@ export default function TriageDashboard() {
                     ["Atty. Clara Ocampo", "1h ago", "The Cebu Court hearing has been moved to March 1st morning."],
                     ["Client Case #0839", "3h ago", "They sent another demand letter today. Screenshot attached."],
                   ].map(([name, time, preview]) => (
-                    <button className="message-item" key={name} type="button" onClick={() => unavailable("Messages")}>
+                    <button className="message-item" key={name} type="button" onClick={() => window.location.assign("/messages")}>
                       <span className="message-meta"><strong>{name}</strong><time>{time}</time></span>
                       <span className="message-preview">{preview}</span>
                     </button>

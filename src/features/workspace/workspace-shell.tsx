@@ -182,7 +182,7 @@ export default function WorkspaceShell({
                 <div className="popover profile-popover" role="region" aria-label="Account menu">
                   <strong>Atty. Juan Dela Cruz</strong>
                   <span>Sample lawyer account</span>
-                  <button type="button" onClick={() => { setPopover(null); onUnavailable("Account settings"); }}>
+                  <button type="button" onClick={() => { setPopover(null); window.location.assign("/settings"); }}>
                     <Settings size={10.05} /> Account settings
                   </button>
                 </div>
