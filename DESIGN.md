@@ -258,6 +258,12 @@ Panels use 10px corners, secondary controls use 6–8px corners, and capsule fil
 - **Thread:** Use a compact case header, light neutral inbound bubbles, workspace-blue outbound bubbles, and a rounded single-line composer docked to the bottom.
 - **Interaction:** Search conversations and thread content separately, select a thread, and send a local demo reply. Label the sample conversation and clarify that replies are not sent; file attachment remains a demo-only action.
 
+### Tasks
+- **Layout:** Keep the shared workspace shell and use one broad, white task ledger on the cool canvas. Put status filters and priority/sort controls directly above the rows; avoid an analytics-first summary.
+- **Task rows:** Show a completion checkbox, task title and matter context, priority, due date, and open/completed state. Place overdue tasks first by default and keep urgency in restrained red, priority in blue/yellow, and all other surfaces neutral.
+- **Interaction:** Search tasks and matters, filter by status or priority, sort by due date or priority, add tasks inline, and complete/reopen tasks in place. Clearly label sample records and temporary local-only changes.
+- **Responsive:** On narrow screens, stack row metadata under the task title and make the filter controls a two-column grid.
+
 ### Cards / Containers
 - **Corner Style:** 10px.
 - **Background:** White against the cool canvas.

@@ -14,6 +14,7 @@ import {
   Search,
   Settings,
   UserRound,
+  ListChecks,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import logo from "../../../assets/batasgo_logo.png";
@@ -24,11 +25,11 @@ const navItems = [
   { label: "Draft Documents", icon: FilePenLine },
   { label: "Calendar", icon: CalendarDays, href: "/calendar" },
   { label: "Messages", icon: Mail, href: "/messages" },
-  { label: "Tasks", icon: Clock3 },
+  { label: "Tasks", icon: ListChecks, href: "/tasks" },
   { label: "Settings", icon: Settings },
 ];
 
-type WorkspacePage = "Case Overview" | "Calendar" | "Messages";
+type WorkspacePage = "Case Overview" | "Calendar" | "Messages" | "Tasks";
 type Popover = "notifications" | "profile" | null;
 
 export default function WorkspaceShell({
