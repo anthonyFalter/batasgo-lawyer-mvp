@@ -4,11 +4,11 @@ import {
   ArrowUp,
   Bot,
   BriefcaseBusiness,
-  CalendarDays,
   Check,
   Clock3,
   FileText,
   MessageSquare,
+  MoreHorizontal,
   Plus,
   Search,
   ShieldAlert,
@@ -16,7 +16,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTypingStream } from "@/hooks/use-typing-stream";
 import WorkspaceShell from "../workspace/workspace-shell";
 import ReactMarkdown from "react-markdown";
@@ -36,6 +36,103 @@ type ChatMessage = {
   intakeReview?: IntakeReviewVisual;
 };
 
+type MatterTableRow = {
+  reference: string;
+  status: string;
+  client: string;
+  domain: string;
+  risk: string;
+  summary: string;
+};
+
+function parseMatterTable(content: string) {
+  const match = content.match(/\[\[MATTER_TABLE\]\]\s*([\s\S]*?)\s*\[\[\/MATTER_TABLE\]\]/);
+  if (!match) return null;
+  try {
+    const parsed: unknown = JSON.parse(match[1]);
+    if (!parsed || typeof parsed !== "object" || !("rows" in parsed) || !Array.isArray(parsed.rows)) return null;
+    const rows = parsed.rows.filter((row): row is MatterTableRow =>
+      Boolean(row)
+      && typeof row === "object"
+      && ["reference", "status", "client", "domain", "risk", "summary"].every((key) =>
+        key in row && typeof row[key as keyof MatterTableRow] === "string"),
+    );
+    return rows.length > 0 ? { before: content.slice(0, match.index), rows, after: content.slice((match.index ?? 0) + match[0].length) } : null;
+  } catch {
+    return null;
+  }
+}
+
+function MatterTable({ rows }: { rows: MatterTableRow[] }) {
+  return (
+    <div className="batasbot-matter-table-wrap">
+      <table className="batasbot-matter-table">
+        <caption className="sr-only">Matching workspace matters</caption>
+        <thead>
+          <tr>
+            <th scope="col">Matter Reference</th>
+            <th scope="col">Status</th>
+            <th scope="col">Client</th>
+            <th scope="col">Domain</th>
+            <th scope="col">Risk</th>
+            <th scope="col">Issue Summary</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={`${row.reference}-${row.client}`}>
+              <td>
+                <div className="batasbot-matter-table-reference">
+                  <strong>{row.reference}</strong>
+                  <Link
+                    className="batasbot-view-matter-button"
+                    href={`/dashboard?matter=${encodeURIComponent(row.reference)}`}
+                    aria-label={`Visit ${row.reference}`}
+                  >
+                    Visit
+                  </Link>
+                </div>
+              </td>
+              <td>{row.status}</td>
+              <td>{row.client}</td>
+              <td>{row.domain}</td>
+              <td>{row.risk}</td>
+              <td>{row.summary}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function isMatterReference(value: string) {
+  return /^(?:DEMO-)?INTAKE-\d{4}-[A-Z0-9-]+$/i.test(value) || /^DEMO-INTAKE-\d{3}$/i.test(value);
+}
+
+function MatterMarkdown({ content }: { content: string }) {
+  return (
+    <ReactMarkdown
+      components={{
+        strong: ({ children }: { children?: ReactNode }) => {
+          const reference = typeof children === "string" ? children.trim() : "";
+          if (!isMatterReference(reference)) return <strong>{children}</strong>;
+          return (
+            <span className="batasbot-matter-reference">
+              <strong>{reference}</strong>
+              <Link className="batasbot-view-matter-button" href={`/dashboard?matter=${encodeURIComponent(reference)}`}>
+                View matter
+              </Link>
+            </span>
+          );
+        },
+      }}
+    >
+      {content}
+    </ReactMarkdown>
+  );
+}
+
 type IntakeReviewVisual = {
   risk: string;
   deadline: string;
@@ -43,6 +140,17 @@ type IntakeReviewVisual = {
   specialty: string;
   specialtyMatch: boolean;
 };
+
+function isIntakeReviewVisual(value: unknown): value is IntakeReviewVisual {
+  if (!value || typeof value !== "object") return false;
+  const review = value as Partial<IntakeReviewVisual>;
+  return typeof review.risk === "string"
+    && typeof review.deadline === "string"
+    && Array.isArray(review.signals)
+    && review.signals.every((signal) => typeof signal === "string")
+    && typeof review.specialty === "string"
+    && typeof review.specialtyMatch === "boolean";
+}
 
 type ChatSession = {
   id: string;
@@ -64,13 +172,70 @@ type TriageChatHandoff = {
 const STARTER_PROMPTS = [
   { label: "Help me draft a document", icon: FileText },
   { label: "Find a matter in my workspace", icon: Search },
-  { label: "What should I prepare for a hearing?", icon: CalendarDays },
 ];
 
 function getSessionTitle(prompt: string) {
-  const cleanPrompt = prompt.replace(/\s+/g, " ").trim();
-  if (cleanPrompt.length <= 36) return cleanPrompt;
-  return `${cleanPrompt.slice(0, 33).trimEnd()}...`;
+  const cleanPrompt = prompt
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[?.!]+$/, "");
+  const prepareMatch = cleanPrompt.match(/^what should i prepare for\s+(.+)$/i);
+  if (prepareMatch?.[1]) return `Preparing for ${prepareMatch[1]}`;
+
+  const actionMatch = cleanPrompt.match(/^(?:please\s+)?(?:help me\s+)?(draft|find|review|create|prepare|explain|summarize|write|organize|plan)\b\s*(.*)$/i);
+  if (actionMatch) {
+    const [, verb, subject] = actionMatch;
+    const gerund = verb.toLowerCase() === "write"
+      ? "Writing"
+      : verb.toLowerCase() === "plan"
+        ? "Planning"
+        : verb.toLowerCase().endsWith("e")
+          ? `${verb.slice(0, -1)}ing`
+          : `${verb}ing`;
+    return `${gerund.charAt(0).toUpperCase()}${gerund.slice(1)}${subject ? ` ${subject}` : ""}`;
+  }
+
+  const words = cleanPrompt.split(" ");
+  const concise = words.slice(0, 8).join(" ");
+  return concise.length <= 48 ? concise : `${concise.slice(0, 45).trimEnd()}...`;
+}
+
+function cleanSessionTitle(title: string) {
+  return title
+    .replace(/\*\*/g, "")
+    .replace(/[`#]/g, "")
+    .replace(/^[-*]\s+/, "")
+    .trim()
+    .slice(0, 255);
+}
+
+function getExchangeTitle(prompt: string, reply: string) {
+  const issueMatch = reply.match(/\bIssue\b\s*[:\-–]\s*(.+?)(?:\n|$)/i);
+  if (issueMatch?.[1]) return cleanSessionTitle(issueMatch[1].replace(/[.!?]+$/, ""));
+  if (/\bUPL\b|unauthorized practice of law/i.test(`${prompt}\n${reply}`)) {
+    return "Unauthorized Practice Of Law";
+  }
+  return cleanSessionTitle(getSessionTitle(prompt));
+}
+
+function getIntakeReviewSessionTitle(handoff: TriageChatHandoff) {
+  return `${handoff.id} · ${handoff.domain} · ${handoff.risk} risk`;
+}
+
+function normalizeSessions(sessionList: ChatSession[]) {
+  const sessionsById = new Map<string, ChatSession>();
+  for (const session of sessionList) {
+    const normalizedSession = { ...session, title: cleanSessionTitle(session.title) };
+    const existing = sessionsById.get(normalizedSession.id);
+    sessionsById.set(normalizedSession.id, existing
+      ? {
+        ...existing,
+        ...normalizedSession,
+        preview: normalizedSession.preview ?? existing.preview,
+      }
+      : normalizedSession);
+  }
+  return [...sessionsById.values()];
 }
 
 function isTriageChatHandoff(value: unknown): value is TriageChatHandoff {
@@ -192,6 +357,11 @@ export default function BatasBotWorkspace() {
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
+  const [sessionPendingDeletion, setSessionPendingDeletion] = useState<ChatSession | null>(null);
+  const [sessionMenuId, setSessionMenuId] = useState<string | null>(null);
+  const [sessionPendingRename, setSessionPendingRename] = useState<ChatSession | null>(null);
+  const [renameTitle, setRenameTitle] = useState("");
+  const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   // Messages for the active session are fetched from the DB, then updated optimistically
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -201,16 +371,30 @@ export default function BatasBotWorkspace() {
   const [notice, setNotice] = useState("");
   const tempIdRef = useRef(0);
   const skipSessionLoadRef = useRef(new Set<string>());
-  const triageHandoffRef = useRef<{ sessionId: string; assistantMessage: ChatMessage } | null>(null);
+  const triageHandoffRef = useRef<{
+    sessionId: string;
+    sessionTitle: string;
+    userContent: string;
+    assistantMessage: ChatMessage;
+  } | null>(null);
+  const triageBootstrapStartedRef = useRef(false);
+  const newChatStartedRef = useRef(false);
+  const sendInFlightRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const sessionQuery = search.trim().toLowerCase();
-  const visibleSessions = sessions.filter((session) =>
+  const visibleSessions = normalizeSessions(sessions).filter((session) =>
     !sessionQuery || `${session.title} ${session.preview ?? ""}`.toLowerCase().includes(sessionQuery),
   );
   const pendingIntakeReview = triageHandoffRef.current?.sessionId === activeSessionId
     ? triageHandoffRef.current.assistantMessage.intakeReview
     : undefined;
+  const displayedMessages = messages.filter((message) =>
+    !(replyPhase !== "idle"
+      && triageHandoffRef.current
+      && message.role === "assistant"
+      && message.content === triageHandoffRef.current.assistantMessage.content),
+  );
 
   // ── Load sessions on mount ─────────────────────────────────────────────
   useEffect(() => {
@@ -219,7 +403,15 @@ export default function BatasBotWorkspace() {
         const res = await fetch("/api/chat/sessions");
         if (res.ok) {
           const data = (await res.json()) as { id: string; title: string; updatedAt: string }[];
-          setSessions(data.map((s) => ({ id: s.id, title: s.title, updatedAt: s.updatedAt })));
+          setSessions((current) => normalizeSessions([
+            ...current.filter((session) => session.id.startsWith("triage-") || session.id === "__new__"),
+            ...data.map((s) => ({ id: s.id, title: s.title, updatedAt: s.updatedAt })),
+          ]));
+          if (data[0]
+            && !newChatStartedRef.current
+            && new URLSearchParams(window.location.search).get("source") !== "triage") {
+            setActiveSessionId((current) => current ?? data[0].id);
+          }
         }
       } catch {
         // silently ignore — user will still be able to chat
@@ -246,9 +438,19 @@ export default function BatasBotWorkspace() {
       try {
         const res = await fetch(`/api/chat/sessions/${activeSessionId}`, { signal: controller.signal });
         if (res.ok) {
-          const data = (await res.json()) as { id: string; role: "user" | "assistant"; content: string }[];
+          const data = (await res.json()) as {
+            id: string;
+            role: "user" | "assistant";
+            content: string;
+            metadata?: unknown;
+          }[];
           if (!controller.signal.aborted) {
-            setMessages(data.map((m) => ({ id: m.id, role: m.role, content: m.content })));
+            setMessages(data.map((m) => ({
+              id: m.id,
+              role: m.role,
+              content: m.content,
+              intakeReview: isIntakeReviewVisual(m.metadata) ? m.metadata : undefined,
+            })));
           }
         }
       } catch {
@@ -267,6 +469,8 @@ export default function BatasBotWorkspace() {
 
   // ── Triage handoff bootstrap ───────────────────────────────────────────
   useEffect(() => {
+    if (triageBootstrapStartedRef.current) return;
+
     let handoffBootstrap = triageHandoffRef.current;
     const isTriageHandoffRoute = new URLSearchParams(window.location.search).get("source") === "triage";
     if (!handoffBootstrap && !isTriageHandoffRoute) return;
@@ -296,90 +500,150 @@ export default function BatasBotWorkspace() {
         content: explainTriageHandoff(handoff),
         intakeReview: getIntakeReviewVisual(handoff),
       };
-      const triageSession: ChatSession = { id: tempId, title: `Review ${handoff.id}`, updatedAt: new Date().toISOString() };
+      const triageSession: ChatSession = {
+        id: tempId,
+        title: getIntakeReviewSessionTitle(handoff),
+        updatedAt: new Date().toISOString(),
+      };
 
-      handoffBootstrap = { sessionId: tempId, assistantMessage };
+      handoffBootstrap = {
+        sessionId: tempId,
+        sessionTitle: getIntakeReviewSessionTitle(handoff),
+        userContent,
+        assistantMessage,
+      };
       triageHandoffRef.current = handoffBootstrap;
       window.sessionStorage.removeItem("batasbot-triage-handoff");
       window.history.replaceState(null, "", window.location.pathname);
-      setSessions((current) => [triageSession, ...current]);
-      setActiveSessionId(tempId);
+      setSessions((current) => normalizeSessions([triageSession, ...current]));
       setMessages([userMessage]);
       setNotice("");
     }
 
+    triageBootstrapStartedRef.current = true;
     const activeHandoff = handoffBootstrap;
-    startTyping(activeHandoff.assistantMessage.content, () => {
-      setMessages((current) => [...current, activeHandoff.assistantMessage]);
-      triageHandoffRef.current = null;
-    });
+    setIsSending(true);
+    void (async () => {
+      try {
+        const response = await fetch("/api/chat/sessions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: activeHandoff.sessionTitle,
+            handoff: {
+              userContent: activeHandoff.userContent,
+              assistantContent: activeHandoff.assistantMessage.content,
+              assistantMetadata: activeHandoff.assistantMessage.intakeReview,
+            },
+          }),
+        });
+        if (!response.ok) {
+          const data = (await response.json().catch(() => ({}))) as { error?: string };
+          throw new Error(data.error || "Unable to save the intake review.");
+        }
+
+        const data = (await response.json()) as { id: string; title?: string; updatedAt?: string };
+        skipSessionLoadRef.current.add(data.id);
+        setActiveSessionId(data.id);
+        setSessions((current) => {
+          const hasTemporarySession = current.some((session) => session.id === activeHandoff.sessionId);
+          const savedSession: ChatSession = {
+            id: data.id,
+            title: data.title || "Intake review",
+            updatedAt: data.updatedAt || new Date().toISOString(),
+            preview: activeHandoff.assistantMessage.content.slice(0, 80),
+          };
+          const withoutTemporary = current.filter((session) => session.id !== activeHandoff.sessionId);
+          return normalizeSessions(hasTemporarySession
+            ? [savedSession, ...withoutTemporary]
+            : [savedSession, ...current]);
+        });
+        triageHandoffRef.current = { ...activeHandoff, sessionId: data.id };
+
+        setIsSending(false);
+        startTyping(activeHandoff.assistantMessage.content, () => {
+          setMessages((current) => current.some((message) =>
+            message.role === "assistant"
+            && message.content === activeHandoff.assistantMessage.content,
+          )
+            ? current
+            : [...current, activeHandoff.assistantMessage]);
+          triageHandoffRef.current = null;
+        });
+      } catch (error) {
+        setIsSending(false);
+        setNotice(error instanceof Error ? error.message : "Unable to save the intake review.");
+      }
+    })();
   }, [startTyping]);
 
   const sendMessage = async (rawMessage: string) => {
     const content = rawMessage.trim();
-    if (!content || isGenerating) return;
+    if (!content || isGenerating || sessionsLoading || sendInFlightRef.current) return;
+    sendInFlightRef.current = true;
 
-    const isNewSession = !activeSessionId || !sessions.some((s) => s.id === activeSessionId);
-    const currentSessionId = activeSessionId;
-    const title = getSessionTitle(content);
-
-    // Optimistic user message
-    const optimisticUserMsg: ChatMessage = { id: `temp-u-${tempIdRef.current++}`, role: "user", content };
-    setMessages((current) => [...current, optimisticUserMsg]);
-
-    if (isNewSession) {
-      // Optimistic new session in sidebar
-      const tempSession: ChatSession = { id: "__new__", title, updatedAt: new Date().toISOString(), preview: content };
-      setSessions((current) => [tempSession, ...current]);
-    } else {
-      // Bump updatedAt on existing session
-      setSessions((current) => current.map((s) =>
-        s.id === currentSessionId ? { ...s, updatedAt: new Date().toISOString(), preview: content } : s,
-      ));
-    }
-
-    setInput("");
-    setIsSending(true);
-
-    let response: Response;
     try {
-      response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: content,
-          sessionId: isNewSession ? undefined : currentSessionId,
-          title,
-        }),
-      });
-    } catch {
-      setIsSending(false);
-      if (isNewSession) setSessions((current) => current.filter((session) => session.id !== "__new__"));
-      const errorMsg: ChatMessage = { id: `temp-e-${tempIdRef.current++}`, role: "assistant", content: "BatasBot could not reach the server. Please check your connection and try again." };
-      setMessages((current) => [...current, errorMsg]);
-      return;
-    }
+      const isNewSession = !activeSessionId || !sessions.some((s) => s.id === activeSessionId);
+      const currentSessionId = activeSessionId;
+      const title = getSessionTitle(content);
 
-    if (!response.ok) {
-      setIsSending(false);
-      if (isNewSession) setSessions((current) => current.filter((session) => session.id !== "__new__"));
-      const errData = (await response.json().catch(() => ({}))) as { error?: string };
-      const errorMsg: ChatMessage = { id: `temp-e-${tempIdRef.current++}`, role: "assistant", content: errData.error || "BatasBot encountered an error. Please try again shortly." };
-      setMessages((current) => [...current, errorMsg]);
-      return;
-    }
+      // Optimistic user message
+      const optimisticUserMsg: ChatMessage = { id: `temp-u-${tempIdRef.current++}`, role: "user", content };
+      setMessages((current) => [...current, optimisticUserMsg]);
 
-    // If server created a new session, update the sidebar with the real ID
-    const resolvedSessionId = response.headers.get("X-Session-Id") ?? currentSessionId ?? "";
-    if (isNewSession && resolvedSessionId) {
-      skipSessionLoadRef.current.add(resolvedSessionId);
-      setActiveSessionId(resolvedSessionId);
-      setSessions((current) => current.map((s) =>
-        s.id === "__new__" ? { ...s, id: resolvedSessionId } : s,
-      ));
-    }
+      if (isNewSession) {
+        // Optimistic new session in sidebar
+        const tempSession: ChatSession = { id: "__new__", title, updatedAt: new Date().toISOString(), preview: content };
+        setSessions((current) => normalizeSessions([tempSession, ...current]));
+      } else {
+        // Bump updatedAt on existing session
+        setSessions((current) => current.map((s) =>
+          s.id === currentSessionId ? { ...s, updatedAt: new Date().toISOString(), preview: content } : s,
+        ));
+      }
 
-    startStream(response, (fullText) => {
+      setInput("");
+      setIsSending(true);
+
+      let response: Response;
+      try {
+        response = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: content,
+            sessionId: isNewSession ? undefined : currentSessionId,
+            title,
+          }),
+        });
+      } catch {
+        setIsSending(false);
+        if (isNewSession) setSessions((current) => current.filter((session) => session.id !== "__new__"));
+        const errorMsg: ChatMessage = { id: `temp-e-${tempIdRef.current++}`, role: "assistant", content: "BatasBot could not reach the server. Please check your connection and try again." };
+        setMessages((current) => [...current, errorMsg]);
+        return;
+      }
+
+      if (!response.ok) {
+        setIsSending(false);
+        if (isNewSession) setSessions((current) => current.filter((session) => session.id !== "__new__"));
+        const errData = (await response.json().catch(() => ({}))) as { error?: string };
+        const errorMsg: ChatMessage = { id: `temp-e-${tempIdRef.current++}`, role: "assistant", content: errData.error || "BatasBot encountered an error. Please try again shortly." };
+        setMessages((current) => [...current, errorMsg]);
+        return;
+      }
+
+      // If server created a new session, update the sidebar with the real ID
+      const resolvedSessionId = response.headers.get("X-Session-Id") ?? currentSessionId ?? "";
+      if (isNewSession && resolvedSessionId) {
+        skipSessionLoadRef.current.add(resolvedSessionId);
+        setActiveSessionId(resolvedSessionId);
+        setSessions((current) => normalizeSessions(current.map((s) =>
+          s.id === "__new__" ? { ...s, id: resolvedSessionId } : s,
+        )));
+      }
+
+      startStream(response, (fullText) => {
       if (!fullText.trim()) {
         setMessages((current) => [...current, {
           id: `temp-e-${tempIdRef.current++}`,
@@ -391,10 +655,40 @@ export default function BatasBotWorkspace() {
       const assistantMsg: ChatMessage = { id: `temp-a-${tempIdRef.current++}`, role: "assistant", content: fullText };
       setMessages((current) => [...current, assistantMsg]);
       // Update sidebar preview
-      setSessions((current) => current.map((s) =>
-        s.id === resolvedSessionId ? { ...s, preview: fullText.slice(0, 80), updatedAt: new Date().toISOString() } : s,
-      ));
-    }, (_error, partialText) => {
+      setSessions((current) => normalizeSessions(current.map((s) =>
+        s.id === resolvedSessionId
+          ? {
+            ...s,
+            title: getExchangeTitle(content, fullText),
+            preview: fullText.slice(0, 80),
+            updatedAt: new Date().toISOString(),
+          }
+          : s,
+      )));
+      void (async () => {
+        try {
+          const sessionsResponse = await fetch("/api/chat/sessions");
+          if (!sessionsResponse.ok) return;
+          const sessionData = (await sessionsResponse.json()) as ChatSession[];
+          setSessions((current) => {
+            const localTitles = new Map(
+              current
+                .filter((session) => session.id === resolvedSessionId)
+                .map((session) => [session.id, session.title]),
+            );
+            return normalizeSessions([
+              ...current.filter((session) => session.id.startsWith("triage-") || session.id === "__new__"),
+              ...sessionData.map((session) => {
+                const localTitle = localTitles.get(session.id);
+                return localTitle ? { ...session, title: localTitle } : session;
+              }),
+            ]);
+          });
+        } catch {
+          // The response is already visible; the next session refresh will reconcile the title.
+        }
+      })();
+      }, (_error, partialText) => {
       const content = partialText.trim()
         ? `${partialText.trim()}\n\n[BatasBot could not finish this response. Please try again.]`
         : "BatasBot could not generate a response. Please try again.";
@@ -403,8 +697,11 @@ export default function BatasBotWorkspace() {
         role: "assistant",
         content,
       }]);
-    });
-    setIsSending(false);
+      });
+      setIsSending(false);
+    } finally {
+      sendInFlightRef.current = false;
+    }
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -413,6 +710,7 @@ export default function BatasBotWorkspace() {
   };
 
   const startNewChat = () => {
+    newChatStartedRef.current = true;
     cancelTyping();
     setActiveSessionId(null);
     setMessages([]);
@@ -423,9 +721,9 @@ export default function BatasBotWorkspace() {
 
   const deleteChatSession = async (session: ChatSession) => {
     if (isGenerating || deletingSessionId) return;
-    if (!window.confirm(`Delete "${session.title}" and its messages? This cannot be undone.`)) return;
 
     setDeletingSessionId(session.id);
+    setSessionPendingDeletion(null);
     setNotice("");
     try {
       const response = await fetch(`/api/chat/sessions/${session.id}`, { method: "DELETE" });
@@ -450,6 +748,34 @@ export default function BatasBotWorkspace() {
       setNotice("Could not reach the server. Please try deleting the conversation again.");
     } finally {
       setDeletingSessionId(null);
+    }
+  };
+
+  const renameChatSession = async () => {
+    if (!sessionPendingRename || renamingSessionId) return;
+    const title = renameTitle.replace(/\s+/g, " ").trim();
+    if (!title) return;
+    setRenamingSessionId(sessionPendingRename.id);
+    setNotice("");
+    try {
+      const response = await fetch(`/api/chat/sessions/${sessionPendingRename.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as { title?: string; error?: string };
+      if (!response.ok) {
+        setNotice(payload.error || "Unable to rename this conversation right now.");
+        return;
+      }
+      setSessions((current) => current.map((session) =>
+        session.id === sessionPendingRename.id ? { ...session, title: payload.title || title } : session,
+      ));
+      setSessionPendingRename(null);
+    } catch {
+      setNotice("Could not reach the server. Please try renaming the conversation again.");
+    } finally {
+      setRenamingSessionId(null);
     }
   };
 
@@ -504,16 +830,35 @@ export default function BatasBotWorkspace() {
                 </div>
               ) : (
                 <div className="batasbot-thread" role="log" aria-live="polite" aria-relevant="additions text" aria-label="Chat history">
-                  {messages.map((message) => (
+                  {displayedMessages.map((message) => (
                     <article className={`batasbot-thread-message batasbot-thread-message--${message.role}`} key={message.id}>
                       {message.role === "assistant" && <span className="batasbot-thread-avatar" aria-hidden="true"><Bot size={10.05} /></span>}
                       <div className="batasbot-thread-body">
                         {message.role === "user" ? (
                           <p>{message.content}</p>
                         ) : (
-                          <div className="batasbot-markdown">
-                            <ReactMarkdown>{message.content}</ReactMarkdown>
-                          </div>
+                          (() => {
+                            const matterTable = parseMatterTable(message.content);
+                            return (
+                              <>
+                                {matterTable?.before.trim() && (
+                                  <div className="batasbot-markdown">
+                                    <MatterMarkdown content={matterTable.before} />
+                                  </div>
+                                )}
+                                {matterTable ? <MatterTable rows={matterTable.rows} /> : (
+                                  <div className="batasbot-markdown">
+                                    <MatterMarkdown content={message.content} />
+                                  </div>
+                                )}
+                                {matterTable?.after.trim() && (
+                                  <div className="batasbot-markdown">
+                                    <MatterMarkdown content={matterTable.after} />
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()
                         )}
                         {message.intakeReview && <IntakeReviewGrid review={message.intakeReview} />}
                         {message.links && (
@@ -529,12 +874,12 @@ export default function BatasBotWorkspace() {
                       </div>
                     </article>
                   ))}
-                  {replyPhase === "thinking" && (
+                  {(isSending || replyPhase === "thinking") && (
                     <div className="batasbot-thread-message batasbot-thread-message--assistant">
                       <span className="batasbot-thread-avatar" aria-hidden="true"><Bot size={10.05} /></span>
                       <div className="batasbot-thread-typing" role="status" aria-label="BatasBot is generating a reply">
                         <span aria-hidden="true"><i /><i /><i /></span>
-                        <span className="sr-only">BatasBot is typing</span>
+                        <span>BatasBot is thinking</span>
                       </div>
                     </div>
                   )}
@@ -542,9 +887,18 @@ export default function BatasBotWorkspace() {
                     <article className="batasbot-thread-message batasbot-thread-message--assistant">
                       <span className="batasbot-thread-avatar" aria-hidden="true"><Bot size={10.05} /></span>
                       <div className="batasbot-thread-body">
-                        <div className="batasbot-markdown batasbot-streaming-text" aria-live="off">
-                          <ReactMarkdown>{streamedReply}</ReactMarkdown>
+                        <div className="batasbot-streaming-label" role="status">
+                          <span aria-hidden="true"><i /><i /><i /></span>
+                          <span>BatasBot is chatting</span>
                         </div>
+                        {(() => {
+                          const matterTable = parseMatterTable(streamedReply);
+                          return matterTable ? <MatterTable rows={matterTable.rows} /> : (
+                            <div className="batasbot-markdown batasbot-streaming-text" aria-live="off">
+                              <MatterMarkdown content={streamedReply} />
+                            </div>
+                          );
+                        })()}
                         {pendingIntakeReview && <IntakeReviewGrid review={pendingIntakeReview} />}
                       </div>
                     </article>
@@ -608,25 +962,36 @@ export default function BatasBotWorkspace() {
                   >
                     <span className="batasbot-session-title-row">
                       <strong>{session.title}</strong>
-                      <time>{new Date(session.updatedAt).toLocaleDateString()}</time>
                     </span>
-                    <span className="batasbot-session-preview">{session.preview ?? "Start a new conversation"}</span>
+                    <time className="batasbot-session-date">{new Date(session.updatedAt).toLocaleDateString()}</time>
                   </button>
                   <button
                     className="batasbot-session-delete"
                     type="button"
-                    aria-label={`Delete conversation: ${session.title}`}
-                    title="Delete conversation"
+                    aria-label={`More options for ${session.title}`}
+                    title="More options"
                     disabled={isGenerating || deletingSessionId !== null}
-                    onClick={() => void deleteChatSession(session)}
+                    onClick={() => setSessionMenuId((current) => current === session.id ? null : session.id)}
                   >
-                    <Trash2 aria-hidden="true" size={10.72} />
+                    <MoreHorizontal aria-hidden="true" size={12} />
                   </button>
+                  {sessionMenuId === session.id && (
+                    <div className="batasbot-session-menu" role="menu">
+                      <button type="button" role="menuitem" onClick={() => {
+                        setRenameTitle(session.title);
+                        setSessionPendingRename(session);
+                        setSessionMenuId(null);
+                      }}>Rename</button>
+                      <button type="button" role="menuitem" onClick={() => {
+                        setSessionPendingDeletion(session);
+                        setSessionMenuId(null);
+                      }}>Delete</button>
+                    </div>
+                  )}
                 </div>
               ))}
               {!sessionsLoading && visibleSessions.length === 0 && <p className="batasbot-session-empty">{sessions.length === 0 ? "No conversations yet." : "No matching sessions."}</p>}
             </div>
-            <p className="batasbot-sessions-note">Synced to your account · stored in Neon PostgreSQL</p>
           </aside>
         </div>
 
@@ -634,6 +999,81 @@ export default function BatasBotWorkspace() {
           <div className="batasbot-notice" role="status">
             <span>{notice}</span>
             <button type="button" aria-label="Dismiss notice" onClick={() => setNotice("")}><X size={10.05} /></button>
+          </div>
+        )}
+        {sessionPendingDeletion && (
+          <div
+            className="batasbot-delete-modal-backdrop"
+            role="presentation"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) setSessionPendingDeletion(null);
+            }}
+          >
+            <section
+              className="batasbot-delete-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="batasbot-delete-modal-title"
+              aria-describedby="batasbot-delete-modal-description"
+              onKeyDown={(event) => {
+                if (event.key === "Escape") setSessionPendingDeletion(null);
+              }}
+              tabIndex={-1}
+            >
+              <div className="batasbot-delete-modal-icon" aria-hidden="true">
+                <Trash2 size={14} />
+              </div>
+              <h2 id="batasbot-delete-modal-title">Delete this conversation?</h2>
+              <p id="batasbot-delete-modal-description">
+                <strong>{sessionPendingDeletion.title}</strong> and all of its messages will be permanently deleted.
+              </p>
+              <div className="batasbot-delete-modal-actions">
+                <button
+                  type="button"
+                  className="batasbot-delete-modal-cancel"
+                  onClick={() => setSessionPendingDeletion(null)}
+                  disabled={deletingSessionId !== null}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="batasbot-delete-modal-confirm"
+                  onClick={() => void deleteChatSession(sessionPendingDeletion)}
+                  disabled={deletingSessionId !== null}
+                >
+                  {deletingSessionId === sessionPendingDeletion.id ? "Deleting…" : "Delete conversation"}
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
+        {sessionPendingRename && (
+          <div className="batasbot-delete-modal-backdrop" role="presentation" onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setSessionPendingRename(null);
+          }}>
+            <section className="batasbot-delete-modal batasbot-rename-modal" role="dialog" aria-modal="true" aria-labelledby="batasbot-rename-modal-title">
+              <h2 id="batasbot-rename-modal-title">Rename conversation</h2>
+              <label className="batasbot-rename-label" htmlFor="batasbot-rename-input">Conversation title</label>
+              <input
+                id="batasbot-rename-input"
+                className="batasbot-rename-input"
+                value={renameTitle}
+                maxLength={255}
+                autoFocus
+                onChange={(event) => setRenameTitle(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") setSessionPendingRename(null);
+                  if (event.key === "Enter") void renameChatSession();
+                }}
+              />
+              <div className="batasbot-delete-modal-actions">
+                <button type="button" className="batasbot-delete-modal-cancel" onClick={() => setSessionPendingRename(null)}>Cancel</button>
+                <button type="button" className="batasbot-delete-modal-confirm" onClick={() => void renameChatSession()} disabled={!renameTitle.trim() || renamingSessionId !== null}>
+                  {renamingSessionId ? "Saving…" : "Save"}
+                </button>
+              </div>
+            </section>
           </div>
         )}
       </main>

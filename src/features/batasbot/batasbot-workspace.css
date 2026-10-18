@@ -95,9 +95,11 @@
   border-radius: 4.69px;
   cursor: pointer;
   text-align: left;
+  overflow: hidden;
 }
 
 .batasbot-session-row {
+  position: relative;
   display: flex;
   min-width: 0;
   align-items: stretch;
@@ -144,8 +146,8 @@
 
 .batasbot-session-delete:hover:not(:disabled),
 .batasbot-session-delete:focus-visible {
-  color: #b4232f;
-  background: #fff0f0;
+  color: var(--blue-ink);
+  background: var(--blue-pale);
 }
 
 .batasbot-session-delete:disabled {
@@ -153,16 +155,179 @@
   opacity: 0.55;
 }
 
-.batasbot-session-title-row {
+.batasbot-session-menu {
+  position: absolute;
+  z-index: 3;
+  top: 25px;
+  right: 2px;
   display: flex;
+  width: 90px;
+  flex-direction: column;
+  padding: 3px;
+  background: var(--surface);
+  border: 0.67px solid var(--line);
+  border-radius: 4.69px;
+  box-shadow: 0 6.7px 16.08px rgb(31 45 68 / 16%);
+}
+
+.batasbot-session-menu button {
+  padding: 5px 6px;
+  color: var(--body-ink);
+  background: transparent;
+  border: 0;
+  border-radius: 3.35px;
+  cursor: pointer;
+  font-size: 10.72px;
+  text-align: left;
+}
+
+.batasbot-session-menu button:hover {
+  color: var(--blue-ink);
+  background: var(--blue-pale);
+}
+
+.batasbot-session-menu button:last-child:hover {
+  color: #b4232f;
+  background: #fff0f0;
+}
+
+.batasbot-delete-modal-backdrop {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16.08px;
+  background: rgb(24 35 54 / 42%);
+}
+
+.batasbot-delete-modal {
+  width: min(100%, 321.6px);
+  padding: 18.76px;
+  background: var(--surface);
+  border: 0.67px solid #dce3ee;
+  border-radius: 8.04px;
+  box-shadow: 0 16.08px 40.2px rgb(31 45 68 / 20%);
+}
+
+.batasbot-delete-modal-icon {
+  display: grid;
+  width: 28.14px;
+  height: 28.14px;
+  place-items: center;
+  color: #b4232f;
+  background: #fff0f0;
+  border-radius: 50%;
+}
+
+.batasbot-delete-modal h2 {
+  margin: 12.06px 0 0;
+  color: var(--heading);
+  font-size: 14.07px;
+  font-weight: 700;
+}
+
+.batasbot-delete-modal p {
+  margin: 6.03px 0 0;
+  color: var(--body-ink);
+  font-size: 11.39px;
+  line-height: 1.55;
+}
+
+.batasbot-delete-modal p strong {
+  color: var(--heading);
+  font-weight: 650;
+}
+
+.batasbot-rename-label {
+  display: block;
+  margin-top: 14.07px;
+  color: var(--muted);
+  font-size: 10.72px;
+}
+
+.batasbot-rename-input {
+  display: block;
+  width: 100%;
+  min-height: 28.14px;
+  margin-top: 4.02px;
+  padding: 5.36px 6.7px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 0.67px solid var(--line);
+  border-radius: var(--radius-control);
+  font-size: 11.39px;
+  outline: none;
+}
+
+.batasbot-rename-input:focus {
+  border-color: #86a7ff;
+  box-shadow: 0 0 0 2.01px rgb(134 167 255 / 18%);
+}
+
+.batasbot-delete-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6.03px;
+  margin-top: 18.76px;
+}
+
+.batasbot-delete-modal-actions button {
+  min-height: 25.46px;
+  padding: 0 8.04px;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  font-size: 10.72px;
+  font-weight: 600;
+}
+
+.batasbot-delete-modal-cancel {
+  color: #47566e;
+  background: var(--surface);
+  border: 0.67px solid var(--line);
+}
+
+.batasbot-delete-modal-cancel:hover:not(:disabled) {
+  background: var(--surface-subtle);
+}
+
+.batasbot-delete-modal-confirm {
+  color: #fff;
+  background: #b4232f;
+  border: 0.67px solid #b4232f;
+}
+
+.batasbot-delete-modal-confirm:hover:not(:disabled) {
+  background: #951d27;
+  border-color: #951d27;
+}
+
+.batasbot-rename-modal .batasbot-delete-modal-confirm {
+  background: #198754;
+  border-color: #198754;
+}
+
+.batasbot-rename-modal .batasbot-delete-modal-confirm:hover:not(:disabled) {
+  background: #157347;
+  border-color: #157347;
+}
+
+.batasbot-delete-modal-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.batasbot-session-title-row {
+  display: block;
   min-width: 0;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 4.69px;
+  overflow: hidden;
+  text-align: left;
 }
 
 .batasbot-session-title-row strong {
+  display: block;
   overflow: hidden;
+  min-width: 0;
   color: #303842;
   font-size: 10.72px;
   font-weight: 650;
@@ -170,10 +335,12 @@
   white-space: nowrap;
 }
 
-.batasbot-session-title-row time {
-  flex: 0 0 auto;
+.batasbot-session-date {
+  display: block;
+  margin-top: 2.01px;
   color: #7b879b;
   font-size: 10.72px;
+  text-align: left;
 }
 
 .batasbot-session-preview {
@@ -457,6 +624,33 @@
   color: #2c3547;
 }
 
+.batasbot-matter-reference {
+  display: inline-flex;
+  align-items: center;
+  gap: 6.03px;
+}
+
+.batasbot-view-matter-button {
+  display: inline-flex;
+  min-height: 18.09px;
+  align-items: center;
+  padding: 0 5.36px;
+  color: var(--blue-ink);
+  background: var(--blue-pale);
+  border: 0.67px solid #cbd8f4;
+  border-radius: var(--radius-control);
+  font-size: 10.05px;
+  font-weight: 650;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.batasbot-view-matter-button:hover {
+  background: #dce7ff;
+  border-color: #aec3f2;
+}
+
 .batasbot-markdown em {
   font-style: italic;
   color: var(--muted);
@@ -522,6 +716,60 @@
   background: transparent;
   font-size: 11.39px;
   color: #1e2736;
+}
+
+.batasbot-matter-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  background: #f1f4f9;
+  border-radius: var(--radius-panel) var(--radius-panel) var(--radius-panel) var(--radius-small);
+}
+
+.batasbot-matter-table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+  color: var(--ink);
+  font-size: 10.72px;
+  line-height: 1.45;
+}
+
+.batasbot-matter-table th,
+.batasbot-matter-table td {
+  padding: 6.7px 8.04px;
+  border-bottom: 0.67px solid #dce3ee;
+  text-align: left;
+  vertical-align: top;
+}
+
+.batasbot-matter-table th {
+  color: #4e5f77;
+  background: #e8edf6;
+  font-size: 10.05px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.batasbot-matter-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.batasbot-matter-table td strong {
+  color: #2c3547;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.batasbot-matter-table-reference {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5.36px;
+}
+
+.batasbot-matter-table-reference .batasbot-view-matter-button {
+  min-width: 42.88px;
+  justify-content: center;
 }
 
 .batasbot-markdown blockquote {
@@ -828,9 +1076,10 @@
 
 .batasbot-thread-typing {
   display: flex;
-  min-width: 38.86px;
+  min-width: 145px;
   min-height: 24.79px;
   align-items: center;
+  gap: 6.03px;
   padding: 0 8.71px;
   background: #f1f4f9;
   border-radius: var(--radius-panel) var(--radius-panel) var(--radius-panel) var(--radius-small);
@@ -855,6 +1104,42 @@
 }
 
 .batasbot-thread-typing i:nth-child(3) {
+  animation-delay: 280ms;
+}
+
+.batasbot-thread-typing > span:last-child,
+.batasbot-streaming-label {
+  color: #72819a;
+  font-size: 10.72px;
+  line-height: 1;
+}
+
+.batasbot-streaming-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5.36px;
+  margin: 0 0 4.02px 2.01px;
+}
+
+.batasbot-streaming-label > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 2.01px;
+}
+
+.batasbot-streaming-label i {
+  width: 2.68px;
+  height: 2.68px;
+  background: #72819a;
+  border-radius: 50%;
+  animation: batasbot-main-typing 1s ease-in-out infinite;
+}
+
+.batasbot-streaming-label i:nth-child(2) {
+  animation-delay: 140ms;
+}
+
+.batasbot-streaming-label i:nth-child(3) {
   animation-delay: 280ms;
 }
 
@@ -1042,7 +1327,7 @@
   }
 
   .batasbot-session-title-row strong,
-  .batasbot-session-title-row time,
+  .batasbot-session-date,
   .batasbot-session-preview,
   .batasbot-session-sample {
     font-size: 10.72px;
@@ -1121,6 +1406,7 @@
 @media (prefers-reduced-motion: reduce) {
   .batasbot-starters button,
   .batasbot-thread-typing i,
+  .batasbot-streaming-label i,
   .batasbot-intake-review,
   .batasbot-intake-stat,
   .batasbot-intake-meter .is-active {

@@ -1,7 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 import { auth } from "@clerk/nextjs/server";
 import { getOrCreatePersonalWorkspace } from "@/lib/db/workspace";
-import { appendMessages, assertSessionOwnership, createSession } from "@/lib/chat/sessions";
+import { appendMessages, assertSessionOwnership, createSession, updateSessionTitle } from "@/lib/chat/sessions";
+import { listWorkspaceIntakes } from "@/lib/intakes/service";
 import { db } from "@/lib/db/client";
 import { chatMessages } from "@/lib/db/schema";
 import { asc, eq } from "drizzle-orm";
@@ -14,6 +15,7 @@ export const dynamic = "force-dynamic";
 
 const PROVIDER_TIMEOUT_MS = 18_000;
 const GROQ_CHAT_MODEL = process.env.GROQ_CHAT_MODEL || "openai/gpt-oss-20b";
+const TITLE_TIMEOUT_MS = 8_000;
 
 // ── System prompt ─────────────────────────────────────────────────────────────
 
@@ -51,6 +53,162 @@ type ConversationMessage = {
   content: string;
 };
 
+function cleanSessionTitle(title: string) {
+  return title
+    .replace(/\*\*/g, "")
+    .replace(/[`#]/g, "")
+    .replace(/^[-*]\s+/, "")
+    .trim()
+    .slice(0, 255);
+}
+
+function asksAboutWorkspaceMatters(message: string) {
+  return /\b(find|show|list|summari[sz]e|review|search|look up|what(?:'s| is))\b.*\b(matter|matters|case|cases|intake|intakes|workspace)\b|\b(matter|matters|case|cases|intake|intakes)\b.*\b(workspace|case overview|summary|summari[sz]e|find|show|list)\b/i.test(message);
+}
+
+function isGenericMatterLookup(message: string) {
+  const normalized = message.trim().replace(/\s+/g, " ");
+  return /^(?:(?:can|could|would)\s+you\s+)?(?:help\s+(?:me\s+)?(?:with\s+)?(?:finding|find|locating|locate|searching for|search for|looking up|look up)|(?:find|show|list|search|look up|locate))\s+(?:a\s+)?matter(?:\s+for me)?(?:\s+in\s+my\s+workspace)?[.!?]*$/i.test(normalized)
+    || /^(?:can|could|would)\s+you\s+help\s+me\s+with\s+finding\s+(?:a\s+)?matter\s+in\s+my\s+workspace[.!?]*$/i.test(normalized)
+    || /\b(?:forgot|don't know|do not know|not sure)\s+(?:the\s+)?(?:specifics|details)\b/i.test(normalized);
+}
+
+function isMatterLookupRequest(message: string) {
+  const normalized = message.trim();
+  return asksAboutWorkspaceMatters(normalized)
+    || /\b(find|locate|search|look up|identify|match)\b.*\b(matter|matters|case|cases|intake|intakes)\b/i.test(normalized)
+    || /\b(?:matter|case|intake)[-\s]?\d{3,}/i.test(normalized);
+}
+
+async function getWorkspaceMattersContext(userId: string, message: string, history: ConversationMessage[]) {
+  const lookupFlowStarted = history.some((item) =>
+    item.role === "user" && isMatterLookupRequest(item.content),
+  );
+  if (!isMatterLookupRequest(message) && !lookupFlowStarted) return "";
+
+  const intakes = await listWorkspaceIntakes(userId);
+  if (intakes.length === 0) {
+    return `\n\n## Workspace matter context
+The user has no matters currently listed in Case Overview. Say that clearly and do not invent matters.`;
+  }
+
+  const matterRecords = intakes.map((intake) => ({
+    reference: intake.reference,
+    domain: intake.domain,
+    client: intake.client,
+    issue: intake.summary,
+    risk: intake.risk,
+    status: intake.status,
+    caseStage: intake.caseStage || "Not specified",
+    deadline: intake.deadline,
+    urgencyFlags: intake.urgencyFlags,
+    documents: intake.documents,
+    existingAiSummary: intake.aiSummary || null,
+  }));
+
+  const lookupInstruction = isGenericMatterLookup(message)
+    ? `The user has not said which matter they want. Ask a concise clarification question such as: "What are you looking for—a client name, matter reference, legal area, or issue?" Do not list or summarize matters yet.`
+    : `Match the user's description semantically against the reference, client, domain, issue, stage, urgency flags, and existing AI summary. Return only the records that match what the user described, including reviewed records. If no record matches, say so and ask for another identifying detail; do not invent a matter.
+
+There are ${matterRecords.length} total matters available in the workspace. Count the matching records before formatting the response. Apply these result-size rules:
+- If more than 10 matters match, do not list or summarize them. State the exact number of matching matters and ask the user to be more specific about the matter they are trying to find.
+- If 6 to 10 matters match, output a machine-readable table block instead of Markdown table syntax. Use exactly this format, with valid JSON:
+[[MATTER_TABLE]]
+{"rows":[{"reference":"...","status":"...","client":"...","domain":"...","risk":"...","summary":"..."}]}
+[[/MATTER_TABLE]]
+Use one row per matching matter and the columns Matter Reference, Status, Client, Domain, Risk, and Issue Summary. Do not add Markdown table syntax inside the block.
+- If 1 to 5 matters match, use the compact card format below.
+
+For 1 to 5 matching matters, format every result exactly as a compact card-style Markdown block. Do not use a table, numbered list, or separate "Matched Record" heading. Put the review status directly below the matter reference:
+
+**MATTER-REFERENCE**
+**STATUS**
+Client name and location
+Legal domain · Risk level
+Issue summary in one or two concise sentences.
+
+Repeat the same block for each matching matter, with one blank line between blocks. Use the actual review status (Pending, Accepted, or Declined) and keep it directly below the reference.`;
+
+  return `\n\n## Workspace matter context
+The following records are the user's Case Overview matters, including pending, accepted, and declined records. These are the only matters you may view or output for this request. Identify each record's review status accurately and do not expose database IDs or claim facts not present here.
+
+${JSON.stringify(matterRecords, null, 2)}
+
+${lookupInstruction}
+Clearly label missing or unverified information.`;
+}
+
+async function generateSessionTitle(
+  history: ConversationMessage[],
+  userMessage: string,
+  assistantMessage: string,
+  geminiApiKey: string | undefined,
+  groqApiKey: string | undefined,
+) {
+  const transcript = [...history, { role: "user" as const, content: userMessage }, { role: "assistant" as const, content: assistantMessage }]
+    .map(({ role, content }) => `${role.toUpperCase()}: ${content.slice(0, 1800)}`)
+    .join("\n\n")
+    .slice(-7_000);
+  const prompt = `Create a concise title for this legal assistant conversation.
+Summarize the overall topic, not the user's exact wording. Use 3-8 words, title case, no quotation marks, no period, and no generic words like "Chat" or "Conversation". Include the legal issue or subject when clear. Return only the title.
+
+${transcript}`;
+
+  if (geminiApiKey) {
+    try {
+      const ai = new GoogleGenAI({ apiKey: geminiApiKey });
+      const response = await ai.models.generateContent({
+        model: process.env.GEMINI_MODEL || "gemini-3.8-flash",
+        contents: prompt,
+        config: {
+          temperature: 0.2,
+          maxOutputTokens: 30,
+          httpOptions: { timeout: TITLE_TIMEOUT_MS, retryOptions: { attempts: 1 } },
+        },
+      });
+      const title = response.text?.trim().replace(/^["']|["']$/g, "");
+      if (title) return cleanSessionTitle(title);
+    } catch (error) {
+      console.error("Gemini session title generation failed.", error instanceof Error ? error.message : "Unknown error");
+    }
+  }
+
+  if (groqApiKey) {
+    try {
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${groqApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: GROQ_CHAT_MODEL,
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.2,
+          max_completion_tokens: 30,
+        }),
+        signal: AbortSignal.timeout(TITLE_TIMEOUT_MS),
+      });
+      if (response.ok) {
+        const data = (await response.json()) as { choices?: { message?: { content?: string | null } }[] };
+        const title = data.choices?.[0]?.message?.content?.trim().replace(/^["']|["']$/g, "");
+        if (title) return cleanSessionTitle(title);
+      } else {
+        console.error(`Groq session title generation failed with status ${response.status}.`);
+      }
+    } catch (error) {
+      console.error("Groq session title generation failed.", error instanceof Error ? error.message : "Unknown error");
+    }
+  }
+
+  const issueMatch = assistantMessage.match(/\bIssue\b\s*[:\-–]\s*(.+?)(?:\n|$)/i);
+  if (issueMatch?.[1]) return issueMatch[1].trim().replace(/[.!?]+$/, "").slice(0, 255);
+  if (/\bUPL\b|unauthorized practice of law/i.test(`${userMessage}\n${assistantMessage}`)) {
+    return "Unauthorized Practice Of Law";
+  }
+  return undefined;
+}
+
 class ChatProviderError extends Error {
   constructor(
     readonly provider: string,
@@ -78,6 +236,7 @@ async function streamWithGemini(
   userMessage: string,
   history: ConversationMessage[],
   apiKey: string,
+  workspaceContext: string,
 ): Promise<ReadableStream<Uint8Array>> {
   const ai = new GoogleGenAI({ apiKey });
 
@@ -91,7 +250,7 @@ async function streamWithGemini(
     const chat = ai.chats.create({
       model: "gemini-3.8-flash",
       config: {
-        systemInstruction: SYSTEM_PROMPT,
+        systemInstruction: `${SYSTEM_PROMPT}${workspaceContext}`,
         temperature: 0.4,
         maxOutputTokens: 2048,
         httpOptions: {
@@ -135,9 +294,10 @@ async function streamWithGroq(
   userMessage: string,
   history: ConversationMessage[],
   apiKey: string,
+  workspaceContext: string,
 ): Promise<ReadableStream<Uint8Array>> {
   const messages = [
-    { role: "system", content: SYSTEM_PROMPT },
+    { role: "system", content: `${SYSTEM_PROMPT}${workspaceContext}` },
     ...history.map((m) => ({ role: m.role, content: m.content })),
     { role: "user", content: userMessage },
   ];
@@ -365,7 +525,7 @@ export async function POST(request: Request) {
   let sessionId = typeof body.sessionId === "string" ? body.sessionId.trim() : "";
   if (!sessionId) {
     const title = typeof body.title === "string" && body.title.trim()
-      ? body.title.trim().slice(0, 255)
+      ? cleanSessionTitle(body.title)
       : userMessage.slice(0, 80);
     sessionId = await createSession(workspaceId, userId, title);
   } else {
@@ -391,19 +551,30 @@ export async function POST(request: Request) {
     content: row.content,
   }));
 
+  let workspaceContext = "";
+  try {
+    workspaceContext = await getWorkspaceMattersContext(userId, userMessage, history);
+  } catch (error) {
+    console.error("Could not load workspace matters for BatasBot.", error instanceof Error ? error.message : "Unknown error");
+    return new Response(
+      JSON.stringify({ error: "BatasBot could not load your Case Overview matters right now. Please try again." }),
+      { status: 503, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
   // ── Build provider priority list ──────────────────────────────────────────
   // Gemini first (lower latency, larger context), Groq as fallback
   const providers: { name: string; stream: () => Promise<ReadableStream<Uint8Array>> }[] = [];
   if (geminiApiKey) {
     providers.push({
       name: "Gemini",
-      stream: () => streamWithGemini(userMessage, history, geminiApiKey),
+      stream: () => streamWithGemini(userMessage, history, geminiApiKey, workspaceContext),
     });
   }
   if (groqApiKey) {
     providers.push({
       name: "Groq",
-      stream: () => streamWithGroq(userMessage, history, groqApiKey),
+      stream: () => streamWithGroq(userMessage, history, groqApiKey, workspaceContext),
     });
   }
 
@@ -466,6 +637,14 @@ export async function POST(request: Request) {
         // Persist both turns after streaming completes
         if (fullText.trim()) {
           await appendMessages(resolvedSessionId, userMessage, fullText.trim());
+          const generatedTitle = await generateSessionTitle(
+            history,
+            userMessage,
+            fullText.trim(),
+            geminiApiKey,
+            groqApiKey,
+          );
+          if (generatedTitle) await updateSessionTitle(resolvedSessionId, generatedTitle);
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : "Stream error";
