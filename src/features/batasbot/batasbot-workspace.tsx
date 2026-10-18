@@ -87,10 +87,16 @@ function isTriageChatHandoff(value: unknown): value is TriageChatHandoff {
 }
 
 function explainTriageHandoff(handoff: TriageChatHandoff) {
-  const needSignals = handoff.reasons.filter((reason) =>
-    !/risk indicators$/.test(reason) && !/^(Fits|Outside profile specialty:)/.test(reason),
-  );
-  return `This intake may merit prompt review because it is marked ${handoff.risk.toLowerCase()} risk, with a deadline of ${handoff.deadline.toLowerCase()}. The intake describes: ${handoff.summary} Signals from the local preview: ${needSignals.join("; ")}. The profile lists ${handoff.specialty}; the matter is ${handoff.domain}. This is a sample-based demo explanation, not a live AI assessment. Verify the source records and deadline before deciding.`;
+  const signals = handoff.reasons
+    .filter((reason) => !/^(Fits|Outside profile specialty:)/.test(reason))
+    .slice(0, 3)
+    .join(" · ");
+  const summaryText = handoff.summary.trim().replace(/\s*\.+\s*$/, "");
+  const deadline = handoff.deadline && !/^no deadline set$/i.test(handoff.deadline)
+    ? `Deadline: ${handoff.deadline}.`
+    : "Deadline: not stated.";
+  const signalText = signals ? `Signals: ${signals}.` : "Signals: none stated.";
+  return `${handoff.id} | ${handoff.domain} | ${handoff.risk} risk. ${deadline} Summary: ${summaryText}. ${signalText}`;
 }
 
 function getIntakeReviewVisual(handoff: TriageChatHandoff): IntakeReviewVisual {
@@ -113,8 +119,13 @@ function getIntakeReviewVisual(handoff: TriageChatHandoff): IntakeReviewVisual {
 
 function IntakeReviewGrid({ review }: { review: IntakeReviewVisual }) {
   const normalizedRisk = review.risk.toLowerCase();
-  const riskLevel = normalizedRisk === "critical" ? 3 : normalizedRisk === "high" ? 2 : 1;
-  const riskTone = normalizedRisk === "critical" ? "critical" : normalizedRisk === "high" ? "high" : "medium";
+  const riskLevel = normalizedRisk === "critical" ? 4
+    : normalizedRisk === "high" ? 3
+      : normalizedRisk === "medium" ? 2 : normalizedRisk === "low" ? 1 : 0;
+  const riskTone = normalizedRisk === "critical" || normalizedRisk === "high"
+    || normalizedRisk === "medium" || normalizedRisk === "low"
+    ? normalizedRisk
+    : "medium";
   const normalizedDeadline = review.deadline.toLowerCase();
   const deadlineLevel = /now|immediate|overdue/.test(normalizedDeadline)
     ? 3
@@ -131,7 +142,7 @@ function IntakeReviewGrid({ review }: { review: IntakeReviewVisual }) {
             <strong>{review.risk}</strong>
           </div>
           <div className="batasbot-intake-meter" aria-hidden="true">
-            {[0, 1, 2].map((segment) => <i className={segment < riskLevel ? "is-active" : ""} key={segment} />)}
+            {[0, 1, 2, 3].map((segment) => <i className={segment < riskLevel ? "is-active" : ""} key={segment} />)}
           </div>
         </div>
 
@@ -564,7 +575,7 @@ export default function BatasBotWorkspace() {
                   <ArrowUp aria-hidden="true" size={11.39} />
                 </button>
               </form>
-              <p className="batasbot-main-disclaimer">BatasBot uses Gemini AI with Groq as a fallback. Responses are for professional reference only — not legal advice. Always verify citations.</p>
+              <p className="batasbot-main-disclaimer">BatasBot responses are for professional reference only — not legal advice. Always verify citations.</p>
             </div>
           </div>
 

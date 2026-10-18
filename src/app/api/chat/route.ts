@@ -318,7 +318,7 @@ async function primeProviderStream(
  *
  * Response: text/plain streaming (reply chunks)
  * Headers:  X-Session-Id  — the session id (new or existing)
- *           X-Provider    — which AI provider served the request ("Gemini" | "Groq")
+ *           X-Assistant   — the assistant name (BatasBot)
  */
 export async function POST(request: Request) {
   const geminiApiKey = process.env.GEMINI_API_KEY;
@@ -326,7 +326,7 @@ export async function POST(request: Request) {
 
   if (!geminiApiKey && !groqApiKey) {
     return new Response(
-      JSON.stringify({ error: "No AI provider API key is configured on the server." }),
+      JSON.stringify({ error: "BatasBot is not configured on the server." }),
       { status: 503, headers: { "Content-Type": "application/json" } },
     );
   }
@@ -410,13 +410,11 @@ export async function POST(request: Request) {
   // ── Try providers in order ────────────────────────────────────────────────
   const resolvedSessionId = sessionId;
   let bodyStream: ReadableStream<Uint8Array> | null = null;
-  let usedProvider = "";
   const failures: ChatProviderError[] = [];
 
   for (const provider of providers) {
     try {
       bodyStream = await primeProviderStream(await provider.stream(), provider.name);
-      usedProvider = provider.name;
       break;
     } catch (error) {
       const failure = error instanceof ChatProviderError
@@ -440,7 +438,7 @@ export async function POST(request: Request) {
     const allBusy = failures.length > 0 && failures.every(({ status }) => status === 503 || status === 429);
     if (allBusy) {
       return new Response(
-        JSON.stringify({ error: "BatasBot AI providers are temporarily busy. Please try again shortly." }),
+        JSON.stringify({ error: "BatasBot is temporarily busy. Please try again shortly." }),
         { status: 503, headers: { "Content-Type": "application/json" } },
       );
     }
@@ -485,7 +483,7 @@ export async function POST(request: Request) {
       "Transfer-Encoding": "chunked",
       "X-Content-Type-Options": "nosniff",
       "X-Session-Id": resolvedSessionId,
-      "X-Provider": usedProvider,
+      "X-Assistant": "BatasBot",
     },
   });
 }

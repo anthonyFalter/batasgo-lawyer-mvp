@@ -1,0 +1,1 @@
+ALTER TYPE "public"."intake_risk" ADD VALUE 'low' BEFORE 'unassessed';

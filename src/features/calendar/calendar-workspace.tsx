@@ -8,14 +8,19 @@ import {
   Clock3,
   MapPin,
   MessageCircle,
+  Pencil,
+  Plus,
+  Sparkles,
+  Trash2,
   X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import WorkspaceShell from "../workspace/workspace-shell";
 import "./calendar-workspace.css";
 
-type EventKind = "family" | "labor" | "civil" | "criminal";
+type EventKind = "family" | "labor" | "civil" | "criminal" | "intake";
 type CalendarView = "day" | "week" | "month";
+type CalendarSource = "manual" | "intake";
 
 type CalendarEvent = {
   id: string;
@@ -28,106 +33,21 @@ type CalendarEvent = {
   location: string;
   details: string;
   attendees: string;
+  source?: CalendarSource;
+  intakeId?: string | null;
 };
 
-const sampleEvents: CalendarEvent[] = [
-  {
-    id: "event-bautista",
-    date: "2024-09-16",
-    startTime: "09:00",
-    durationMinutes: 60,
-    title: "R. Bautista",
-    matter: "Family support consultation",
-    kind: "family",
-    location: "Meeting room 1",
-    details: "Review the support agreement and confirm the documents needed for the next filing.",
-    attendees: "R. Bautista, Atty. Dela Cruz, and intake associate",
-  },
-  {
-    id: "event-firmas",
-    date: "2024-09-16",
-    startTime: "14:30",
-    durationMinutes: 60,
-    title: "Firmas Dev. Corp.",
-    matter: "Civil contract review",
-    kind: "civil",
-    location: "Conference room 2",
-    details: "Discuss the proposed revisions to the development agreement and outstanding clauses.",
-    attendees: "Firmas representative and legal team",
-  },
-  {
-    id: "event-santos",
-    date: "2024-09-17",
-    startTime: "10:00",
-    durationMinutes: 60,
-    title: "M. Santos",
-    matter: "Labor case · Northstar Agency",
-    kind: "labor",
-    location: "Meeting room 1",
-    details: "Prepare for the labor mediation and review the client’s timeline and supporting records.",
-    attendees: "M. Santos, Atty. Dela Cruz, and case associate",
-  },
-  {
-    id: "event-alcantara",
-    date: "2024-09-17",
-    startTime: "16:00",
-    durationMinutes: 60,
-    title: "R. Alcantara",
-    matter: "Criminal defense · Case conference",
-    kind: "criminal",
-    location: "Private meeting room",
-    details: "Review the next hearing date, evidence list, and questions for the client.",
-    attendees: "R. Alcantara and defense counsel",
-  },
-  {
-    id: "event-ramos",
-    date: "2024-09-18",
-    startTime: "11:30",
-    durationMinutes: 60,
-    title: "L. Ramos",
-    matter: "Labor case · Benefits review",
-    kind: "labor",
-    location: "Video conference",
-    details: "Check the benefits computation and agree on the documents to request from the employer.",
-    attendees: "L. Ramos and case associate",
-  },
-  {
-    id: "event-hernandez",
-    date: "2024-09-19",
-    startTime: "09:00",
-    durationMinutes: 60,
-    title: "T. Hernandez",
-    matter: "Family matter · Case update",
-    kind: "family",
-    location: "Meeting room 3",
-    details: "Share the latest filing update and confirm the client’s preferred next steps.",
-    attendees: "T. Hernandez and Atty. Dela Cruz",
-  },
-  {
-    id: "event-sy",
-    date: "2024-09-19",
-    startTime: "14:00",
-    durationMinutes: 60,
-    title: "K. Sy",
-    matter: "Criminal defense · Evidence review",
-    kind: "criminal",
-    location: "Meeting room 2",
-    details: "Walk through the evidence index and outline remaining review questions.",
-    attendees: "K. Sy and defense counsel",
-  },
-  {
-    id: "event-weekly-sync",
-    date: "2024-09-20",
-    startTime: "10:00",
-    durationMinutes: 60,
-    title: "Weekly sync",
-    matter: "Labor and employment team",
-    kind: "labor",
-    location: "Main conference room",
-    details: "Review open labor matters, upcoming deadlines, and follow-up assignments.",
-    attendees: "Labor and employment team",
-  },
-];
+type CalendarDraft = {
+  title: string;
+  matter: string;
+  kind: EventKind;
+  date: string;
+  startTime: string;
+  durationMinutes: number;
+  location: string;
+  details: string;
+  attendees: string;
+};
 
 const weekdays = [
   { short: "Mon", full: "Monday" },
@@ -144,10 +64,25 @@ const eventKindLabels: Record<EventKind, string> = {
   labor: "Labor law",
   civil: "Civil law",
   criminal: "Criminal law",
+  intake: "Intake follow-up",
 };
 
 function dateKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function createEmptyDraft(date: Date): CalendarDraft {
+  return {
+    title: "",
+    matter: "",
+    kind: "labor",
+    date: dateKey(date),
+    startTime: "09:00",
+    durationMinutes: 60,
+    location: "",
+    details: "",
+    attendees: "",
+  };
 }
 
 function getCalendarDays(month: Date) {
@@ -164,7 +99,7 @@ function getCalendarDays(month: Date) {
 function getWeekdays(date: Date) {
   const monday = new Date(date);
   monday.setDate(date.getDate() - ((date.getDay() + 6) % 7));
-  return Array.from({ length: 5 }, (_, index) => {
+  return Array.from({ length: 7 }, (_, index) => {
     const day = new Date(monday);
     day.setDate(monday.getDate() + index);
     return day;
@@ -210,25 +145,48 @@ function CalendarEventTooltip({ event }: { event: CalendarEvent }) {
 }
 
 export default function CalendarWorkspace() {
-  const demoToday = useMemo(() => new Date(2024, 8, 17), []);
-  const [selectedDate, setSelectedDate] = useState(demoToday);
+  const today = useMemo(() => new Date(), []);
+  const [selectedDate, setSelectedDate] = useState(today);
   const [view, setView] = useState<CalendarView>("week");
   const [search, setSearch] = useState("");
   const [toast, setToast] = useState("");
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [isLoadingEvents, setIsLoadingEvents] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<CalendarDraft>(createEmptyDraft(today));
+  const [isSavingEvent, setIsSavingEvent] = useState(false);
+
+  const loadEvents = async () => {
+    setIsLoadingEvents(true);
+    try {
+      const response = await fetch("/api/calendar", { cache: "no-store" });
+      if (!response.ok) throw new Error("Unable to load calendar events.");
+      const payload = (await response.json()) as { events?: CalendarEvent[] };
+      setEvents(Array.isArray(payload.events) ? payload.events : []);
+    } catch {
+      setToast("Unable to load the workspace calendar.");
+    } finally {
+      setIsLoadingEvents(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadEvents();
+  }, []);
 
   const eventsByDate = useMemo(() => {
     const query = search.trim().toLowerCase();
-    const visible = sampleEvents.filter((event) =>
+    const visible = events.filter((event) =>
       !query || `${event.title} ${event.matter} ${event.location} ${event.details} ${eventKindLabels[event.kind]}`.toLowerCase().includes(query),
     );
     const grouped = new Map<string, CalendarEvent[]>();
 
     for (const event of visible) {
-      const key = event.date;
-      grouped.set(key, [...(grouped.get(key) ?? []), event]);
+      grouped.set(event.date, [...(grouped.get(event.date) ?? []), event]);
     }
     return grouped;
-  }, [search]);
+  }, [events, search]);
 
   const calendarDays = getCalendarDays(selectedDate);
   const weekdaysInView = getWeekdays(selectedDate);
@@ -247,7 +205,93 @@ export default function CalendarWorkspace() {
   };
 
   const goToToday = () => {
-    setSelectedDate(demoToday);
+    setSelectedDate(today);
+  };
+
+  const openCreateEvent = () => {
+    setEditingEventId(null);
+    setDraft(createEmptyDraft(selectedDate));
+    setIsModalOpen(true);
+  };
+
+  const openEditEvent = (event: CalendarEvent) => {
+    setEditingEventId(event.id);
+    setDraft({
+      title: event.title,
+      matter: event.matter,
+      kind: event.kind,
+      date: event.date,
+      startTime: event.startTime,
+      durationMinutes: event.durationMinutes,
+      location: event.location,
+      details: event.details,
+      attendees: event.attendees,
+    });
+    setIsModalOpen(true);
+  };
+
+  const saveEvent = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsSavingEvent(true);
+    try {
+      const payload = {
+        title: draft.title.trim(),
+        matter: draft.matter.trim(),
+        kind: draft.kind,
+        date: draft.date,
+        startTime: draft.startTime,
+        durationMinutes: Number(draft.durationMinutes),
+        location: draft.location.trim(),
+        details: draft.details.trim(),
+        attendees: draft.attendees.trim(),
+      };
+
+      const url = editingEventId ? `/api/calendar/${editingEventId}` : "/api/calendar";
+      const method = editingEventId ? "PATCH" : "POST";
+      const response = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const message = await response.json().catch(() => ({ error: "Unable to save the calendar event." }));
+        throw new Error(message.error || "Unable to save the calendar event.");
+      }
+
+      const result = (await response.json()) as { event?: CalendarEvent };
+      const savedEvent = result.event;
+      if (!savedEvent) throw new Error("The calendar service did not return a saved event.");
+
+      setEvents((current) => {
+        if (editingEventId) {
+          return current.map((item) => item.id === savedEvent.id ? savedEvent : item);
+        }
+        return [savedEvent, ...current];
+      });
+      setIsModalOpen(false);
+      setToast(editingEventId ? "Event updated." : "Event added to your calendar.");
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Unable to save the calendar event.");
+    } finally {
+      setIsSavingEvent(false);
+    }
+  };
+
+  const deleteEvent = async (eventId: string) => {
+    if (eventId.startsWith("intake-")) {
+      setToast("This intake reminder is generated automatically and can’t be removed manually.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/calendar/${eventId}`, { method: "DELETE" });
+      if (!response.ok) throw new Error("Unable to delete the event.");
+      setEvents((current) => current.filter((item) => item.id !== eventId));
+      setToast("Event deleted.");
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Unable to delete the event.");
+    }
   };
 
   const unavailable = (label: string) => setToast(`${label} is not part of this demo yet.`);
@@ -296,7 +340,13 @@ export default function CalendarWorkspace() {
                     </button>
                   ))}
                 </div>
-                <button className="calendar-today-button" type="button" onClick={goToToday}>Today</button>
+                <div className="calendar-actions-inline">
+                  <button className="calendar-today-button" type="button" onClick={goToToday}>Today</button>
+                  <button className="calendar-create-button" type="button" onClick={openCreateEvent}>
+                    <Plus size={10.72} />
+                    Add event
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -305,7 +355,7 @@ export default function CalendarWorkspace() {
                 {weekdaysInView.map((date) => {
                   const key = dateKey(date);
                   const weekday = weekdays[(date.getDay() + 6) % 7];
-                  const isToday = key === dateKey(demoToday);
+                  const isToday = key === dateKey(today);
 
                   return (
                     <button
@@ -323,14 +373,16 @@ export default function CalendarWorkspace() {
               </div>
             )}
 
-            {view === "month" ? (
+            {isLoadingEvents ? (
+              <p className="calendar-loading" role="status">Loading calendar events…</p>
+            ) : view === "month" ? (
               <div className="calendar-month-scroll">
                 <div className="calendar-month-grid" aria-label="Month calendar">
                   {weekdays.map((weekday) => <div className="calendar-month-weekday" key={weekday.full}>{weekday.short}</div>)}
                   {calendarDays.map((date) => {
                     const key = dateKey(date);
-                    const events = eventsByDate.get(key) ?? [];
-                    const isToday = key === dateKey(demoToday);
+                    const dayEvents = eventsByDate.get(key) ?? [];
+                    const isToday = key === dateKey(today);
 
                     return (
                       <div className={`calendar-month-cell${date.getMonth() === selectedDate.getMonth() ? "" : " is-outside"}`} key={key}>
@@ -343,7 +395,7 @@ export default function CalendarWorkspace() {
                           {date.getDate()}
                         </button>
                         <div className="calendar-month-events">
-                          {events.map((event) => (
+                          {dayEvents.map((event) => (
                             <article className={`calendar-month-event calendar-month-event--${event.kind}`} key={event.id}>
                               <button type="button" aria-describedby={`${event.id}-details`}>
                                 <span>{formatClock(event.startTime)}</span> {event.title}
@@ -361,13 +413,13 @@ export default function CalendarWorkspace() {
               <div className="calendar-schedule-scroll">
                 <div
                   className={`calendar-week-schedule${view === "day" ? " is-day-view" : ""}`}
-                  data-selected-day={Math.min((selectedDate.getDay() + 6) % 7, 4)}
+                  data-selected-day={(selectedDate.getDay() + 6) % 7}
                 >
                   <div className="calendar-week-head">
                     <div className="calendar-time-gutter" aria-hidden="true" />
                     {visibleDays.map((date) => {
                       const key = dateKey(date);
-                      const isToday = key === dateKey(demoToday);
+                      const isToday = key === dateKey(today);
                       const weekday = weekdays[(date.getDay() + 6) % 7];
 
                       return (
@@ -393,12 +445,12 @@ export default function CalendarWorkspace() {
                     <div className="calendar-day-columns">
                       {visibleDays.map((date) => {
                         const key = dateKey(date);
-                        const events = eventsByDate.get(key) ?? [];
-                        const isToday = key === dateKey(demoToday);
+                        const dayEvents = eventsByDate.get(key) ?? [];
+                        const isToday = key === dateKey(today);
 
                         return (
                           <div className={`calendar-day-column${isToday ? " is-today" : ""}`} key={key}>
-                            {events.map((event) => {
+                            {dayEvents.map((event) => {
                               const [hour, minute] = event.startTime.split(":").map(Number);
                               const minutesFromStart = hour * 60 + minute - 8 * 60;
 
@@ -411,8 +463,21 @@ export default function CalendarWorkspace() {
                                   <button type="button" aria-describedby={`${event.id}-details`}>
                                     <strong>{formatClock(event.startTime)}</strong>
                                     <span>{event.title}</span>
-                                    <small>{eventKindLabels[event.kind].replace(" law", "").toUpperCase()} (3 SP)</small>
+                                    <small>{eventKindLabels[event.kind].replace(" law", "").toUpperCase()} ({event.durationMinutes} MIN)</small>
                                   </button>
+                                  <div className="calendar-event-actions">
+                                    {event.source !== "intake" && (
+                                      <>
+                                        <button type="button" aria-label={`Edit ${event.title}`} onClick={() => openEditEvent(event)}>
+                                          <Pencil size={9.38} />
+                                        </button>
+                                        <button type="button" aria-label={`Delete ${event.title}`} onClick={() => void deleteEvent(event.id)}>
+                                          <Trash2 size={9.38} />
+                                        </button>
+                                      </>
+                                    )}
+                                    {event.source === "intake" && <span className="calendar-intake-pill"><Sparkles size={8} /> Auto</span>}
+                                  </div>
                                   <CalendarEventTooltip event={event} />
                                 </article>
                               );
@@ -425,7 +490,6 @@ export default function CalendarWorkspace() {
                 </div>
               </div>
             )}
-            <p className="calendar-sample-note">Sample schedule · Local demo data only</p>
           </section>
 
           <aside className="calendar-reference-rail" aria-label="Calendar updates">
@@ -454,14 +518,81 @@ export default function CalendarWorkspace() {
                 <h2 id="quick-stats-heading">Quick Stats</h2>
               </div>
               <dl className="calendar-quick-stats">
-                <div><dt>This Week’s Consultations</dt><dd>8 Scheduled</dd></div>
-                <div><dt>New Intake Requests</dt><dd className="is-urgent">3 Pending</dd></div>
-                <div><dt>Completed Follow-ups</dt><dd>5 Checked</dd></div>
+                <div><dt>Total events</dt><dd>{events.length}</dd></div>
+                <div><dt>Intake reminders</dt><dd>{events.filter((event) => event.source === "intake").length}</dd></div>
+                <div><dt>Manual entries</dt><dd>{events.filter((event) => event.source !== "intake").length}</dd></div>
               </dl>
             </section>
           </aside>
         </div>
       </main>
+      {isModalOpen && (
+        <div className="calendar-event-modal-backdrop" onClick={(event) => {
+          if (event.target === event.currentTarget) setIsModalOpen(false);
+        }}>
+          <div className="calendar-event-modal" role="dialog" aria-modal="true" aria-label={editingEventId ? "Edit calendar event" : "Create calendar event"}>
+            <header className="calendar-event-modal-header">
+              <div>
+                <h2>{editingEventId ? "Edit event" : "New event"}</h2>
+                <p>{editingEventId ? "Update details for this calendar item." : "Create a calendar item and keep your schedule current."}</p>
+              </div>
+              <button type="button" className="calendar-event-close" aria-label="Close event editor" onClick={() => setIsModalOpen(false)}>
+                <X size={12.06} />
+              </button>
+            </header>
+            <form className="calendar-event-form" onSubmit={saveEvent}>
+              <div className="calendar-event-field-grid">
+                <label>
+                  <span>Title</span>
+                  <input value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} placeholder="Client name or meeting title" required />
+                </label>
+                <label>
+                  <span>Matter</span>
+                  <input value={draft.matter} onChange={(event) => setDraft((current) => ({ ...current, matter: event.target.value }))} placeholder="Intake or matter type" required />
+                </label>
+                <label>
+                  <span>Type</span>
+                  <select value={draft.kind} onChange={(event) => setDraft((current) => ({ ...current, kind: event.target.value as EventKind }))}>
+                    {Object.entries(eventKindLabels).map(([key, label]) => (
+                      <option key={key} value={key}>{label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Date</span>
+                  <input type="date" value={draft.date} onChange={(event) => setDraft((current) => ({ ...current, date: event.target.value }))} required />
+                </label>
+                <label>
+                  <span>Start time</span>
+                  <input type="time" value={draft.startTime} onChange={(event) => setDraft((current) => ({ ...current, startTime: event.target.value }))} required />
+                </label>
+                <label>
+                  <span>Duration (minutes)</span>
+                  <input type="number" min={15} max={480} step={15} value={draft.durationMinutes} onChange={(event) => setDraft((current) => ({ ...current, durationMinutes: Number(event.target.value) || 60 }))} required />
+                </label>
+                <label className="calendar-event-field--wide">
+                  <span>Location</span>
+                  <input value={draft.location} onChange={(event) => setDraft((current) => ({ ...current, location: event.target.value }))} placeholder="Conference room, video call, etc." />
+                </label>
+                <label className="calendar-event-field--wide">
+                  <span>Details</span>
+                  <textarea value={draft.details} onChange={(event) => setDraft((current) => ({ ...current, details: event.target.value }))} placeholder="Add a brief note for the meeting or follow-up." rows={3} />
+                </label>
+                <label className="calendar-event-field--wide">
+                  <span>Attendees</span>
+                  <input value={draft.attendees} onChange={(event) => setDraft((current) => ({ ...current, attendees: event.target.value }))} placeholder="Client, counsel, team members" />
+                </label>
+              </div>
+              <footer className="calendar-event-modal-footer">
+                <button type="button" className="calendar-event-cancel" onClick={() => setIsModalOpen(false)}>Cancel</button>
+                <button type="submit" className="calendar-event-save" disabled={isSavingEvent}>
+                  {isSavingEvent ? "Saving…" : editingEventId ? "Update event" : "Add event"}
+                </button>
+              </footer>
+            </form>
+          </div>
+        </div>
+      )}
       {toast && (
         <div className="toast calendar-toast" role="status">
           <span className="toast-check"><Check size={10.72} /></span>
