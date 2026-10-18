@@ -93,6 +93,11 @@ async function getTaskApiError(response: Response, fallback: string) {
   return payload?.error || fallback;
 }
 
+function mergeTasks(current: Task[], incoming: Task[]) {
+  const incomingIds = new Set(incoming.map((task) => task.id));
+  return [...incoming, ...current.filter((task) => !incomingIds.has(task.id))];
+}
+
 export default function TasksWorkspace() {
   const [today] = useState(() => new Date());
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -118,6 +123,7 @@ export default function TasksWorkspace() {
   const [toast, setToast] = useState("");
   const titleInputRef = useRef<HTMLInputElement>(null);
   const nextTaskId = useRef(0);
+  const taskMutationVersion = useRef(0);
 
   useEffect(() => {
     if (isCreating) titleInputRef.current?.focus();
@@ -127,13 +133,18 @@ export default function TasksWorkspace() {
     let isCurrent = true;
 
     const loadTasks = async () => {
+      const requestVersion = taskMutationVersion.current;
       try {
         const response = await fetch("/api/tasks", { cache: "no-store" });
         if (!response.ok) throw new Error(await getTaskApiError(response, "Unable to load tasks."));
         const payload = await response.json() as { tasks?: Task[] };
-        if (isCurrent) setTasks(Array.isArray(payload.tasks) ? payload.tasks : []);
+        if (isCurrent && requestVersion === taskMutationVersion.current) {
+          setTasks(Array.isArray(payload.tasks) ? payload.tasks : []);
+        }
       } catch (error) {
-        if (isCurrent) setToast(error instanceof Error ? error.message : "Unable to load tasks right now.");
+        if (isCurrent && requestVersion === taskMutationVersion.current) {
+          setToast(error instanceof Error ? error.message : "Unable to load tasks right now.");
+        }
       } finally {
         if (isCurrent) setIsLoadingTasks(false);
       }
@@ -184,6 +195,7 @@ export default function TasksWorkspace() {
       if (!response.ok) throw new Error(await getTaskApiError(response, "Unable to update this task."));
       const payload = await response.json() as { task?: Task };
       if (!payload.task) throw new Error("The task service did not return the updated task.");
+      taskMutationVersion.current += 1;
       setTasks((current) => current.map((item) => item.id === payload.task?.id ? payload.task : item));
       setAnnouncement(`${task.title} marked ${completed ? "complete" : "open"}.`);
     } catch (error) {
@@ -195,6 +207,7 @@ export default function TasksWorkspace() {
     try {
       const response = await fetch(`/api/tasks/${task.id}`, { method: "DELETE" });
       if (!response.ok) throw new Error(await getTaskApiError(response, "Unable to delete this task."));
+      taskMutationVersion.current += 1;
       setTasks((current) => current.filter((item) => item.id !== task.id));
       setAnnouncement(`${task.title} deleted.`);
     } catch (error) {
@@ -229,7 +242,8 @@ export default function TasksWorkspace() {
       if (!response.ok) throw new Error(await getTaskApiError(response, "Unable to add this task."));
       const payload = await response.json() as { task?: Task };
       if (!payload.task) throw new Error("The task service did not return the saved task.");
-      setTasks((current) => [payload.task!, ...current]);
+      taskMutationVersion.current += 1;
+      setTasks((current) => mergeTasks(current, [payload.task!]));
       setActiveView("open");
       setPriorityFilter("all");
       setSearch("");
@@ -310,7 +324,8 @@ export default function TasksWorkspace() {
         skippedIntakeReferences?: string[];
       };
       const generatedTasks = payload.tasks ?? [];
-      setTasks((current) => [...generatedTasks, ...current]);
+      taskMutationVersion.current += 1;
+      setTasks((current) => mergeTasks(current, generatedTasks));
       setActiveView("all");
       setPriorityFilter("all");
       setSearch("");
@@ -547,10 +562,7 @@ export default function TasksWorkspace() {
                         aria-label={`${task.completed ? "Reopen" : "Mark"} task: ${task.title}`}
                       />
                       <div className="task-description">
-                        <span className="task-description-title">
-                          <strong>{task.title}</strong>
-                          {task.source === "ai" && <span className="task-ai-badge">AI</span>}
-                        </span>
+                        <strong>{task.title}</strong>
                         <span>{task.matter || "No matter linked"}</span>
                       </div>
                     </div>
