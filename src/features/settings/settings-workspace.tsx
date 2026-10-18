@@ -11,7 +11,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import WorkspaceShell from "../workspace/workspace-shell";
 import "./settings-workspace.css";
 
@@ -37,6 +37,12 @@ export default function SettingsWorkspace() {
   const [search, setSearch] = useState("");
   const [activeSection, setActiveSection] = useState<SectionKey>("profile");
   const [toast, setToast] = useState("");
+  const [identity, setIdentity] = useState<{ displayName: string; email: string | null; imageUrl: string } | null>(null);
+  const [specialty, setSpecialty] = useState("");
+  const [bio, setBio] = useState("");
+  const [listed, setListed] = useState(false);
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
+  const [isProfileSaving, setIsProfileSaving] = useState(false);
   const [toggles, setToggles] = useState<Record<ToggleKey, boolean>>({
     "new-intake": true,
     calendar: true,
@@ -63,6 +69,46 @@ export default function SettingsWorkspace() {
   };
 
   const unavailable = (label: string) => setToast(`${label} is not part of this demo yet.`);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/citizen/directory-profile", { cache: "no-store" })
+      .then((response) => response.json().then((body) => ({ ok: response.ok, body })))
+      .then(({ ok, body }) => {
+        if (!active) return;
+        if (!ok) throw new Error(body?.error ?? "Unable to load your profile.");
+        setIdentity(body.identity ?? null);
+        setSpecialty(body.profile?.specialty ?? "");
+        setBio(body.profile?.bio ?? "");
+        setListed(Boolean(body.profile?.listed));
+      })
+      .catch((error: unknown) => {
+        if (active) setToast(error instanceof Error ? error.message : "Unable to load your profile.");
+      })
+      .finally(() => { if (active) setIsProfileLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  const saveProfile = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsProfileSaving(true);
+    try {
+      const response = await fetch("/api/citizen/directory-profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ specialty, bio, listed }),
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(body?.error ?? "Unable to save your profile.");
+      setSpecialty(body.profile.specialty);
+      setBio(body.profile.bio);
+      setToast("Profile saved.");
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Unable to save your profile.");
+    } finally {
+      setIsProfileSaving(false);
+    }
+  };
 
   return (
     <WorkspaceShell
@@ -117,40 +163,58 @@ export default function SettingsWorkspace() {
 
           <section className="settings-content" aria-label="Account settings">
             {currentSection.key === "profile" && (
-              <div className="settings-card settings-card--wide">
+              <form className="settings-card settings-card--wide" onSubmit={saveProfile}>
                 <div className="settings-card-header">
                   <div>
                     <p className="eyebrow">Profile</p>
                     <h2>Lawyer account</h2>
                   </div>
-                  <button type="button" className="text-button" onClick={() => unavailable("Profile management")}>
-                    Edit profile
-                  </button>
                 </div>
 
                 <div className="profile-summary">
-                  <div className="profile-avatar" aria-label="Lawyer initial">J</div>
+                  {identity?.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img className="profile-avatar" src={identity.imageUrl} alt="" />
+                  ) : (
+                    <div className="profile-avatar" aria-hidden="true">{(identity?.displayName || "L").charAt(0).toUpperCase()}</div>
+                  )}
                   <div className="profile-copy">
-                    <strong>Atty. Juan Dela Cruz</strong>
-                    <span>BatasGO workspace</span>
+                    <strong>{isProfileLoading ? "Loading..." : identity?.displayName || "Unnamed account"}</strong>
+                    <span>{identity?.email ?? "Signed in with Clerk"}</span>
                   </div>
                 </div>
+                <p className="profile-note">
+                  Your name, email, and photo come from your Clerk account. Change them from the account menu
+                  (Manage account) and they update here and in the citizen directory.
+                </p>
 
-                <div className="detail-grid">
-                  <div>
-                    <label>Email</label>
-                    <p>juan.delacruz@batasgo.ph</p>
-                  </div>
-                  <div>
-                    <label>Primary specialization</label>
-                    <p>Labor &amp; employment litigation</p>
-                  </div>
-                  <div>
-                    <label>Workspace role</label>
-                    <p>Managing partner</p>
-                  </div>
+                <div className="profile-form">
+                  <label>
+                    <span>Specialty <small>(required to open Messages)</small></span>
+                    <input
+                      required
+                      minLength={2}
+                      maxLength={100}
+                      value={specialty}
+                      disabled={isProfileLoading}
+                      onChange={(event) => setSpecialty(event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    <span>Short introduction</span>
+                    <textarea
+                      maxLength={600}
+                      rows={3}
+                      value={bio}
+                      disabled={isProfileLoading}
+                      onChange={(event) => setBio(event.target.value)}
+                    />
+                  </label>
+                  <button type="submit" className="primary-button" disabled={isProfileLoading || isProfileSaving}>
+                    {isProfileSaving ? "Saving..." : "Save profile"}
+                  </button>
                 </div>
-              </div>
+              </form>
             )}
 
             {currentSection.key === "appearance" && (

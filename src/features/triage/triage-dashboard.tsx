@@ -66,8 +66,21 @@ type DecisionFilter = "all" | Decision["result"];
 type RankedIntake = { intake: Intake; score: number; reasons: string[]; specialtyMatch: boolean };
 type AiSummaryBlock = { type: "paragraph"; text: string } | { type: "list"; items: string[] };
 type AiSummarySection = { heading: string; blocks: AiSummaryBlock[] };
+type TodayScheduleEvent = { id: string; title: string; matter: string; date: string; startTime: string };
 
 const seenDecisionIdsStorageKey = "batasgo:triage:seen-decision-ids";
+
+function getLocalDateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function formatScheduleTime(time: string) {
+  const [hours, minutes] = time.split(":").map(Number);
+  return new Date(2000, 0, 1, hours, minutes).toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 const aiSummaryHeadings = [
   "Reported issue",
@@ -391,6 +404,10 @@ export default function TriageDashboard() {
   const [seenDecisionIds, setSeenDecisionIds] = useState<Set<string>>(() => new Set());
   const [warpingIntakeIds, setWarpingIntakeIds] = useState<Set<string>>(() => new Set());
   const [isLoadingIntakes, setIsLoadingIntakes] = useState(true);
+  const [todayScheduleEvents, setTodayScheduleEvents] = useState<TodayScheduleEvent[]>([]);
+  const [isLoadingTodaySchedule, setIsLoadingTodaySchedule] = useState(true);
+  const [todayScheduleError, setTodayScheduleError] = useState(false);
+  const [todayDateKey] = useState(() => getLocalDateKey(new Date()));
   const [intakeLoadError, setIntakeLoadError] = useState("");
   const [busyIntakeId, setBusyIntakeId] = useState<string | null>(null);
   const [generatingSummaryId, setGeneratingSummaryId] = useState<string | null>(null);
@@ -462,6 +479,30 @@ export default function TriageDashboard() {
   useEffect(() => {
     void loadIntakes();
   }, [loadIntakes]);
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    const loadTodaySchedule = async () => {
+      try {
+        const response = await fetch("/api/calendar", { cache: "no-store" });
+        if (!response.ok) throw new Error("Unable to load calendar events.");
+        const payload = await response.json() as { events?: TodayScheduleEvent[] };
+        const events = (payload.events ?? [])
+          .filter((event) => event.date === todayDateKey)
+          .sort((a, b) => a.startTime.localeCompare(b.startTime))
+          .slice(0, 3);
+        if (isCurrent) setTodayScheduleEvents(events);
+      } catch {
+        if (isCurrent) setTodayScheduleError(true);
+      } finally {
+        if (isCurrent) setIsLoadingTodaySchedule(false);
+      }
+    };
+
+    void loadTodaySchedule();
+    return () => { isCurrent = false; };
+  }, [todayDateKey]);
 
   useEffect(() => {
     try {
@@ -1405,9 +1446,20 @@ export default function TriageDashboard() {
                   </button>
                 </div>
                 <div className="schedule-list">
-                  <div className="schedule-item"><time><strong>10:00 AM</strong><span>Today</span></time><div><strong>DOLE Illegal Dismissal Prep</strong><span>M. Santos · Labor Code</span></div></div>
-                  <div className="schedule-item"><time><strong>02:30 PM</strong><span>Today</span></time><div><strong>Contract Mediation Conference</strong><span>Fintrex Dev Corp · Civil Code</span></div></div>
-                  <div className="schedule-item"><time><strong>04:00 PM</strong><span>Today</span></time><div><strong>RA 10175 Evidentiary Audit</strong><span>R. Alcantara · Cybercrime</span></div></div>
+                  {isLoadingTodaySchedule ? (
+                    <p className="schedule-empty-state" role="status">Loading calendar…</p>
+                  ) : todayScheduleError ? (
+                    <p className="schedule-empty-state" role="status">Today&apos;s schedule is unavailable.</p>
+                  ) : todayScheduleEvents.length > 0 ? (
+                    todayScheduleEvents.map((event) => (
+                      <div className="schedule-item" key={event.id}>
+                        <time><strong>{formatScheduleTime(event.startTime)}</strong><span>Today</span></time>
+                        <div><strong>{event.title}</strong><span>{event.matter || "Calendar event"}</span></div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="schedule-empty-state">No events scheduled today.</p>
+                  )}
                 </div>
               </section>
               <section className="rail-panel messages-panel">

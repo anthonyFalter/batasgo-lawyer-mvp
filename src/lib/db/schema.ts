@@ -1,7 +1,9 @@
 import {
   boolean,
+  customType,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -18,6 +20,14 @@ export const intakeStatus = pgEnum("intake_status", ["pending", "accepted", "dec
 export const calendarEventKind = pgEnum("calendar_event_kind", ["family", "labor", "civil", "criminal", "intake"]);
 export const taskPriority = pgEnum("task_priority", ["high", "medium", "low"]);
 export const taskSource = pgEnum("task_source", ["manual", "ai"]);
+export const citizenMessageSender = pgEnum("citizen_message_sender", ["citizen", "lawyer"]);
+export const citizenMessageKind = pgEnum("citizen_message_kind", ["text", "journal_handoff"]);
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType() {
+    return "bytea";
+  },
+});
 
 export const workspaces = pgTable("workspaces", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -162,5 +172,120 @@ export const chatMessages = pgTable(
   },
   (table) => [
     index("chat_messages_session_order_idx").on(table.sessionId, table.createdAt),
+  ],
+);
+
+export const citizenLawyerProfiles = pgTable(
+  "citizen_lawyer_profiles",
+  {
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" })
+      .primaryKey(),
+    clerkUserId: text("clerk_user_id").notNull(),
+    displayName: text("display_name").notNull(),
+    specialty: text("specialty").notNull(),
+    bio: text("bio").notNull().default(""),
+    listed: boolean("listed").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("citizen_lawyer_profiles_listed_idx").on(table.listed, table.updatedAt),
+    index("citizen_lawyer_profiles_clerk_user_idx").on(table.clerkUserId),
+  ],
+);
+
+export const citizenConversations = pgTable(
+  "citizen_conversations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    citizenId: text("citizen_id").notNull(),
+    citizenDisplayName: text("citizen_display_name").notNull().default("Citizen"),
+    subject: text("subject").notNull().default("New conversation"),
+    lastMessagePreview: text("last_message_preview").notNull().default(""),
+    lastMessageAt: timestamp("last_message_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("citizen_conversations_workspace_citizen_unique").on(table.workspaceId, table.citizenId),
+    index("citizen_conversations_workspace_updated_idx").on(table.workspaceId, table.lastMessageAt),
+    index("citizen_conversations_citizen_updated_idx").on(table.citizenId, table.lastMessageAt),
+  ],
+);
+
+export type CitizenJournalEntrySnapshot = {
+  id: string;
+  title: string;
+  incidentDate: string;
+  location: string;
+  details: string;
+  recordedAt: string;
+};
+
+export const citizenJournalHandoffs = pgTable(
+  "citizen_journal_handoffs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => citizenConversations.id, { onDelete: "cascade" }),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    citizenId: text("citizen_id").notNull(),
+    title: text("title").notNull(),
+    entries: jsonb("entries").$type<CitizenJournalEntrySnapshot[]>().notNull(),
+    consentedAt: timestamp("consented_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("citizen_journal_handoffs_conversation_created_idx").on(table.conversationId, table.createdAt),
+    index("citizen_journal_handoffs_workspace_created_idx").on(table.workspaceId, table.createdAt),
+    index("citizen_journal_handoffs_citizen_created_idx").on(table.citizenId, table.createdAt),
+  ],
+);
+
+export const citizenHandoffAttachments = pgTable(
+  "citizen_handoff_attachments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    handoffId: uuid("handoff_id")
+      .notNull()
+      .references(() => citizenJournalHandoffs.id, { onDelete: "cascade" }),
+    sourceEntryId: text("source_entry_id").notNull(),
+    fileName: text("file_name").notNull(),
+    contentType: text("content_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    sha256: text("sha256").notNull(),
+    content: bytea("content").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("citizen_handoff_attachments_handoff_created_idx").on(table.handoffId, table.createdAt),
+  ],
+);
+
+export const citizenMessages = pgTable(
+  "citizen_messages",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => citizenConversations.id, { onDelete: "cascade" }),
+    sender: citizenMessageSender("sender").notNull(),
+    senderId: text("sender_id").notNull(),
+    kind: citizenMessageKind("kind").notNull().default("text"),
+    content: text("content").notNull(),
+    handoffId: uuid("handoff_id").references(() => citizenJournalHandoffs.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("citizen_messages_conversation_created_idx").on(table.conversationId, table.createdAt),
+    index("citizen_messages_handoff_idx").on(table.handoffId),
   ],
 );
