@@ -54,6 +54,8 @@ export const intakes = pgTable(
     summary: text("summary").notNull(),
     receivedAt: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
     deadlineAt: timestamp("deadline_at", { withTimezone: true }),
+    caseStage: text("case_stage").notNull().default(""),
+    urgencyFlags: text("urgency_flags").array().notNull().default(sql`ARRAY[]::text[]`),
     status: intakeStatus("status").notNull().default("pending"),
     priorityScore: integer("priority_score"),
     documents: text("documents").array().notNull().default(sql`ARRAY[]::text[]`),

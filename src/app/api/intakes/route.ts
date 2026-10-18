@@ -66,6 +66,11 @@ export async function POST(request: Request) {
           : risk === "High" ? "high" : risk === "Unassessed" ? "unassessed" : "medium",
         client,
         summary,
+        deadlineAt: parsed.data.deadlineAt
+          ? new Date(`${parsed.data.deadlineAt}T12:00:00.000Z`)
+          : null,
+        caseStage: parsed.data.caseStage,
+        urgencyFlags: parsed.data.urgencyFlags,
         priorityScore: score,
         documents: parsed.data.documents,
         isSample: false,

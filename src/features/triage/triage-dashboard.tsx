@@ -6,8 +6,10 @@ import {
   Check,
   ChevronDown,
   ClipboardCheck,
+  CalendarDays,
   FileText,
   FilePenLine,
+  LockKeyhole,
   Sparkles,
   Clock3,
   Inbox,
@@ -16,13 +18,17 @@ import {
   ShieldAlert,
   Upload,
   X,
+  ShieldCheck,
 } from "lucide-react";
 import { type CSSProperties, type FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   apiErrorResponseSchema,
+  intakeCaseStages,
+  intakeAiExtractionResponseSchema,
   intakeAiReviewResponseSchema,
   intakeListResponseSchema,
   intakeResponseSchema,
+  intakeUrgencyFlags,
   type IntakeDTO,
 } from "@/lib/intakes/validation";
 import { getRiskFromScore, suggestIntakeDetails } from "@/lib/intakes/triage";
@@ -45,8 +51,18 @@ type IntakeReview = {
   source: "local" | "ai";
   provider?: "Gemini" | "Groq";
   documentReview?: { processedCount: number; truncated: boolean; visionUsed: boolean };
+  fieldSources?: IntakeFieldSources;
   factors?: IntakeReviewFactors;
 };
+type IntakeFieldSources = {
+  title: { document: string | null; page: number | null };
+  description: { document: string | null; page: number | null };
+  domain: { document: string | null; page: number | null };
+  deadlineAt: { document: string | null; page: number | null };
+  caseStage: { document: string | null; page: number | null };
+  urgencyFlags: { document: string | null; page: number | null };
+};
+type IntakeStage = "choose" | "upload" | "details" | "result";
 type DecisionFilter = "all" | Decision["result"];
 type RankedIntake = { intake: Intake; score: number; reasons: string[]; specialtyMatch: boolean };
 type AiSummaryBlock = { type: "paragraph"; text: string } | { type: "list"; items: string[] };
@@ -396,9 +412,17 @@ export default function TriageDashboard() {
   const [intakeTitle, setIntakeTitle] = useState("");
   const [intakeDescription, setIntakeDescription] = useState("");
   const [intakeSpecialty, setIntakeSpecialty] = useState("");
+  const [intakeDeadline, setIntakeDeadline] = useState("");
+  const [intakeCaseStage, setIntakeCaseStage] = useState("");
+  const [selectedUrgencyFlags, setSelectedUrgencyFlags] = useState<string[]>([]);
+  const [aiFilledFields, setAiFilledFields] = useState<Set<keyof IntakeFieldSources>>(() => new Set());
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
-  const [intakeStage, setIntakeStage] = useState<"form" | "review">("form");
+  const [intakeStage, setIntakeStage] = useState<IntakeStage>("choose");
+  const [intakePath, setIntakePath] = useState<"documents" | "manual" | null>(null);
+  const [maskIdentifiers, setMaskIdentifiers] = useState(true);
+  const [documentConsent, setDocumentConsent] = useState(false);
+  const [manualAiConsent, setManualAiConsent] = useState(false);
   const [intakeReview, setIntakeReview] = useState<IntakeReview | null>(null);
   const [isGeneratingIntakeReview, setIsGeneratingIntakeReview] = useState(false);
   const [intakeAiReviewError, setIntakeAiReviewError] = useState("");
@@ -722,8 +746,16 @@ export default function TriageDashboard() {
     setIntakeTitle("");
     setIntakeDescription("");
     setIntakeSpecialty("");
+    setIntakeDeadline("");
+    setIntakeCaseStage("");
+    setSelectedUrgencyFlags([]);
+    setAiFilledFields(new Set());
     setSelectedFiles([]);
-    setIntakeStage("form");
+    setIntakeStage("choose");
+    setIntakePath(null);
+    setMaskIdentifiers(true);
+    setDocumentConsent(false);
+    setManualAiConsent(false);
     setIntakeReview(null);
     setIntakeAiReviewError("");
     setIsGeneratingIntakeReview(false);
@@ -742,6 +774,27 @@ export default function TriageDashboard() {
     clearManualIntake();
     setNewIntakeOpen(true);
   };
+
+  const createIntakeDraft = (): Intake => ({
+    id: "00000000-0000-4000-8000-000000000000",
+    reference: "Intake preview",
+    domain: intakeSpecialty || "Other",
+    risk: "Unassessed",
+    client: intakeTitle.trim() || "Untitled intake",
+    summary: intakeDescription.trim() || "Details pending lawyer review.",
+    received: "Just now",
+    receivedOrder: 3,
+    deadline: intakeDeadline ? `Due ${intakeDeadline}` : "No deadline set",
+    deadlineOrder: 99,
+    deadlineAt: intakeDeadline ? new Date(`${intakeDeadline}T12:00:00.000Z`).toISOString() : null,
+    caseStage: intakeCaseStage,
+    urgencyFlags: selectedUrgencyFlags,
+    documents: selectedFiles.map((file) => file.name),
+    priorityScore: null,
+    status: "pending",
+    isSample: false,
+    aiSummary: null,
+  });
 
   const addDocuments = (files: FileList | File[]) => {
     const incomingFiles = Array.from(files);
@@ -778,7 +831,7 @@ export default function TriageDashboard() {
     const suggestions = suggestIntakeDetails(intakeTitle, intakeDescription);
     setIntakeTitle(suggestions.title);
     setIntakeDescription(suggestions.description);
-    setIntakeSpecialty(suggestions.specialty);
+    if (!intakeSpecialty) setIntakeSpecialty(suggestions.specialty);
   };
 
   const generateSampleSummary = async (intake: Intake) => {
@@ -807,66 +860,8 @@ export default function TriageDashboard() {
     }
   };
 
-  const submitManualIntake = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const suggestions = suggestIntakeDetails(intakeTitle, intakeDescription);
-    const specialty = intakeSpecialty || suggestions.specialty;
-    const newIntake: Intake = {
-      id: "00000000-0000-4000-8000-000000000000",
-      reference: "Intake preview",
-      domain: specialty,
-      risk: getRiskFromScore(suggestions.score),
-      client: intakeTitle.trim() || "Untitled intake",
-      summary: intakeDescription.trim() || "Details pending lawyer review.",
-      received: "Just now",
-      receivedOrder: 3,
-      deadline: "No deadline set",
-      deadlineOrder: 99,
-      deadlineAt: null,
-      documents: selectedFiles.map((file) => file.name),
-      priorityScore: suggestions.score,
-      status: "pending",
-      isSample: false,
-      aiSummary: null,
-    };
-
-    setIntakeAiReviewError("");
-    setIntakeReview({
-      intake: newIntake,
-      summary: suggestions.summary,
-      signals: suggestions.signals,
-      source: "local",
-      factors: {
-        temporalDeadlines: {
-          score: suggestions.factors.temporalDeadlines,
-          rationale: suggestions.factors.temporalDeadlines
-            ? "Based on an explicitly stated deadline or hearing in the entered details."
-            : "No supporting deadline facts found in the entered details.",
-        },
-        caseRiskImpact: {
-          score: suggestions.factors.caseRiskImpact,
-          rationale: suggestions.factors.caseRiskImpact
-            ? "Based on a concrete risk or impact stated in the entered details."
-            : "No supporting harm or impact facts found in the entered details.",
-        },
-        proceduralStatus: {
-          score: suggestions.factors.proceduralStatus,
-          rationale: suggestions.factors.proceduralStatus
-            ? "Based on a procedural stage stated in the entered details."
-            : "No procedural stage found in the entered details.",
-        },
-        severityBonus: {
-          score: 0,
-          rationale: "AI-only bonus; not included in the local estimate.",
-        },
-      },
-    });
-    setIntakeStage("review");
-  };
-
-  const generateIntakeAiReview = async () => {
-    if (!intakeReview || isGeneratingIntakeReview) return;
-
+  const requestIntakeAiReview = async (includeDocuments: boolean) => {
+    if (isGeneratingIntakeReview || (includeDocuments && (!documentConsent || selectedFiles.length === 0))) return;
     const controller = new AbortController();
     intakeReviewRequestRef.current?.abort();
     intakeReviewRequestRef.current = controller;
@@ -879,44 +874,99 @@ export default function TriageDashboard() {
         title: intakeTitle,
         description: intakeDescription,
         domain: intakeSpecialty,
-        documents: selectedFiles.map((file) => file.name),
+        deadlineAt: intakeDeadline || null,
+        caseStage: intakeCaseStage,
+        urgencyFlags: selectedUrgencyFlags,
+        documents: includeDocuments ? selectedFiles.map((file) => file.name) : [],
       }));
-      selectedFiles.forEach((file) => formData.append("files", file, file.name));
+      formData.append("maskIdentifiers", String(maskIdentifiers));
+      formData.append("mode", includeDocuments ? "extract" : "score");
+      formData.append("aiConsent", String(intakePath === "documents" ? documentConsent : manualAiConsent));
+      if (includeDocuments) {
+        selectedFiles.forEach((file) => formData.append("files", file, file.name));
+      }
       const response = await fetch("/api/intakes/review", {
         method: "POST",
         body: formData,
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(12_000)]),
       });
       if (!response.ok) throw new Error(await getResponseError(response, "Unable to generate an AI review."));
-      const parsed = intakeAiReviewResponseSchema.safeParse(await response.json());
-      if (!parsed.success) throw new Error("The AI review service returned an invalid assessment.");
+      const payload: unknown = await response.json();
       if (controller.signal.aborted) return;
 
-      const { review } = parsed.data;
-      setIntakeTitle(review.title);
-      setIntakeDescription(review.description);
-      setIntakeSpecialty(review.domain);
-      setIntakeReview({
-        intake: {
-          ...intakeReview.intake,
-          client: review.title,
-          domain: review.domain,
-          priorityScore: review.priorityScore,
-          risk: review.risk,
-          summary: review.description,
-        },
-        summary: review.summary,
-        signals: review.signals.length ? review.signals : ["No immediate urgency signals stated"],
-        source: "ai",
-        provider: review.provider,
-        documentReview: review.documentReview,
-        factors: review.factors,
-      });
+      const previousReview = intakeReview;
+      if (includeDocuments) {
+        const parsed = intakeAiExtractionResponseSchema.safeParse(payload);
+        if (!parsed.success) throw new Error("The document extraction service returned an invalid response.");
+        const { extraction: review } = parsed.data;
+        setIntakeTitle(review.title);
+        setIntakeDescription(review.description);
+        setIntakeSpecialty(review.domain);
+        setIntakeDeadline(review.deadlineAt ?? "");
+        setIntakeCaseStage(review.caseStage);
+        setSelectedUrgencyFlags(review.urgencyFlags);
+        const filledFields = new Set<keyof IntakeFieldSources>();
+        if (review.title) filledFields.add("title");
+        if (review.description) filledFields.add("description");
+        if (review.domain) filledFields.add("domain");
+        if (review.deadlineAt) filledFields.add("deadlineAt");
+        if (review.caseStage) filledFields.add("caseStage");
+        if (review.urgencyFlags.length) filledFields.add("urgencyFlags");
+        setAiFilledFields(filledFields);
+        setIntakeReview({
+          intake: {
+            ...createIntakeDraft(),
+            client: review.title,
+            domain: review.domain,
+            deadline: review.deadlineAt ? `Due ${review.deadlineAt}` : "No deadline set",
+            deadlineAt: review.deadlineAt ? new Date(`${review.deadlineAt}T12:00:00.000Z`).toISOString() : null,
+            caseStage: review.caseStage,
+            urgencyFlags: review.urgencyFlags,
+          },
+          summary: review.summary,
+          signals: review.signals.length ? review.signals : ["No immediate urgency signals stated"],
+          source: "ai",
+          provider: review.provider,
+          documentReview: review.documentReview,
+          fieldSources: review.fieldSources,
+        });
+        setIntakeStage("details");
+      } else {
+        const parsed = intakeAiReviewResponseSchema.safeParse(payload);
+        if (!parsed.success) throw new Error("The AI scoring service returned an invalid assessment.");
+        const { review } = parsed.data;
+        const draft = previousReview?.intake ?? createIntakeDraft();
+        setIntakeReview({
+          intake: {
+            ...draft,
+            client: intakeTitle.trim() || "Untitled intake",
+            domain: intakeSpecialty || "Other",
+            summary: intakeDescription.trim() || "Details pending lawyer review.",
+            deadline: intakeDeadline ? `Due ${intakeDeadline}` : "No deadline set",
+            deadlineAt: intakeDeadline ? new Date(`${intakeDeadline}T12:00:00.000Z`).toISOString() : null,
+            caseStage: intakeCaseStage,
+            urgencyFlags: selectedUrgencyFlags,
+            documents: selectedFiles.map((file) => file.name),
+            priorityScore: review.priorityScore,
+            risk: review.risk,
+          },
+          summary: review.summary,
+          signals: review.signals.length ? review.signals : ["No immediate urgency signals stated"],
+          source: "ai",
+          provider: review.provider,
+          documentReview: previousReview?.documentReview,
+          fieldSources: previousReview?.fieldSources,
+          factors: review.factors,
+        });
+        setIntakeStage("result");
+      }
     } catch (error) {
       if (!controller.signal.aborted) {
         const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
         setIntakeAiReviewError(timedOut
-          ? "AI review timed out. The uploaded documents were not scored; add matter details or try again."
+          ? includeDocuments
+            ? "BatasBot took too long to read this file. You can try again or switch to manual entry; your selected files are still here."
+            : "BatasBot took too long to score these details. Your work is still here; try again."
           : error instanceof Error ? error.message : "Unable to generate an AI review.");
       }
     } finally {
@@ -925,6 +975,30 @@ export default function TriageDashboard() {
         setIsGeneratingIntakeReview(false);
       }
     }
+  };
+
+  const submitIntakeDetails = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (intakePath === "manual" && !manualAiConsent) return;
+    void requestIntakeAiReview(false);
+  };
+
+  const clearAiFieldSource = (field: keyof IntakeFieldSources) => {
+    setAiFilledFields((current) => {
+      const next = new Set(current);
+      next.delete(field);
+      return next;
+    });
+    setIntakeReview((current) => {
+      if (!current?.fieldSources) return current;
+      return {
+        ...current,
+        fieldSources: {
+          ...current.fieldSources,
+          [field]: { document: null, page: null },
+        },
+      };
+    });
   };
 
   const proceedWithManualIntake = async () => {
@@ -939,6 +1013,9 @@ export default function TriageDashboard() {
           description: intakeDescription,
           domain: intakeSpecialty,
           documents: selectedFiles.map((file) => file.name),
+          deadlineAt: intakeDeadline || null,
+          caseStage: intakeCaseStage,
+          urgencyFlags: selectedUrgencyFlags,
           priorityScore: intakeReview.intake.priorityScore,
         }),
       });
@@ -960,6 +1037,16 @@ export default function TriageDashboard() {
   };
 
   const unavailable = (label: string) => showToast(`${label} is not part of this demo yet.`);
+  const calculatedIntakeScore = intakeReview?.factors
+    ? Math.min(100,
+        intakeReview.factors.temporalDeadlines.score
+          + intakeReview.factors.caseRiskImpact.score
+          + intakeReview.factors.proceduralStatus.score
+          + intakeReview.factors.severityBonus.score,
+      )
+    : null;
+  const scoreManuallyOverridden = calculatedIntakeScore !== null
+    && intakeReview?.intake.priorityScore !== calculatedIntakeScore;
 
   return (
     <WorkspaceShell
@@ -1333,7 +1420,7 @@ export default function TriageDashboard() {
         <dialog
           ref={intakeDialogRef}
           className="new-intake-dialog"
-          aria-labelledby={intakeStage === "form" ? "new-intake-heading" : "intake-review-heading"}
+          aria-labelledby="new-intake-heading"
           onCancel={(event) => {
             event.preventDefault();
             closeNewIntake();
@@ -1344,273 +1431,479 @@ export default function TriageDashboard() {
           }}
         >
           <div className="new-intake-dialog-content">
-            {intakeStage === "form" && (
-              <header className="new-intake-dialog-header">
-                <div>
-                  <h2 id="new-intake-heading">Create an intake</h2>
-                  <p>Only file names are saved. Full contents are sent to AI providers only if you request an AI review.</p>
+            <header className="new-intake-dialog-header">
+              <div className="new-intake-heading-copy">
+                <h2 id="new-intake-heading">New intake</h2>
+                <p>Capture the facts first. BatasBot scores only after you confirm them.</p>
+              </div>
+              <button className="quiet-icon-button" type="button" aria-label="Close new intake" onClick={closeNewIntake}>
+                <X aria-hidden="true" size={13.4} />
+              </button>
+              <ol className="intake-progress" aria-label="Intake progress">
+                {[
+                  ["choose", "Choose"],
+                  ["details", "Details"],
+                  ["result", "Score"],
+                ].map(([step, label], index) => {
+                  const currentStep = intakeStage === "choose" ? 0
+                    : intakeStage === "result" ? 2 : 1;
+                  return (
+                    <li className={index === currentStep ? "is-current" : index < currentStep ? "is-complete" : ""} key={step}>
+                      <span>{index < currentStep ? <Check aria-hidden="true" size={10} /> : index + 1}</span>
+                      {label}
+                    </li>
+                  );
+                })}
+              </ol>
+            </header>
+
+            {intakeStage === "choose" && (
+              <section className="intake-method-screen" aria-labelledby="intake-method-heading">
+                <div className="intake-method-intro">
+                  <h3 id="intake-method-heading">How would you like to start?</h3>
+                  <p>Choose the path that fits the information you have.</p>
                 </div>
-                <button className="quiet-icon-button" type="button" aria-label="Close new intake" onClick={closeNewIntake}>
-                  <X aria-hidden="true" size={13.4} />
-                </button>
-              </header>
-            )}
-            {intakeStage === "form" ? (
-              <form className="new-intake-form" onSubmit={submitManualIntake}>
-              <section className="intake-upload-section" aria-labelledby="intake-upload-label">
-                <div className="intake-form-label" id="intake-upload-label">Documents</div>
-                <input
-                  ref={documentInputRef}
-                  className="intake-file-input"
-                  type="file"
-                  accept=".pdf,.docx,.txt,.jpg,.jpeg,.png"
-                  multiple
-                  onChange={(event) => {
-                    if (event.currentTarget.files) addDocuments(event.currentTarget.files);
-                    event.currentTarget.value = "";
-                  }}
-                />
                 <button
-                  className={`intake-dropzone${isDraggingFiles ? " is-dragging" : ""}`}
+                  className="intake-method-option intake-method-option--documents"
                   type="button"
-                  onClick={() => documentInputRef.current?.click()}
-                  onDragOver={(event) => {
-                    event.preventDefault();
-                    setIsDraggingFiles(true);
-                  }}
-                  onDragLeave={() => setIsDraggingFiles(false)}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    setIsDraggingFiles(false);
-                    addDocuments(event.dataTransfer.files);
+                  onClick={() => {
+                    setIntakePath("documents");
+                    setIntakeStage("upload");
                   }}
                 >
-                  <span className="intake-dropzone-icon"><Upload aria-hidden="true" size={13.4} /></span>
-                  <span><strong>Choose documents</strong><small>PDF, DOCX, TXT, JPG, PNG · up to 5 files, 10 MB total</small></span>
-                </button>
-                {selectedFiles.length > 0 && (
-                  <ul className="intake-file-list" aria-label="Selected documents">
-                    {selectedFiles.map((file) => (
-                      <li key={`${file.name}-${file.size}-${file.lastModified}`}>
-                        <FileText aria-hidden="true" size={12.06} />
-                        <span title={file.name}>{file.name}</span>
-                        <small>{file.size < 1024 * 1024 ? `${Math.max(1, Math.round(file.size / 1024))} KB` : `${(file.size / (1024 * 1024)).toFixed(1)} MB`}</small>
-                        <button
-                          type="button"
-                          aria-label={`Remove ${file.name}`}
-                          onClick={() => {
-                            setSelectedFiles((current) => current.filter((item) => item !== file));
-                          }}
-                        >
-                          <X aria-hidden="true" size={10.72} />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
-
-              <div className="intake-form-fields">
-                <label className="intake-form-field" htmlFor="manual-intake-title">
-                  <span>Title</span>
-                  <input
-                    id="manual-intake-title"
-                    autoFocus
-                    maxLength={120}
-                    placeholder="e.g. Unpaid wages and dismissal"
-                    value={intakeTitle}
-                    onChange={(event) => setIntakeTitle(event.target.value)}
-                  />
-                </label>
-                <label className="intake-form-field" htmlFor="manual-intake-specialty">
-                  <span>Specialty</span>
-                  <select
-                    id="manual-intake-specialty"
-                    value={intakeSpecialty}
-                    onChange={(event) => setIntakeSpecialty(event.target.value)}
-                  >
-                    <option value="" disabled>Select a legal specialty</option>
-                    {specialtyOptions.map((specialty) => <option value={specialty} key={specialty}>{specialty}</option>)}
-                  </select>
-                </label>
-                <label className="intake-form-field intake-form-field--wide" htmlFor="manual-intake-description">
-                  <span>Description</span>
-                  <textarea
-                    id="manual-intake-description"
-                    rows={4}
-                    maxLength={1200}
-                    placeholder="Summarize the client's situation, key dates, and requested help."
-                    value={intakeDescription}
-                    onChange={(event) => setIntakeDescription(event.target.value)}
-                  />
-                </label>
-              </div>
-
-              <section className="intake-ai-assist" aria-label="Local intake suggestions">
-                <button className="intake-ai-button" type="button" onClick={generateIntakeSuggestions}>
-                  <Sparkles aria-hidden="true" size={10.72} /> Quick suggestions
-                </button>
-              </section>
-
-              <footer className="new-intake-form-footer">
-                <p>Review your details before requesting an optional AI assessment.</p>
-                <div className="new-intake-form-actions">
-                  <button className="intake-cancel-button" type="button" onClick={closeNewIntake}>Cancel</button>
-                  <button className="intake-submit-button" type="submit">Review intake <ArrowRight aria-hidden="true" size={12.06} /></button>
-                </div>
-              </footer>
-              </form>
-            ) : intakeReview && (
-              <section className="intake-review" aria-labelledby="intake-review-heading">
-                <header className="intake-review-header">
-                  <div>
-                    <h2 id="intake-review-heading">{intakeReview.source === "ai" ? "AI-assisted urgency review" : "Urgency overview"}</h2>
-                    <p>{intakeReview.intake.client || "Untitled intake"} <span aria-hidden="true">·</span> {intakeReview.intake.domain}</p>
-                  </div>
-                  <span className={`intake-review-risk intake-review-risk--${intakeReview.intake.risk.toLowerCase()}`}>
-                    {intakeReview.intake.risk}
+                  <span className="intake-method-icon"><FileText aria-hidden="true" size={19} /></span>
+                  <span className="intake-method-copy">
+                    <strong>Start from documents</strong>
+                    <small>Let BatasBot extract key facts for you to review.</small>
                   </span>
-                </header>
+                  <ArrowRight aria-hidden="true" size={15} />
+                </button>
+                <button
+                  className="intake-method-option intake-method-option--manual"
+                  type="button"
+                  onClick={() => {
+                    setIntakePath("manual");
+                    setIntakeStage("details");
+                  }}
+                >
+                  <span className="intake-method-icon"><FilePenLine aria-hidden="true" size={18} /></span>
+                  <span className="intake-method-copy">
+                    <strong>Enter details manually</strong>
+                    <small>Nothing is sent to an AI provider until you ask BatasBot to score it.</small>
+                  </span>
+                  <ArrowRight aria-hidden="true" size={15} />
+                </button>
+                <p className="intake-privacy-footnote">
+                  <LockKeyhole aria-hidden="true" size={13} />
+                  You review every fact before a score is generated.
+                </p>
+              </section>
+            )}
 
-                <section className="intake-review-draft" aria-labelledby="intake-review-draft-heading">
-                  <div>
-                    <h3 id="intake-review-draft-heading">
-                      {intakeReview.source === "ai" ? "BatasBot suggestions" : "Intake details"}
-                    </h3>
-                    <button
-                      className="intake-review-edit"
-                      type="button"
-                      disabled={isGeneratingIntakeReview || isSavingIntake}
-                      onClick={() => setIntakeStage("form")}
-                    >
-                      Edit fields
-                    </button>
+            {intakeStage === "upload" && (
+              <div className="intake-board">
+                <section className="intake-board-main" aria-labelledby="intake-upload-heading">
+                  <div className="intake-section-heading">
+                    <div>
+                      <h3 id="intake-upload-heading">Add matter documents</h3>
+                      <p>Upload a clear PDF, Word file, text file, or image.</p>
+                    </div>
+                    <span className="intake-step-label">DOCUMENTS</span>
                   </div>
-                  <dl>
-                    <div><dt>Title</dt><dd>{intakeTitle || "Not provided"}</dd></div>
-                    <div><dt>Specialty</dt><dd>{intakeSpecialty || "Not selected"}</dd></div>
-                    <div><dt>Description</dt><dd>{intakeDescription || "Not provided"}</dd></div>
-                  </dl>
+
+                  <div className="intake-consent">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={documentConsent}
+                        onChange={(event) => setDocumentConsent(event.target.checked)}
+                      />
+                      <span>
+                        <strong>I consent to AI document review</strong>
+                        <small>Document contents are sent to the configured AI provider. When masking is on, detectable identifiers in readable text are replaced before sending.</small>
+                      </span>
+                    </label>
+                    <p>
+                      When this site uses HTTPS, the request is encrypted in transit. BatasGO does not save uploaded contents.
+                      The AI provider processes document contents to generate the requested extraction; its own handling and retention terms apply.
+                    </p>
+                  </div>
+
+                  <input
+                    ref={documentInputRef}
+                    className="intake-file-input"
+                    type="file"
+                    accept=".pdf,.docx,.txt,.jpg,.jpeg,.png"
+                    multiple
+                    disabled={!documentConsent || isGeneratingIntakeReview}
+                    onChange={(event) => {
+                      if (event.currentTarget.files) addDocuments(event.currentTarget.files);
+                      event.currentTarget.value = "";
+                    }}
+                  />
+                  <button
+                    className={`intake-dropzone${isDraggingFiles ? " is-dragging" : ""}`}
+                    type="button"
+                    disabled={!documentConsent || isGeneratingIntakeReview}
+                    onClick={() => documentInputRef.current?.click()}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      setIsDraggingFiles(true);
+                    }}
+                    onDragLeave={() => setIsDraggingFiles(false)}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      setIsDraggingFiles(false);
+                      if (documentConsent) addDocuments(event.dataTransfer.files);
+                    }}
+                  >
+                    <span className="intake-dropzone-icon"><Upload aria-hidden="true" size={16} /></span>
+                    <span><strong>Choose documents</strong><small>PDF, DOCX, TXT, JPG, PNG · up to 5 files, 10 MB total</small></span>
+                    <span className="intake-dropzone-action">Browse</span>
+                  </button>
+                  {selectedFiles.length > 0 && (
+                    <ul className="intake-file-list" aria-label="Selected documents">
+                      {selectedFiles.map((file) => (
+                        <li key={`${file.name}-${file.size}-${file.lastModified}`}>
+                          <FileText aria-hidden="true" size={14} />
+                          <span title={file.name}>{file.name}</span>
+                          <small>{file.size < 1024 * 1024 ? `${Math.max(1, Math.round(file.size / 1024))} KB` : `${(file.size / (1024 * 1024)).toFixed(1)} MB`}</small>
+                          <button
+                            type="button"
+                            aria-label={`Remove ${file.name}`}
+                            disabled={isGeneratingIntakeReview}
+                            onClick={() => setSelectedFiles((current) => current.filter((item) => item !== file))}
+                          >
+                            <X aria-hidden="true" size={12} />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  {intakeAiReviewError && (
+                    <div className="intake-error-recovery" role="alert">
+                      <p>{intakeAiReviewError}</p>
+                      <button type="button" onClick={() => {
+                        setIntakePath("manual");
+                        setIntakeStage("details");
+                      }}>
+                        Switch to manual entry <ArrowRight aria-hidden="true" size={13} />
+                      </button>
+                    </div>
+                  )}
+
+                  <footer className="intake-board-footer">
+                    <button className="intake-cancel-button" type="button" onClick={() => setIntakeStage("choose")}>Back</button>
+                    <button
+                      className="intake-submit-button"
+                      type="button"
+                      disabled={!documentConsent || selectedFiles.length === 0 || isGeneratingIntakeReview}
+                      onClick={() => void requestIntakeAiReview(true)}
+                    >
+                      {isGeneratingIntakeReview ? <><Sparkles aria-hidden="true" size={13} /> Reading documents…</> : <>Upload &amp; extract <ArrowRight aria-hidden="true" size={13} /></>}
+                    </button>
+                  </footer>
+                  <span className="sr-only" role="status" aria-live="polite">
+                    {isGeneratingIntakeReview ? "BatasBot is reading the selected documents." : ""}
+                  </span>
                 </section>
 
-                <div className="intake-review-metrics">
-                  <section className="intake-review-score" aria-label="Priority score">
-                    <span>Priority score</span>
-                    <div className="intake-review-score-value">
-                      <strong>{intakeReview.intake.priorityScore ?? "—"}</strong>
-                      {intakeReview.intake.priorityScore !== null && <small>/100</small>}
+                <aside className="intake-board-rail" aria-label="Privacy options">
+                  <div className="intake-rail-heading"><h4>Privacy choices</h4></div>
+                  <label className="intake-toggle-row">
+                    <input
+                      type="checkbox"
+                      checked={maskIdentifiers}
+                      onChange={(event) => setMaskIdentifiers(event.target.checked)}
+                    />
+                    <span><strong>Mask identifiers where detected</strong><small>Names, phone numbers, addresses, and ID numbers in readable text.</small></span>
+                  </label>
+                  <p className="intake-rail-note">This is partial risk reduction, not anonymization. Masking cannot be reliably applied to scanned images; you can turn it off only if you approve full-image AI review.</p>
+                </aside>
+              </div>
+            )}
+
+            {intakeStage === "details" && (
+              <form className="intake-board" onSubmit={submitIntakeDetails}>
+                <section className="intake-board-main" aria-labelledby="intake-details-heading">
+                  <div className="intake-section-heading">
+                    <div>
+                      <h3 id="intake-details-heading">{intakePath === "documents" ? "Review extracted details" : "Enter matter details"}</h3>
+                      <p>{intakePath === "documents" ? "BatasBot's suggestions are marked. Verify every date before scoring." : "Add the key facts BatasBot should consider."}</p>
                     </div>
-                    <small className="intake-review-score-source">
-                      {intakeReview.intake.priorityScore === null
-                        ? "Needs evidence before scoring"
-                        : intakeReview.source === "ai"
-                          ? `AI-assisted · ${intakeReview.provider}`
-                          : "Text-only estimate"}
-                    </small>
-                    {intakeReview.intake.priorityScore !== null && (
-                      <div
-                        className="intake-review-meter"
-                        role="progressbar"
-                        aria-label="Urgency score"
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-valuenow={intakeReview.intake.priorityScore}
+                    {intakePath === "documents" && <span className="intake-ai-badge"><Sparkles aria-hidden="true" size={12} /> AI draft</span>}
+                  </div>
+
+                  {intakePath === "documents" && intakeReview?.documentReview && (
+                    <div className="intake-extraction-status">
+                      <Check aria-hidden="true" size={14} />
+                      <span>
+                        Read {intakeReview.documentReview.processedCount} file{intakeReview.documentReview.processedCount === 1 ? "" : "s"}.
+                        {intakeReview.documentReview.visionUsed ? " Image review used Gemini Vision." : ""}
+                        {intakeReview.documentReview.truncated ? " Some text was shortened." : ""}
+                      </span>
+                    </div>
+                  )}
+
+                  {intakePath === "documents" && !intakeDeadline && (
+                    <div className="intake-missing-fact">
+                      <CalendarDays aria-hidden="true" size={15} />
+                      <p><strong>No deadline found.</strong> Add the next deadline or hearing date if known.</p>
+                    </div>
+                  )}
+
+                  <div className="intake-form-fields">
+                    <label className="intake-form-field" htmlFor="manual-intake-title">
+                      <span>Matter title {aiFilledFields.has("title") && <small className="intake-ai-field-tag"><Sparkles aria-hidden="true" size={10} /> AI-filled</small>}</span>
+                      {aiFilledFields.has("title") && intakeReview?.fieldSources?.title?.document && (
+                        <small className="intake-field-source">From {intakeReview.fieldSources.title.document}{intakeReview.fieldSources.title.page ? ` · page ${intakeReview.fieldSources.title.page}` : ""}</small>
+                      )}
+                      <input
+                        id="manual-intake-title"
+                        autoFocus
+                        maxLength={120}
+                        placeholder="e.g. Unpaid wages and dismissal"
+                        value={intakeTitle}
+                        onChange={(event) => {
+                          setIntakeTitle(event.target.value);
+                          clearAiFieldSource("title");
+                        }}
+                      />
+                    </label>
+                    <label className="intake-form-field" htmlFor="manual-intake-specialty">
+                      <span>Practice area {aiFilledFields.has("domain") && <small className="intake-ai-field-tag"><Sparkles aria-hidden="true" size={10} /> AI-filled</small>}</span>
+                      {aiFilledFields.has("domain") && intakeReview?.fieldSources?.domain?.document && (
+                        <small className="intake-field-source">From {intakeReview.fieldSources.domain.document}{intakeReview.fieldSources.domain.page ? ` · page ${intakeReview.fieldSources.domain.page}` : ""}</small>
+                      )}
+                      <select
+                        id="manual-intake-specialty"
+                        value={intakeSpecialty}
+                        onChange={(event) => {
+                          setIntakeSpecialty(event.target.value);
+                          clearAiFieldSource("domain");
+                        }}
                       >
+                        <option value="">Select a legal specialty</option>
+                        {specialtyOptions.map((specialty) => <option value={specialty} key={specialty}>{specialty}</option>)}
+                      </select>
+                    </label>
+                    <label className="intake-form-field intake-form-field--wide" htmlFor="manual-intake-description">
+                      <span>What happened? {aiFilledFields.has("description") && <small className="intake-ai-field-tag"><Sparkles aria-hidden="true" size={10} /> AI-filled</small>}</span>
+                      {aiFilledFields.has("description") && intakeReview?.fieldSources?.description?.document && (
+                        <small className="intake-field-source">From {intakeReview.fieldSources.description.document}{intakeReview.fieldSources.description.page ? ` · page ${intakeReview.fieldSources.description.page}` : ""}</small>
+                      )}
+                      <textarea
+                        id="manual-intake-description"
+                        rows={4}
+                        maxLength={1200}
+                        placeholder="Summarize the client's situation, key dates, and requested help."
+                        value={intakeDescription}
+                        onChange={(event) => {
+                          setIntakeDescription(event.target.value);
+                          clearAiFieldSource("description");
+                        }}
+                      />
+                    </label>
+                    <label className="intake-form-field" htmlFor="intake-next-deadline">
+                      <span>Next deadline or hearing {aiFilledFields.has("deadlineAt") && <small className="intake-ai-field-tag"><Sparkles aria-hidden="true" size={10} /> AI-filled</small>}</span>
+                      {aiFilledFields.has("deadlineAt") && intakeReview?.fieldSources?.deadlineAt?.document && (
+                        <small className="intake-field-source">From {intakeReview.fieldSources.deadlineAt.document}{intakeReview.fieldSources.deadlineAt.page ? ` · page ${intakeReview.fieldSources.deadlineAt.page}` : ""}</small>
+                      )}
+                      <input
+                        id="intake-next-deadline"
+                        type="date"
+                        value={intakeDeadline}
+                        onChange={(event) => {
+                          setIntakeDeadline(event.target.value);
+                          clearAiFieldSource("deadlineAt");
+                        }}
+                      />
+                    </label>
+                    <label className="intake-form-field" htmlFor="intake-case-stage">
+                      <span>Case stage {aiFilledFields.has("caseStage") && <small className="intake-ai-field-tag"><Sparkles aria-hidden="true" size={10} /> AI-filled</small>}</span>
+                      {intakePath === "documents" && !intakeCaseStage && <small className="intake-field-source">No case stage found. Add one if known.</small>}
+                      {aiFilledFields.has("caseStage") && intakeReview?.fieldSources?.caseStage?.document && (
+                        <small className="intake-field-source">From {intakeReview.fieldSources.caseStage.document}{intakeReview.fieldSources.caseStage.page ? ` · page ${intakeReview.fieldSources.caseStage.page}` : ""}</small>
+                      )}
+                      <select
+                        id="intake-case-stage"
+                        value={intakeCaseStage}
+                        onChange={(event) => {
+                          setIntakeCaseStage(event.target.value);
+                          clearAiFieldSource("caseStage");
+                        }}
+                      >
+                        <option value="">Not stated</option>
+                        {intakeCaseStages.map((stage) => <option key={stage} value={stage}>{stage}</option>)}
+                      </select>
+                    </label>
+                    <fieldset className="intake-urgency-fieldset intake-form-field--wide">
+                      <legend>Urgency flags {aiFilledFields.has("urgencyFlags") && <small className="intake-ai-field-tag"><Sparkles aria-hidden="true" size={10} /> AI-filled</small>}</legend>
+                      {intakePath === "documents" && !selectedUrgencyFlags.length && <small className="intake-field-source">No urgency flags found. Add any that apply.</small>}
+                      {aiFilledFields.has("urgencyFlags") && intakeReview?.fieldSources?.urgencyFlags?.document && (
+                        <small className="intake-field-source">From {intakeReview.fieldSources.urgencyFlags.document}{intakeReview.fieldSources.urgencyFlags.page ? ` · page ${intakeReview.fieldSources.urgencyFlags.page}` : ""}</small>
+                      )}
+                      <div className="intake-urgency-options">
+                        {intakeUrgencyFlags.map((flag) => (
+                          <label key={flag}>
+                            <input
+                              type="checkbox"
+                              checked={selectedUrgencyFlags.includes(flag)}
+                              onChange={(event) => {
+                                setSelectedUrgencyFlags((current) => event.target.checked
+                                  ? [...current, flag]
+                                  : current.filter((item) => item !== flag));
+                                clearAiFieldSource("urgencyFlags");
+                              }}
+                            />
+                            {flag}
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                  </div>
+
+                  {intakePath === "manual" && (
+                    <section className="intake-manual-privacy">
+                      <label className="intake-toggle-row">
+                        <input type="checkbox" checked={manualAiConsent} onChange={(event) => setManualAiConsent(event.target.checked)} />
+                        <span><strong>Send these confirmed details to an AI provider for scoring</strong><small>BatasBot scores only after you check this and choose the scoring action.</small></span>
+                      </label>
+                      <label className="intake-toggle-row">
+                        <input type="checkbox" checked={maskIdentifiers} onChange={(event) => setMaskIdentifiers(event.target.checked)} />
+                        <span><strong>Mask identifiers before AI review</strong><small>Pattern checks replace some names, phone numbers, addresses, and ID numbers with tokens.</small></span>
+                      </label>
+                            <p>This is partial risk reduction, not anonymization. Your details stay in this form until you choose “Score with AI”; that action sends them to the configured provider.</p>
+                    </section>
+                  )}
+
+                  {intakeAiReviewError && <p className="intake-ai-review-error" role="alert">{intakeAiReviewError}</p>}
+                  <footer className="intake-board-footer">
+                    <button className="intake-cancel-button" type="button" onClick={() => setIntakeStage(intakePath === "documents" ? "upload" : "choose")}>Back</button>
+                    <div>
+                      {intakePath === "manual" && (
+                        <button className="intake-suggestion-button" type="button" onClick={generateIntakeSuggestions}>
+                          <Sparkles aria-hidden="true" size={12} /> Quick suggestions
+                        </button>
+                      )}
+                      <button className="intake-submit-button" type="submit" disabled={isGeneratingIntakeReview || (!intakeTitle.trim() && !intakeDescription.trim()) || (intakePath === "manual" && !manualAiConsent)}>
+                        {isGeneratingIntakeReview ? <><Sparkles aria-hidden="true" size={13} /> Scoring details…</> : <>Looks good — score with AI <ArrowRight aria-hidden="true" size={13} /></>}
+                      </button>
+                    </div>
+                  </footer>
+                  <span className="sr-only" role="status" aria-live="polite">
+                    {isGeneratingIntakeReview ? "BatasBot is scoring the confirmed intake details." : ""}
+                  </span>
+                </section>
+
+                <aside className="intake-board-rail" aria-label="Review guidance">
+                  <div className="intake-rail-heading"><h4>Check before scoring</h4></div>
+                  <p>Confirm the names, dates, and facts against the original. AI suggestions can be wrong; they are not legal advice.</p>
+                  {intakePath === "documents" && (
+                    <>
+                      <div className="intake-rail-divider" />
+                      <h4>Files reviewed</h4>
+                      <ul className="intake-reviewed-files">
+                        {selectedFiles.map((file) => <li key={`${file.name}-${file.size}-${file.lastModified}`}><FileText aria-hidden="true" size={13} /><span>{file.name}</span></li>)}
+                      </ul>
+                    </>
+                  )}
+                  <div className="intake-provider-note">
+                    <span>{intakePath === "documents"
+                      ? "The confirmed fields—not the original file—are sent for scoring."
+                      : "Nothing is sent to an AI provider until you choose the scoring action."}</span>
+                  </div>
+                </aside>
+              </form>
+            )}
+
+            {intakeStage === "result" && intakeReview && (
+              <section className="intake-score-board" aria-labelledby="intake-score-heading">
+                <div className="intake-score-main">
+                  <header className="intake-review-header">
+                    <div>
+                      <h3 id="intake-score-heading">AI urgency score</h3>
+                      <p>{intakeReview.intake.client} · {intakeReview.intake.domain}</p>
+                    </div>
+                    <span className={`intake-review-risk intake-review-risk--${intakeReview.intake.risk.toLowerCase()}`}>{intakeReview.intake.risk}</span>
+                  </header>
+
+                  <section className="intake-review-score" aria-label="Priority score">
+                    <div className="intake-score-value-row">
+                      <strong>{intakeReview.intake.priorityScore ?? "—"}</strong>
+                      <span>/100</span>
+                      <small>{scoreManuallyOverridden ? "Manual override" : `AI-assisted · ${intakeReview.provider}`}</small>
+                    </div>
+                    {intakeReview.intake.priorityScore !== null && (
+                      <div className="intake-review-meter" role="progressbar" aria-label="Urgency score" aria-valuemin={0} aria-valuemax={100} aria-valuenow={intakeReview.intake.priorityScore}>
                         <span style={{ width: `${intakeReview.intake.priorityScore}%` }} />
                       </div>
                     )}
+                    <label className="intake-score-override" htmlFor="intake-score-override">
+                      <span>Adjust score</span>
+                      <input
+                        id="intake-score-override"
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={intakeReview.intake.priorityScore ?? 0}
+                        onChange={(event) => {
+                          const score = Number(event.target.value);
+                          setIntakeReview((current) => current ? {
+                            ...current,
+                            intake: { ...current.intake, priorityScore: score, risk: getRiskFromScore(score) },
+                          } : current);
+                        }}
+                      />
+                      <small>Manual override · current value {intakeReview.intake.priorityScore ?? 0}</small>
+                    </label>
                   </section>
-                  <div className="intake-review-stat">
-                    <span>Signals</span>
-                    <strong>{intakeReview.signals.length}</strong>
-                  </div>
-                  <div className="intake-review-stat">
-                    <span>Selected file names</span>
-                    <strong>{intakeReview.intake.documents?.length ?? 0}</strong>
-                  </div>
+
+                  {intakeReview.factors && (
+                    <section className="intake-review-breakdown" aria-labelledby="intake-review-breakdown-heading">
+                      <h4 id="intake-review-breakdown-heading">Score breakdown</h4>
+                      <dl>
+                        {([
+                          ["Temporal deadlines", intakeReview.factors.temporalDeadlines, 50],
+                          ["Case risk & impact", intakeReview.factors.caseRiskImpact, 30],
+                          ["Procedural status", intakeReview.factors.proceduralStatus, 20],
+                          ["AI severity bonus", intakeReview.factors.severityBonus, 10],
+                        ] as const).map(([label, factor, maximum]) => (
+                          <div className="intake-review-factor" key={label}>
+                            <dt>{label}<span>{factor.score}/{maximum}</span></dt>
+                            <dd>{factor.rationale}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                      <p>The AI score = min(100, deadlines + case risk/impact + procedural status + AI severity bonus). The final priority can be manually adjusted above.</p>
+                    </section>
+                  )}
+                  <section className="intake-result-summary">
+                    <h4>BatasBot note</h4>
+                    <p>{intakeReview.summary}</p>
+                    <small>Reported facts are unverified. Verify all details and deadlines.</small>
+                  </section>
                 </div>
 
-                {intakeReview.factors && (
-                  <section className="intake-review-breakdown" aria-labelledby="intake-review-breakdown-heading">
-                    <h3 id="intake-review-breakdown-heading">How this score was formed</h3>
-                    <dl>
-                      {([
-                        ["Temporal deadlines", intakeReview.factors.temporalDeadlines, 50],
-                        ["Case risk & impact", intakeReview.factors.caseRiskImpact, 30],
-                        ["Procedural status", intakeReview.factors.proceduralStatus, 20],
-                        ["AI severity bonus", intakeReview.factors.severityBonus, 10],
-                      ] as const).map(([label, factor, maximum]) => (
-                        <div className="intake-review-factor" key={label}>
-                          <dt>{label}<span>{factor.score}/{maximum}</span></dt>
-                          <dd>{factor.rationale}</dd>
-                        </div>
-                      ))}
-                    </dl>
-                    <p>
-                      Score = min(100, deadlines + case risk/impact + procedural status + AI severity bonus).
-                      {intakeReview.source === "local" && intakeReview.intake.documents.length > 0
-                        ? " Local estimates use entered text only; selected file contents are not included."
-                        : intakeReview.source === "local" ? " Local estimates use entered text only; the AI bonus is not applied." : ""}
-                    </p>
-                  </section>
-                )}
-                {intakeReview.documentReview && (
-                  <p className="intake-review-document-note">
-                    Read {intakeReview.documentReview.processedCount} uploaded document{intakeReview.documentReview.processedCount === 1 ? "" : "s"}
-                    {intakeReview.documentReview.visionUsed ? " with Gemini Vision" : ""}.
-                    {intakeReview.documentReview.truncated ? " Some extracted text was shortened to fit the review." : ""}
-                  </p>
-                )}
+                <aside className="intake-score-rail">
+                  <div className="intake-rail-heading"><ClipboardCheck aria-hidden="true" size={16} /><h4>Confirmed details</h4></div>
+                  <dl>
+                    <div><dt>Next date</dt><dd>{intakeDeadline || "No deadline set"}</dd></div>
+                    <div><dt>Case stage</dt><dd>{intakeCaseStage || "Not stated"}</dd></div>
+                    <div><dt>Urgency flags</dt><dd>{selectedUrgencyFlags.length ? selectedUrgencyFlags.join(", ") : "None selected"}</dd></div>
+                    <div><dt>Signals</dt><dd>{intakeReview.signals.length}</dd></div>
+                  </dl>
+                  <div className="intake-provider-note"><ShieldCheck aria-hidden="true" size={14} /><span>Score is a triage aid, not a legal conclusion. You control the final priority.</span></div>
+                  {intakeReview.documentReview && (
+                    <small className="intake-review-document-note">Read {intakeReview.documentReview.processedCount} file{intakeReview.documentReview.processedCount === 1 ? "" : "s"}{intakeReview.documentReview.truncated ? " · some text shortened" : ""}.</small>
+                  )}
+                </aside>
 
-                <div className="intake-review-signals" aria-label="Urgency signals">
-                  {intakeReview.signals.map((signal) => <span key={signal}>{signal}</span>)}
-                </div>
-
-                <section className="intake-review-summary" aria-labelledby="intake-review-summary-heading">
-                  <div>
-                    <Sparkles aria-hidden="true" size={12.06} />
-                    <h3 id="intake-review-summary-heading">
-                      {intakeReview.source === "ai" ? "BatasBot triage note" : "Intake summary"}
-                    </h3>
-                  </div>
-                  <p>{intakeReview.summary}</p>
-                  {intakeReview.source === "ai" && <small>Reported facts are unverified; verify all details and deadlines.</small>}
-                </section>
-
-                <section
-                  className="intake-ai-disclosure"
-                  aria-label="Optional external AI review"
-                  aria-busy={isGeneratingIntakeReview}
-                >
-                  <span className="sr-only" role="status" aria-live="polite">
-                    {isGeneratingIntakeReview ? "Generating AI intake review." : ""}
-                  </span>
-                  <p>
-                    <strong>Optional AI review</strong>
-                    {" "}When you choose {intakeReview.source === "ai" ? "Regenerate AI review" : "Generate AI review"},
-                    your entered details and the full contents of selected documents are sent to configured AI
-                    providers (Gemini first; Groq can be used as fallback for text-readable files). Image and
-                    scanned-PDF review requires Gemini. BatasGO does not store uploaded file contents. Review
-                    provider privacy terms before using client data; verify all suggested fields and scoring.
-                  </p>
-                  {intakeAiReviewError && <p className="intake-ai-review-error" role="alert">{intakeAiReviewError}</p>}
-                  <button
-                    className="intake-ai-button"
-                    type="button"
-                    disabled={isGeneratingIntakeReview || isSavingIntake}
-                    onClick={() => void generateIntakeAiReview()}
-                  >
-                    <Sparkles aria-hidden="true" size={10.72} />
-                    {isGeneratingIntakeReview
-                      ? "Generating AI review…"
-                      : intakeReview.source === "ai" ? "Regenerate AI review" : "Generate AI review"}
-                  </button>
-                </section>
-
-                <footer className="intake-review-footer">
-                  <button className="intake-cancel-button" type="button" disabled={isGeneratingIntakeReview || isSavingIntake} onClick={() => setIntakeStage("form")}>Edit details</button>
-                  <button className="intake-submit-button" type="button" disabled={isSavingIntake || isGeneratingIntakeReview} onClick={() => void proceedWithManualIntake()}>
-                    {isSavingIntake ? "Saving…" : "Save intake"} <ArrowRight aria-hidden="true" size={12.06} />
+                <footer className="intake-board-footer intake-board-footer--result">
+                  <button className="intake-cancel-button" type="button" disabled={isSavingIntake} onClick={() => setIntakeStage("details")}>Edit details &amp; rescore</button>
+                  <button className="intake-submit-button" type="button" disabled={isSavingIntake} onClick={() => void proceedWithManualIntake()}>
+                    {isSavingIntake ? "Saving…" : "Save intake"} <ArrowRight aria-hidden="true" size={13} />
                   </button>
                 </footer>
               </section>

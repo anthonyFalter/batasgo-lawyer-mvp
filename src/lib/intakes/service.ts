@@ -57,6 +57,8 @@ export function toIntakeDTO(intake: typeof intakes.$inferSelect): IntakeDTO {
     deadline: deadline.label,
     deadlineOrder: deadline.order,
     deadlineAt: intake.deadlineAt?.toISOString() ?? null,
+    caseStage: intake.caseStage,
+    urgencyFlags: intake.urgencyFlags,
     documents: intake.documents,
     priorityScore: intake.priorityScore,
     status: intake.status,

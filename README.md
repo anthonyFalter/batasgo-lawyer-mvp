@@ -14,7 +14,7 @@ This project uses Next.js. Clerk-authenticated intake records and accept/decline
 - Clerk authentication with protected workspace routes
 - Neon Postgres and Drizzle ORM for persistent intake and workspace data
 - Zod for server-side request validation
-- Google Gemini API with optional Groq fallback for synthetic summaries and lawyer-triggered intake review
+- Google Gemini API with optional Groq fallback for synthetic summaries and explicitly requested intake review
 
 ### Planned for a backend-enabled MVP
 
@@ -66,13 +66,13 @@ Open [http://localhost:3000](http://localhost:3000) for the BatasGO intro and wo
 | `/sign-in` | Clerk sign-in page. |
 | `/sign-up` | Clerk sign-up page. |
 
-Case Overview intake records and decisions and BatasBot conversation sessions persist in Neon; BatasBot sessions can be deleted from the session list. Document Assembly, Messages, Calendar, and Tasks use demo data in the browser and are not saved to a server. Intake document selection saves file names only. If a lawyer explicitly requests an AI review, supported file contents are temporarily processed and sent to configured AI providers; uploaded contents are not stored in Neon.
+Case Overview intake records and decisions and BatasBot conversation sessions persist in Neon; BatasBot sessions can be deleted from the session list. Document Assembly, Messages, Calendar, and Tasks use demo data in the browser and are not saved to a server. Saved intakes retain selected document names and structured deadline, stage, and urgency details, not file contents. Document review requires consent before upload; readable text can be pseudonymized before provider transmission, but masking is partial and cannot be reliably applied to scans or images. Uploaded contents are processed in memory by BatasGO and are not persisted; AI providers receive the content needed for the requested output and apply their own handling and retention terms.
 
 ## Intake API
 
 - `GET /api/intakes` — list intakes for the authenticated user's workspace.
 - `POST /api/intakes` — create a workspace intake; its validated local or explicitly AI-reviewed priority is saved with the matter. Unscored intakes stay unassessed rather than receiving a fabricated default score.
-- `POST /api/intakes/review` — generate title, description, practice-area suggestions, an AI-assisted summary, and an explained priority score from explicitly submitted details and supported documents.
+- `POST /api/intakes/review` — generate title, description, practice-area suggestions, structured dates/stage/urgency facts with best-effort source references, an AI-assisted summary, and an explained priority score from explicitly submitted details and consented supported documents.
 - `PATCH /api/intakes/:intakeId` — update an intake's status (`pending`, `accepted`, or `declined`).
 - `POST /api/intakes/:intakeId/summary` — generate and save an AI summary **only for synthetic sample records**. It tries Gemini first, then Groq when `GROQ_API_KEY` is configured and Gemini fails.
 
@@ -80,7 +80,7 @@ Persistent intake endpoints require Clerk authentication and resolve workspace m
 
 ## Security and sensitive data
 
-The citizen-app submission path is not connected. Manually entered intake details are persisted to Neon, so use synthetic data until database location, retention, access controls, and organizational approval are confirmed. Intake API operations require Clerk authentication and are scoped to the user's workspace.
+The citizen-app submission path is not connected. Manually entered intake details are persisted to Neon when saved, so use synthetic data until database location, retention, access controls, and organizational approval are confirmed. Manual details are sent to AI only after the lawyer requests scoring. Intake API operations require Clerk authentication and are scoped to the user's workspace.
 
 - **Authorize every data operation.** Never trust client-supplied user, workspace, or matter IDs as proof of access. Keep health-check responses minimal and free of secrets or internal configuration.
 - **Keep keys and credentials secret.** Store them in local environment files or the deployment platform's secret manager; never commit them or put them in source code. `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is intended to be public; keep `CLERK_SECRET_KEY`, `DATABASE_URL`, and `GEMINI_API_KEY` server-only. The `.env*` files are ignored by Git, and `.env.example` contains placeholders only. Rotate any credential that may have been exposed.
@@ -88,7 +88,7 @@ The citizen-app submission path is not connected. Manually entered intake detail
 - **Handle client data carefully.** Collect only what the feature needs, enforce access checks for database records and uploaded files, and avoid logging message contents, documents, credentials, or other sensitive personal information.
 - **Review third-party services.** Before sending client data to AI, hosting, storage, or other providers, review their security, privacy, retention, and data-location practices.
 
-The sample-summary route checks the database `isSample` flag and does not accept intake text from the browser. The separate intake-review route accepts title, description, selected specialty, and supported PDF, DOCX, TXT, JPG, and PNG contents only when a lawyer explicitly requests an AI review. Documents are processed in memory and are not saved; the UI discloses which data and providers are involved before that action. Review providers' privacy, retention, and data-location terms before using real client information. AI-assisted triage uses temporal deadlines (0–50), case risk and impact (0–30), procedural status (0–20), and an AI-only severity bonus (0–10), capped at 100. Each component's rationale is shown for lawyer verification. A local text-only estimate never scores file names or document contents; if it finds no explicit evidence, the matter remains unassessed until AI or a lawyer reviews it. The score supports prioritization and is not legal advice. Provider availability and free-tier quotas are not guaranteed.
+The sample-summary route checks the database `isSample` flag and does not accept intake text from the browser. The intake flow discloses that supported PDF, DOCX, TXT, JPG, and PNG contents are sent to configured AI providers before upload. Identifier masking is best-effort text pseudonymization and is not anonymization; scanned/image review requires the lawyer to turn masking off because identifiers cannot be reliably removed from pixels. Review providers' privacy, retention, and data-location terms before using real client information. AI-assisted triage keeps the existing formula: temporal deadlines (0–50), case risk and impact (0–30), procedural status (0–20), and an AI-only severity bonus (0–10), capped at 100. Each component's rationale is shown for lawyer verification, and the lawyer can override the final score. The score supports prioritization and is not legal advice. Provider availability and free-tier quotas are not guaranteed.
 
 ## Available commands
 
