@@ -48,12 +48,12 @@ function getSummaryPrompt(intake: {
   priorityScore: number | null;
   summary: string;
 }) {
-  return `Prepare a concise intake triage brief for this synthetic example.
+  return `Prepare a concise intake triage brief for this intake.
 
 Practice area: ${intake.domain}
 Existing heuristic risk label: ${intake.risk}
 Existing priority score: ${intake.priorityScore === null ? "Not assessed" : `${intake.priorityScore}/100`}
-Synthetic intake text: <intake_text>
+Intake text: <intake_text>
 ${intake.summary}
 </intake_text>`;
 }
@@ -163,11 +163,10 @@ export async function POST(
       .where(and(
         eq(intakes.id, intakeId),
         eq(intakes.workspaceId, workspaceId),
-        eq(intakes.isSample, true),
       ))
       .limit(1);
 
-    if (!intake) return Response.json({ error: "Synthetic sample intake was not found." }, { status: 404 });
+    if (!intake) return Response.json({ error: "Intake was not found." }, { status: 404 });
     if (intake.aiSummary) return Response.json({ intake: toIntakeDTO(intake) });
     const geminiApiKey = process.env.GEMINI_API_KEY;
     const groqApiKey = process.env.GROQ_API_KEY;
@@ -241,14 +240,13 @@ export async function POST(
       .where(and(
         eq(intakes.id, intake.id),
         eq(intakes.workspaceId, workspaceId),
-        eq(intakes.isSample, true),
       ))
       .returning();
 
     if (!updated) return Response.json({ error: "Intake was not found." }, { status: 404 });
     return Response.json({ intake: toIntakeDTO(updated) });
   } catch (error) {
-    console.error("Could not generate a sample intake summary.", error instanceof Error ? error.name : "UnknownError");
+    console.error("Could not generate an intake summary.", error instanceof Error ? error.name : "UnknownError");
     return Response.json({ error: "Unable to generate the summary right now." }, { status: 500 });
   }
 }

@@ -6,6 +6,7 @@ import {
   BriefcaseBusiness,
   CalendarClock,
   Check,
+  ChevronDown,
   Clock3,
   FileText,
   ListChecks,
@@ -292,8 +293,8 @@ function isTriageChatHandoff(value: unknown): value is TriageChatHandoff {
     && typeof handoff.summary === "string"
     && Array.isArray(handoff.reasons)
     && handoff.reasons.every((reason) => typeof reason === "string")
-    && (handoff.signals === undefined
-      || Array.isArray(handoff.signals) && handoff.signals.every((signal) => typeof signal === "string"))
+    && (Array.isArray(handoff.signals) && handoff.signals.every((signal) => typeof signal === "string")
+      || handoff.signals === undefined)
     && typeof handoff.specialty === "string";
 }
 
@@ -447,6 +448,7 @@ export default function BatasBotWorkspace() {
   const [input, setInput] = useState("");
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
+  const [sessionsCollapsed, setSessionsCollapsed] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
   const [sessionPendingDeletion, setSessionPendingDeletion] = useState<ChatSession | null>(null);
@@ -1058,7 +1060,7 @@ export default function BatasBotWorkspace() {
           </button>
         </header>
 
-        <div className="batasbot-content-grid">
+        <div className={`batasbot-content-grid${sessionsCollapsed ? " is-sessions-collapsed" : ""}`}>
           <div className="batasbot-main-column">
             <section className="batasbot-chat-area" aria-label="BatasBot conversation">
               {messagesLoading ? (
@@ -1085,91 +1087,93 @@ export default function BatasBotWorkspace() {
                 </div>
               ) : (
                 <div className="batasbot-thread" role="log" aria-live="polite" aria-relevant="additions text" aria-label="Chat history">
-                  {displayedMessages.map((message) => (
-                    <article className={`batasbot-thread-message batasbot-thread-message--${message.role}`} key={message.id}>
-                      {message.role === "assistant" && <span className="batasbot-thread-avatar" aria-hidden="true"><Bot size={10.05} /></span>}
-                      <div className="batasbot-thread-body">
-                        {message.role === "user" ? (
-                          <>
-                            {message.attachmentName && (
-                              <span className="batasbot-message-file">
-                                <FileText aria-hidden="true" size={12} />
-                                {message.attachmentName}
-                              </span>
-                            )}
-                            <p>{message.attachmentName
-                              ? message.content.replace(/^Attached journal text file: [^\r\n]+\nReview request:\s*/, "")
-                              : message.content}</p>
-                          </>
-                        ) : (
-                          (() => {
-                            const matterTable = parseMatterTable(message.content);
-                            return (
-                              <>
-                                {matterTable?.before.trim() && (
-                                  <div className="batasbot-markdown">
-                                    <MatterMarkdown content={matterTable.before} />
-                                  </div>
-                                )}
-                                {matterTable ? <MatterTable rows={matterTable.rows} /> : (
-                                  <div className="batasbot-markdown">
-                                    <MatterMarkdown content={message.journalReview?.summary ?? message.content} />
-                                  </div>
-                                )}
-                                {matterTable?.after.trim() && (
-                                  <div className="batasbot-markdown">
-                                    <MatterMarkdown content={matterTable.after} />
-                                  </div>
-                                )}
-                              </>
-                            );
-                          })()
-                        )}
-                        {message.intakeReview && <IntakeReviewGrid review={message.intakeReview} />}
-                        {message.journalReview && <JournalReviewCard review={message.journalReview} />}
-                        {message.links && (
-                          <div className="batasbot-thread-links">
-                            {message.links.map(({ label, href, icon: Icon }) => (
-                              <Link href={href} key={href}>
-                                <Icon aria-hidden="true" size={9.38} />
-                                {label}
-                              </Link>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </article>
-                  ))}
-                  {(isSending || replyPhase === "thinking") && (
-                    <div className="batasbot-thread-message batasbot-thread-message--assistant">
-                      <span className="batasbot-thread-avatar" aria-hidden="true"><Bot size={10.05} /></span>
-                      <div className="batasbot-thread-typing" role="status" aria-label="BatasBot is generating a reply">
-                        <span aria-hidden="true"><i /><i /><i /></span>
-                        <span>BatasBot is thinking</span>
-                      </div>
-                    </div>
-                  )}
-                  {replyPhase === "typing" && (
-                    <article className="batasbot-thread-message batasbot-thread-message--assistant">
-                      <span className="batasbot-thread-avatar" aria-hidden="true"><Bot size={10.05} /></span>
-                      <div className="batasbot-thread-body">
-                        <div className="batasbot-streaming-label" role="status">
-                          <span aria-hidden="true"><i /><i /><i /></span>
-                          <span>BatasBot is chatting</span>
-                        </div>
-                        {(() => {
-                          const matterTable = parseMatterTable(streamedReply);
-                          return matterTable ? <MatterTable rows={matterTable.rows} /> : (
-                            <div className="batasbot-markdown batasbot-streaming-text" aria-live="off">
-                              <MatterMarkdown content={streamedReply} />
+                  <div className="batasbot-thread-content">
+                    {displayedMessages.map((message) => (
+                      <article className={`batasbot-thread-message batasbot-thread-message--${message.role}`} key={message.id}>
+                        {message.role === "assistant" && <span className="batasbot-thread-avatar" aria-hidden="true"><Bot size={10.05} /></span>}
+                        <div className="batasbot-thread-body">
+                          {message.role === "user" ? (
+                            <>
+                              {message.attachmentName && (
+                                <span className="batasbot-message-file">
+                                  <FileText aria-hidden="true" size={12} />
+                                  {message.attachmentName}
+                                </span>
+                              )}
+                              <p>{message.attachmentName
+                                ? message.content.replace(/^Attached journal text file: [^\r\n]+\nReview request:\s*/, "")
+                                : message.content}</p>
+                            </>
+                          ) : (
+                            (() => {
+                              const matterTable = parseMatterTable(message.content);
+                              return (
+                                <>
+                                  {matterTable?.before.trim() && (
+                                    <div className="batasbot-markdown">
+                                      <MatterMarkdown content={matterTable.before} />
+                                    </div>
+                                  )}
+                                  {matterTable ? <MatterTable rows={matterTable.rows} /> : (
+                                    <div className="batasbot-markdown">
+                                      <MatterMarkdown content={message.journalReview?.summary ?? message.content} />
+                                    </div>
+                                  )}
+                                  {matterTable?.after.trim() && (
+                                    <div className="batasbot-markdown">
+                                      <MatterMarkdown content={matterTable.after} />
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()
+                          )}
+                          {message.intakeReview && <IntakeReviewGrid review={message.intakeReview} />}
+                          {message.journalReview && <JournalReviewCard review={message.journalReview} />}
+                          {message.links && (
+                            <div className="batasbot-thread-links">
+                              {message.links.map(({ label, href, icon: Icon }) => (
+                                <Link href={href} key={href}>
+                                  <Icon aria-hidden="true" size={9.38} />
+                                  {label}
+                                </Link>
+                              ))}
                             </div>
-                          );
-                        })()}
-                        {pendingIntakeReview && <IntakeReviewGrid review={pendingIntakeReview} />}
+                          )}
+                        </div>
+                      </article>
+                    ))}
+                    {(isSending || replyPhase === "thinking") && (
+                      <div className="batasbot-thread-message batasbot-thread-message--assistant">
+                        <span className="batasbot-thread-avatar" aria-hidden="true"><Bot size={10.05} /></span>
+                        <div className="batasbot-thread-typing" role="status" aria-label="BatasBot is generating a reply">
+                          <span aria-hidden="true"><i /><i /><i /></span>
+                          <span>BatasBot is thinking</span>
+                        </div>
                       </div>
-                    </article>
-                  )}
-                  <div ref={messagesEndRef} />
+                    )}
+                    {replyPhase === "typing" && (
+                      <article className="batasbot-thread-message batasbot-thread-message--assistant">
+                        <span className="batasbot-thread-avatar" aria-hidden="true"><Bot size={10.05} /></span>
+                        <div className="batasbot-thread-body">
+                          <div className="batasbot-streaming-label" role="status">
+                            <span aria-hidden="true"><i /><i /><i /></span>
+                            <span>BatasBot is chatting</span>
+                          </div>
+                          {(() => {
+                            const matterTable = parseMatterTable(streamedReply);
+                            return matterTable ? <MatterTable rows={matterTable.rows} /> : (
+                              <div className="batasbot-markdown batasbot-streaming-text" aria-live="off">
+                                <MatterMarkdown content={streamedReply} />
+                              </div>
+                            );
+                          })()}
+                          {pendingIntakeReview && <IntakeReviewGrid review={pendingIntakeReview} />}
+                        </div>
+                      </article>
+                    )}
+                    <div ref={messagesEndRef} />
+                  </div>
                 </div>
               )}
             </section>
@@ -1234,15 +1238,33 @@ export default function BatasBotWorkspace() {
             </div>
           </div>
 
-          <aside className="batasbot-sessions-panel" aria-labelledby="batasbot-sessions-title">
+          <aside
+            className={`batasbot-sessions-panel${sessionsCollapsed ? " is-collapsed" : ""}`}
+            aria-label="Chat sessions"
+          >
             <div className="batasbot-panel-heading">
               <div>
                 <h2 id="batasbot-sessions-title">Sessions</h2>
                 <span>{sessions.length} conversations</span>
               </div>
-              <MessageSquare aria-hidden="true" size={12.06} />
+              <button
+                className="batasbot-panel-toggle"
+                type="button"
+                aria-label={sessionsCollapsed ? "Expand sessions" : "Collapse sessions"}
+                aria-controls="batasbot-session-list"
+                aria-expanded={!sessionsCollapsed}
+                title={sessionsCollapsed ? "Expand sessions" : "Collapse sessions"}
+                onClick={() => setSessionsCollapsed((collapsed) => !collapsed)}
+              >
+                <MessageSquare aria-hidden="true" size={12.06} />
+                <ChevronDown
+                  className="batasbot-panel-toggle-chevron"
+                  aria-hidden="true"
+                  size={10.72}
+                />
+              </button>
             </div>
-            <div className="batasbot-session-list" aria-label="Chat sessions">
+            <div id="batasbot-session-list" className="batasbot-session-list" aria-label="Chat sessions">
               {sessionsLoading && <p className="batasbot-session-empty">Loading…</p>}
               {!sessionsLoading && visibleSessions.map((session) => (
                 <div

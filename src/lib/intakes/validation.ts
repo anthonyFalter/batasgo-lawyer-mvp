@@ -131,6 +131,7 @@ export const intakeDTOSchema = z.object({
   deadlineAt: z.string().nullable(),
   caseStage: z.string(),
   urgencyFlags: z.array(z.string()),
+  signals: z.array(z.string()),
   documents: z.array(z.string()),
   priorityScore: z.number().nullable(),
   status: z.enum(["pending", "accepted", "declined"]),

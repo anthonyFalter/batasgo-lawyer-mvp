@@ -859,7 +859,9 @@ export default function TriageDashboard() {
         deadline: recommendation.intake.deadline,
         summary: recommendation.intake.summary,
         reasons: recommendation.reasons,
-        signals: urgencyAssessment.signals,
+        signals: recommendation.intake.signals.length
+          ? recommendation.intake.signals
+          : urgencyAssessment.signals,
         specialty: profileSpecialty,
       }));
     } catch {
@@ -914,6 +916,7 @@ export default function TriageDashboard() {
     deadlineAt: intakeDeadline ? new Date(`${intakeDeadline}T12:00:00.000Z`).toISOString() : null,
     caseStage: intakeCaseStage,
     urgencyFlags: selectedUrgencyFlags,
+    signals: [],
     documents: selectedFiles.map((file) => file.name),
     priorityScore: null,
     status: "pending",
@@ -952,8 +955,8 @@ export default function TriageDashboard() {
     setSelectedFiles((current) => [...current, ...filesWithinTotalLimit]);
   };
 
-  const generateSampleSummary = async (intake: Intake) => {
-    if (!intake.isSample || intake.aiSummary || generatingSummaryId === intake.id) return;
+  const generateIntakeSummary = async (intake: Intake) => {
+    if (intake.aiSummary || generatingSummaryId === intake.id) return;
     setGeneratingSummaryId(intake.id);
     try {
       const response = await fetch(`/api/intakes/${intake.id}/summary`, {
@@ -1038,7 +1041,7 @@ export default function TriageDashboard() {
           urgencyFlags: review.urgencyFlags,
         },
         summary: review.summary,
-        signals: review.signals.length ? review.signals : ["No immediate urgency signals stated"],
+        signals: review.signals,
         source: "ai",
         provider: review.provider,
         documentReview: review.documentReview,
@@ -1089,7 +1092,7 @@ export default function TriageDashboard() {
         : intakeDescription.trim()
           ? intakeDescription.trim().replace(/\s+/g, " ").split(/(?<=[.!?])\s/)[0].slice(0, 220)
           : "Details pending lawyer review.",
-      signals: assessment.signals.length ? assessment.signals : ["No immediate urgency signals stated"],
+      signals: assessment.signals,
       source: "local",
       documentReview: intakeReview?.documentReview,
       fieldSources: intakeReview?.fieldSources,
@@ -1366,53 +1369,55 @@ export default function TriageDashboard() {
                     </div>
                     <h3>{intake.client}</h3>
                     <p className="intake-summary">{intake.summary}</p>
-                    {intake.isSample && (
-                      <section
-                        className={`sample-ai-summary${generatingSummaryId === intake.id ? " is-generating" : ""}`}
-                        aria-label="Synthetic sample AI summary"
-                        aria-busy={generatingSummaryId === intake.id}
-                      >
-                        {intake.aiSummary ? (
-                          <details
-                            className="sample-ai-summary-details"
-                            open={expandedAiSummaryIds.has(intake.id)}
-                            onToggle={(event) => {
-                              const isOpen = event.currentTarget.open;
-                              setExpandedAiSummaryIds((current) => {
-                                const next = new Set(current);
-                                if (isOpen) next.add(intake.id);
-                                else next.delete(intake.id);
-                                return next;
-                              });
-                            }}
-                          >
-                            <summary>
-                              <span className="sample-ai-summary-title">
-                                <Sparkles aria-hidden="true" size={13.4} fill="currentColor" strokeWidth={1.7} />
-                                <strong>AI Summary</strong>
-                              </span>
-                              <ChevronDown aria-hidden="true" size={12} />
-                            </summary>
-                            <AiSummaryContent
-                              id={intake.id}
-                              summary={intake.aiSummary}
-                              shouldAnimate={typingSummaryId === intake.id}
-                              onComplete={handleSummaryTypingComplete}
-                            />
-                            <small>AI-generated from synthetic text only. Verify all facts.</small>
-                          </details>
-                        ) : (
-                          <button
-                            type="button"
-                            disabled={generatingSummaryId === intake.id}
-                            onClick={() => void generateSampleSummary(intake)}
-                          >
-                            <Sparkles aria-hidden="true" size={9.38} />
-                            {generatingSummaryId === intake.id ? "Generating summary…" : "AI Summary"}
-                          </button>
-                        )}
-                      </section>
-                    )}
+                    <section
+                      className={`sample-ai-summary${generatingSummaryId === intake.id ? " is-generating" : ""}`}
+                      aria-label={`AI summary for ${intake.reference}`}
+                      aria-busy={generatingSummaryId === intake.id}
+                    >
+                      {intake.aiSummary ? (
+                        <details
+                          className="sample-ai-summary-details"
+                          open={expandedAiSummaryIds.has(intake.id)}
+                          onToggle={(event) => {
+                            const isOpen = event.currentTarget.open;
+                            setExpandedAiSummaryIds((current) => {
+                              const next = new Set(current);
+                              if (isOpen) next.add(intake.id);
+                              else next.delete(intake.id);
+                              return next;
+                            });
+                          }}
+                        >
+                          <summary>
+                            <span className="sample-ai-summary-title">
+                              <Sparkles aria-hidden="true" size={13.4} fill="currentColor" strokeWidth={1.7} />
+                              <strong>AI Summary</strong>
+                            </span>
+                            <ChevronDown aria-hidden="true" size={12} />
+                          </summary>
+                          <AiSummaryContent
+                            id={intake.id}
+                            summary={intake.aiSummary}
+                            shouldAnimate={typingSummaryId === intake.id}
+                            onComplete={handleSummaryTypingComplete}
+                          />
+                          <small>
+                            {intake.isSample
+                              ? "AI-generated from synthetic text only. Verify all facts."
+                              : "AI-generated from intake details. Verify all facts and deadlines."}
+                          </small>
+                        </details>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={generatingSummaryId === intake.id}
+                          onClick={() => void generateIntakeSummary(intake)}
+                        >
+                          <Sparkles aria-hidden="true" size={9.38} />
+                          {generatingSummaryId === intake.id ? "Generating summary…" : "AI Summary"}
+                        </button>
+                      )}
+                    </section>
                     {intake.documents && intake.documents.length > 0 && (
                       <div className="intake-document-summary" title={intake.documents.join(", ")}>
                         <Paperclip aria-hidden="true" size={9.38} />

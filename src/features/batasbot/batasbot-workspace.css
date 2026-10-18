@@ -66,9 +66,43 @@
   font-size: 10.72px;
 }
 
-.batasbot-panel-heading > svg {
-  flex: 0 0 auto;
+.batasbot-panel-toggle {
+  display: flex;
+  width: 32px;
+  min-width: 32px;
+  min-height: 28px;
+  flex: 0 0 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0;
   color: #7b879b;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-small);
+  cursor: pointer;
+}
+
+.batasbot-panel-toggle:hover {
+  color: var(--blue-ink);
+  background: var(--blue-pale);
+}
+
+.batasbot-panel-toggle:focus-visible {
+  outline: 1.34px solid #86a7ff;
+  outline-offset: 1.34px;
+}
+
+.batasbot-panel-toggle svg {
+  flex: 0 0 auto;
+}
+
+.batasbot-panel-toggle-chevron {
+  transition: transform 160ms ease-out;
+}
+
+.batasbot-panel-toggle[aria-expanded="false"] .batasbot-panel-toggle-chevron {
+  transform: rotate(180deg);
 }
 
 .batasbot-session-list {
@@ -541,16 +575,24 @@
 
 .batasbot-thread {
   display: flex;
-  width: min(100%, 616.4px);
+  width: 100%;
   min-height: 0;
   flex: 1;
   flex-direction: column;
-  gap: 16.08px;
+  gap: 0;
   padding: 18.76px 18.76px;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-color: #c6ceda transparent;
   scrollbar-width: thin;
+}
+
+.batasbot-thread-content {
+  display: flex;
+  width: min(100%, 578.88px);
+  flex-direction: column;
+  gap: 16.08px;
+  margin-inline: auto;
 }
 
 .batasbot-thread-message {
@@ -1607,6 +1649,9 @@
 
   .batasbot-thread {
     padding: 12.06px 8.04px;
+  }
+
+  .batasbot-thread-content {
     gap: 10.72px;
   }
 
@@ -1636,7 +1681,8 @@
   .batasbot-streaming-label i,
   .batasbot-intake-review,
   .batasbot-intake-stat,
-  .batasbot-intake-meter .is-active {
+  .batasbot-intake-meter .is-active,
+  .batasbot-panel-toggle-chevron {
     transition: none;
     animation: none;
   }
@@ -1719,5 +1765,43 @@
 
   body .workspace .batasbot-starters {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.batasbot-content-grid.is-sessions-collapsed {
+  grid-template-columns: minmax(0, 1fr) 42px;
+}
+
+.batasbot-sessions-panel.is-collapsed {
+  padding-left: 4px;
+}
+
+.batasbot-sessions-panel.is-collapsed .batasbot-panel-heading {
+  justify-content: center;
+  margin-bottom: 0;
+}
+
+.batasbot-sessions-panel.is-collapsed .batasbot-panel-heading > div {
+  display: none;
+}
+
+.batasbot-sessions-panel.is-collapsed .batasbot-session-list {
+  display: none;
+}
+
+@media (max-width: 656.6px) {
+  body .workspace .batasbot-sessions-panel {
+    max-height: 144px;
+  }
+
+  body .workspace .batasbot-sessions-panel.is-collapsed {
+    max-height: 52px;
+    padding: 0 0 4px;
+  }
+}
+
+@media (max-width: 428.8px) {
+  body .workspace .batasbot-sessions-panel {
+    max-height: 104px;
   }
 }
