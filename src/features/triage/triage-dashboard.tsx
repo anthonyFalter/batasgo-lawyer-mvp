@@ -843,6 +843,14 @@ export default function TriageDashboard() {
   const reviewRecommendedIntake = () => {
     if (!recommendation) return;
 
+    const urgencyAssessment = scoreIntakeUrgency({
+      title: recommendation.intake.client,
+      description: recommendation.intake.summary,
+      deadlineAt: recommendation.intake.deadlineAt,
+      caseStage: recommendation.intake.caseStage,
+      urgencyFlags: recommendation.intake.urgencyFlags,
+    });
+
     try {
       window.sessionStorage.setItem("batasbot-triage-handoff", JSON.stringify({
         id: recommendation.intake.reference,
@@ -851,6 +859,7 @@ export default function TriageDashboard() {
         deadline: recommendation.intake.deadline,
         summary: recommendation.intake.summary,
         reasons: recommendation.reasons,
+        signals: urgencyAssessment.signals,
         specialty: profileSpecialty,
       }));
     } catch {

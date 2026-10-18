@@ -209,6 +209,7 @@ type TriageChatHandoff = {
   deadline: string;
   summary: string;
   reasons: string[];
+  signals?: string[];
   specialty: string;
 };
 
@@ -291,14 +292,18 @@ function isTriageChatHandoff(value: unknown): value is TriageChatHandoff {
     && typeof handoff.summary === "string"
     && Array.isArray(handoff.reasons)
     && handoff.reasons.every((reason) => typeof reason === "string")
+    && (handoff.signals === undefined
+      || Array.isArray(handoff.signals) && handoff.signals.every((signal) => typeof signal === "string"))
     && typeof handoff.specialty === "string";
 }
 
 function explainTriageHandoff(handoff: TriageChatHandoff) {
-  const signals = handoff.reasons
-    .filter((reason) => !/^(Fits|Outside profile specialty:)/.test(reason))
-    .slice(0, 3)
-    .join(" · ");
+  const signals = handoff.signals
+    ? handoff.signals.join(" · ")
+    : handoff.reasons
+      .filter((reason) => !/^(Fits|Outside profile specialty:)/.test(reason))
+      .slice(0, 3)
+      .join(" · ");
   const summaryText = handoff.summary.trim().replace(/\s*\.+\s*$/, "");
   const deadline = handoff.deadline && !/^no deadline set$/i.test(handoff.deadline)
     ? `Deadline: ${handoff.deadline}.`
@@ -308,7 +313,7 @@ function explainTriageHandoff(handoff: TriageChatHandoff) {
 }
 
 function getIntakeReviewVisual(handoff: TriageChatHandoff): IntakeReviewVisual {
-  const signals = handoff.reasons
+  const signals = handoff.signals ?? handoff.reasons
     .flatMap((reason) => reason.split(" · "))
     .filter((reason) => !/risk indicators$/i.test(reason)
       && !/^(review deadline:|closing in|time-sensitive follow-up)/i.test(reason)
