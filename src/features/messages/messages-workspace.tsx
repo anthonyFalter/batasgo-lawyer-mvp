@@ -16,9 +16,10 @@ import {
   X,
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { scoreIntakeUrgency } from "@/lib/intakes/triage";
-import { intakeResponseSchema } from "@/lib/intakes/validation";
-import type { CitizenJournalHandoffContext } from "@/lib/citizen/journal-handoff-context";
+import {
+  journalIntakeHandoffStorageKey,
+  type CitizenJournalHandoffContext,
+} from "@/lib/citizen/journal-handoff-context";
 import WorkspaceShell from "../workspace/workspace-shell";
 import "./messages-workspace.css";
 
@@ -133,7 +134,7 @@ export default function MessagesWorkspace() {
   const [toast, setToast] = useState("");
   const [error, setError] = useState("");
   const [journalActionError, setJournalActionError] = useState<{ messageId: string; message: string } | null>(null);
-  const [savingJournalId, setSavingJournalId] = useState<string | null>(null);
+  const [openingJournalIntakeId, setOpeningJournalIntakeId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingThread, setIsLoadingThread] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -404,53 +405,25 @@ export default function MessagesWorkspace() {
     window.location.assign("/batasbot?source=citizen-journal");
   };
 
-  const addJournalToIntakeQueue = async (message: Message) => {
+  const addJournalToIntakeQueue = (message: Message) => {
     const handoff = message.journalHandoff;
-    if (!handoff || savingJournalId) return;
-    setSavingJournalId(message.id);
+    if (!handoff || openingJournalIntakeId) return;
+    setOpeningJournalIntakeId(message.id);
     setJournalActionError(null);
 
-    const fullDescription = (handoff.entries ?? []).map((entry) =>
-      `${entry.title} (${entry.incidentDate}${entry.location ? ` · ${entry.location}` : ""})\n${entry.details}`,
-    ).join("\n\n");
-    const description = fullDescription.slice(0, 1200);
-    const title = `Journal: ${handoff.title}`.slice(0, 120);
-    const urgency = scoreIntakeUrgency({
-      title,
-      description,
-      deadlineAt: null,
-      caseStage: "",
-      urgencyFlags: [],
-    });
-
     try {
-      const result = await requestApi<{ intake: unknown }>("/api/intakes", {
-        method: "POST",
-        body: JSON.stringify({
-          title,
-          description: description || "No journal entry details were included.",
-          domain: "",
-          documents: handoff.attachments.slice(0, 10).map(({ fileName }) => fileName),
-          deadlineAt: null,
-          caseStage: "",
-          urgencyFlags: [],
-          priorityScore: urgency.score,
-        }),
-      });
-      const parsed = intakeResponseSchema.safeParse(result);
-      if (!parsed.success) throw new Error("The intake service returned an invalid response.");
-      const followUp = [
-        fullDescription.length > description.length ? "Journal details were shortened to fit the intake limit." : "",
-        handoff.attachments.length > 10 ? "Only 10 attachment names can be saved with an intake." : "",
-      ].filter(Boolean).join(" ");
-      setToast(`Journal added to the intake queue as ${parsed.data.intake.reference} with urgency score ${urgency.score}/100.${followUp ? ` ${followUp}` : ""}`);
+      const context = createJournalContext(message);
+      if (!context) throw new Error("This message does not contain a journal to add.");
+      window.sessionStorage.setItem(journalIntakeHandoffStorageKey, JSON.stringify(context));
+      window.location.assign("/dashboard?source=journal-intake");
     } catch (actionError) {
       setJournalActionError({
         messageId: message.id,
-        message: actionError instanceof Error ? actionError.message : "Unable to add this journal to the intake queue.",
+        message: actionError instanceof Error
+          ? `Unable to open a new intake for this journal: ${actionError.message}`
+          : "Unable to open a new intake for this journal.",
       });
-    } finally {
-      setSavingJournalId(null);
+      setOpeningJournalIntakeId(null);
     }
   };
 
@@ -583,11 +556,11 @@ export default function MessagesWorkspace() {
                                 </button>
                                 <button
                                   type="button"
-                                  disabled={Boolean(savingJournalId)}
-                                  aria-busy={savingJournalId === message.id}
-                                  onClick={() => void addJournalToIntakeQueue(message)}
+                                  disabled={Boolean(openingJournalIntakeId)}
+                                  aria-busy={openingJournalIntakeId === message.id}
+                                  onClick={() => addJournalToIntakeQueue(message)}
                                 >
-                                  {savingJournalId === message.id
+                                  {openingJournalIntakeId === message.id
                                     ? <LoaderCircle className="citizen-handoff-loading" aria-hidden="true" size={14} />
                                     : <Plus aria-hidden="true" size={14} />}
                                   Add to intake queue

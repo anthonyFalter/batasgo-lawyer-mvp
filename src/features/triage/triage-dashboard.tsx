@@ -29,6 +29,11 @@ import {
   intakeUrgencyFlags,
   type IntakeDTO,
 } from "@/lib/intakes/validation";
+import {
+  createCitizenJournalTextFile,
+  isCitizenJournalHandoffContext,
+  journalIntakeHandoffStorageKey,
+} from "@/lib/citizen/journal-handoff-context";
 import { getRiskAction, getRiskFromScore, scoreIntakeUrgency, suggestIntakeDetails } from "@/lib/intakes/triage";
 import WorkspaceShell from "../workspace/workspace-shell";
 
@@ -447,6 +452,7 @@ export default function TriageDashboard() {
   const intakeDialogRef = useRef<HTMLDialogElement>(null);
   const documentInputRef = useRef<HTMLInputElement>(null);
   const intakeReviewRequestRef = useRef<AbortController | null>(null);
+  const journalIntakeHandoffHandledRef = useRef(false);
 
   const handleSummaryTypingComplete = useCallback((id: string) => {
     setTypingSummaryId((current) => current === id ? null : current);
@@ -477,6 +483,49 @@ export default function TriageDashboard() {
   useEffect(() => {
     void loadIntakes();
   }, [loadIntakes]);
+
+  useEffect(() => {
+    if (journalIntakeHandoffHandledRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("source") !== "journal-intake") return;
+    journalIntakeHandoffHandledRef.current = true;
+
+    try {
+      const storedHandoff = window.sessionStorage.getItem(journalIntakeHandoffStorageKey);
+      if (!storedHandoff) {
+        throw new Error("The journal details were not available. Return to Messages and try again.");
+      }
+      const parsedHandoff: unknown = JSON.parse(storedHandoff);
+      if (!isCitizenJournalHandoffContext(parsedHandoff)) {
+        throw new Error("The transferred journal details are invalid. Return to Messages and try again.");
+      }
+
+      const journalFile = createCitizenJournalTextFile(parsedHandoff);
+      setIntakeTitle(`Journal: ${parsedHandoff.title}`.slice(0, 120));
+      setIntakeDescription("");
+      setIntakeSpecialty("");
+      setIntakeDeadline("");
+      setIntakeCaseStage("");
+      setSelectedUrgencyFlags([]);
+      setAiFilledFields(new Set());
+      setSelectedFiles([journalFile]);
+      setIntakePath("documents");
+      setIntakeStage("upload");
+      setDocumentConsent(false);
+      setMaskIdentifiers(true);
+      setIntakeReview(null);
+      setIntakeAiReviewError("");
+      setNewIntakeOpen(true);
+      window.sessionStorage.removeItem(journalIntakeHandoffStorageKey);
+      const nextUrl = new URL(window.location.href);
+      nextUrl.searchParams.delete("source");
+      window.history.replaceState(window.history.state, "", `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`);
+    } catch (error) {
+      setToast(error instanceof Error
+        ? `Unable to open this journal in a new intake: ${error.message}`
+        : "Unable to open this journal in a new intake.");
+    }
+  }, []);
 
   useEffect(() => {
     let isCurrent = true;
