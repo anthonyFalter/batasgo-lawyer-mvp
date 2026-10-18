@@ -481,28 +481,22 @@ export default function TriageDashboard() {
   }, [loadIntakes]);
 
   useEffect(() => {
-    let isCurrent = true;
+    const reference = new URLSearchParams(window.location.search).get("matter")?.trim();
+    if (!reference || isLoadingIntakes) return;
 
-    const loadTodaySchedule = async () => {
-      try {
-        const response = await fetch("/api/calendar", { cache: "no-store" });
-        if (!response.ok) throw new Error("Unable to load calendar events.");
-        const payload = await response.json() as { events?: TodayScheduleEvent[] };
-        const events = (payload.events ?? [])
-          .filter((event) => event.date === todayDateKey)
-          .sort((a, b) => a.startTime.localeCompare(b.startTime))
-          .slice(0, 3);
-        if (isCurrent) setTodayScheduleEvents(events);
-      } catch {
-        if (isCurrent) setTodayScheduleError(true);
-      } finally {
-        if (isCurrent) setIsLoadingTodaySchedule(false);
-      }
-    };
+    const reviewedMatter = decisions.find(({ intake }) => intake.reference.toLowerCase() === reference.toLowerCase());
+    if (reviewedMatter) {
+      setDecisionHistoryOpen(true);
+      setDecisionFilter("all");
+      return;
+    }
 
-    void loadTodaySchedule();
-    return () => { isCurrent = false; };
-  }, [todayDateKey]);
+    const pendingMatter = intakes.find((intake) => intake.reference.toLowerCase() === reference.toLowerCase());
+    if (pendingMatter) {
+      setDecisionHistoryOpen(false);
+      setSearch(pendingMatter.reference);
+    }
+  }, [decisions, intakes, isLoadingIntakes]);
 
   useEffect(() => {
     try {
