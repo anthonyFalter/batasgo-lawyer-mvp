@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { getOrCreatePersonalWorkspace } from "@/lib/db/workspace";
-import { createSession, listSessions } from "@/lib/chat/sessions";
+import { appendMessages, createSession, listSessions } from "@/lib/chat/sessions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,7 +36,14 @@ export async function POST(request: Request) {
     return Response.json({ error: "Unauthorized." }, { status: 401 });
   }
 
-  let body: { title?: string };
+  let body: {
+    title?: string;
+    handoff?: {
+      userContent?: string;
+      assistantContent?: string;
+      assistantMetadata?: unknown;
+    };
+  };
   try {
     body = await request.json();
   } catch {
@@ -46,10 +53,18 @@ export async function POST(request: Request) {
   const title = typeof body.title === "string" && body.title.trim()
     ? body.title.trim().slice(0, 255)
     : "New conversation";
+  const handoff = body.handoff;
+  const userContent = typeof handoff?.userContent === "string" ? handoff.userContent.trim() : "";
+  const assistantContent = typeof handoff?.assistantContent === "string" ? handoff.assistantContent.trim() : "";
+
+  if (handoff && (!userContent || !assistantContent || !handoff.assistantMetadata)) {
+    return Response.json({ error: "A handoff requires both user and assistant content." }, { status: 400 });
+  }
 
   try {
     const workspaceId = await getOrCreatePersonalWorkspace(userId);
     const id = await createSession(workspaceId, userId, title);
+    if (handoff) await appendMessages(id, userContent, assistantContent, handoff.assistantMetadata);
     return Response.json({ id, title, updatedAt: new Date().toISOString() }, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

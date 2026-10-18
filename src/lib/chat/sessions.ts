@@ -16,6 +16,7 @@ export type StoredMessage = {
   id: string;
   role: "user" | "assistant";
   content: string;
+  metadata: unknown;
   createdAt: string; // ISO string
 };
 
@@ -52,6 +53,7 @@ export async function getSessionMessages(sessionId: string): Promise<StoredMessa
       id: chatMessages.id,
       role: chatMessages.role,
       content: chatMessages.content,
+      metadata: chatMessages.metadata,
       createdAt: chatMessages.createdAt,
     })
     .from(chatMessages)
@@ -62,6 +64,7 @@ export async function getSessionMessages(sessionId: string): Promise<StoredMessa
     id: row.id,
     role: row.role,
     content: row.content,
+    metadata: row.metadata,
     createdAt: row.createdAt.toISOString(),
   }));
 }
@@ -88,15 +91,24 @@ export async function appendMessages(
   sessionId: string,
   userContent: string,
   assistantContent: string,
+  assistantMetadata?: unknown,
 ): Promise<void> {
   await db.insert(chatMessages).values([
     { sessionId, role: "user", content: userContent },
-    { sessionId, role: "assistant", content: assistantContent },
+    { sessionId, role: "assistant", content: assistantContent, metadata: assistantMetadata },
   ]);
 
   await db
     .update(chatSessions)
     .set({ updatedAt: new Date() })
+    .where(eq(chatSessions.id, sessionId));
+}
+
+/** Replace a session title for the specified owned session. */
+export async function updateSessionTitle(sessionId: string, title: string): Promise<void> {
+  await db
+    .update(chatSessions)
+    .set({ title: title.replace(/\*\*/g, "").replace(/[`#]/g, "").trim().slice(0, 255), updatedAt: new Date() })
     .where(eq(chatSessions.id, sessionId));
 }
 
