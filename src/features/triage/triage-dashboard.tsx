@@ -18,7 +18,6 @@ import {
   ShieldAlert,
   Upload,
   X,
-  ShieldCheck,
 } from "lucide-react";
 import { type CSSProperties, type FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
@@ -31,7 +30,7 @@ import {
   intakeUrgencyFlags,
   type IntakeDTO,
 } from "@/lib/intakes/validation";
-import { getRiskFromScore, suggestIntakeDetails } from "@/lib/intakes/triage";
+import { getRiskAction, getRiskFromScore, suggestIntakeDetails } from "@/lib/intakes/triage";
 import WorkspaceShell from "../workspace/workspace-shell";
 
 type Risk = IntakeDTO["risk"];
@@ -195,7 +194,7 @@ async function getResponseError(response: Response, fallback: string) {
   return parsed.success ? parsed.data.error : fallback;
 }
 
-const riskRank: Record<Risk, number> = { Unassessed: 4, Critical: 3, High: 2, Medium: 1 };
+const riskRank: Record<Risk, number> = { Unassessed: 5, Critical: 4, High: 3, Medium: 2, Low: 1 };
 const profileSpecialty = "Labor & Employment litigation";
 const specialtyOptions = [
   "Labor & Employment",
@@ -223,7 +222,7 @@ function rankIntakesForReview(intakes: Intake[]): RankedIntake | null {
     return 5;
   };
   const urgencyPoints = (intake: Intake) => {
-    const riskPoints = { Unassessed: 40, Critical: 40, High: 28, Medium: 15 }[intake.risk];
+    const riskPoints = { Unassessed: 40, Critical: 40, High: 28, Medium: 15, Low: 5 }[intake.risk];
     const recencyPoints = Math.min(intake.receivedOrder, 3) * 2;
     return riskPoints + deadlinePoints(intake) + recencyPoints;
   };
@@ -827,13 +826,6 @@ export default function TriageDashboard() {
     setSelectedFiles((current) => [...current, ...filesWithinTotalLimit]);
   };
 
-  const generateIntakeSuggestions = () => {
-    const suggestions = suggestIntakeDetails(intakeTitle, intakeDescription);
-    setIntakeTitle(suggestions.title);
-    setIntakeDescription(suggestions.description);
-    if (!intakeSpecialty) setIntakeSpecialty(suggestions.specialty);
-  };
-
   const generateSampleSummary = async (intake: Intake) => {
     if (!intake.isSample || intake.aiSummary || generatingSummaryId === intake.id) return;
     setGeneratingSummaryId(intake.id);
@@ -1180,6 +1172,7 @@ export default function TriageDashboard() {
                       { value: "Critical", label: "Critical Risk" },
                       { value: "High", label: "High Risk" },
                       { value: "Medium", label: "Medium Risk" },
+                      { value: "Low", label: "Low Risk" },
                       { value: "Unassessed", label: "Needs Review" },
                     ]}
                   />
@@ -1502,7 +1495,11 @@ export default function TriageDashboard() {
 
             {intakeStage === "upload" && (
               <div className="intake-board">
-                <section className="intake-board-main" aria-labelledby="intake-upload-heading">
+                <section
+                  className={`intake-board-main${isGeneratingIntakeReview ? " is-ai-generating" : ""}`}
+                  aria-labelledby="intake-upload-heading"
+                  aria-busy={isGeneratingIntakeReview}
+                >
                   <div className="intake-section-heading">
                     <div>
                       <h3 id="intake-upload-heading">Add matter documents</h3>
@@ -1626,7 +1623,11 @@ export default function TriageDashboard() {
 
             {intakeStage === "details" && (
               <form className="intake-board" onSubmit={submitIntakeDetails}>
-                <section className="intake-board-main" aria-labelledby="intake-details-heading">
+                <section
+                  className={`intake-board-main${isGeneratingIntakeReview ? " is-ai-generating" : ""}`}
+                  aria-labelledby="intake-details-heading"
+                  aria-busy={isGeneratingIntakeReview}
+                >
                   <div className="intake-section-heading">
                     <div>
                       <h3 id="intake-details-heading">{intakePath === "documents" ? "Review extracted details" : "Enter matter details"}</h3>
@@ -1782,11 +1783,6 @@ export default function TriageDashboard() {
                   <footer className="intake-board-footer">
                     <button className="intake-cancel-button" type="button" onClick={() => setIntakeStage(intakePath === "documents" ? "upload" : "choose")}>Back</button>
                     <div>
-                      {intakePath === "manual" && (
-                        <button className="intake-suggestion-button" type="button" onClick={generateIntakeSuggestions}>
-                          <Sparkles aria-hidden="true" size={12} /> Quick suggestions
-                        </button>
-                      )}
                       <button className="intake-submit-button" type="submit" disabled={isGeneratingIntakeReview || (!intakeTitle.trim() && !intakeDescription.trim()) || (intakePath === "manual" && !manualAiConsent)}>
                         {isGeneratingIntakeReview ? <><Sparkles aria-hidden="true" size={13} /> Scoring details…</> : <>Looks good — score with AI <ArrowRight aria-hidden="true" size={13} /></>}
                       </button>
@@ -1826,10 +1822,13 @@ export default function TriageDashboard() {
                       <h3 id="intake-score-heading">AI urgency score</h3>
                       <p>{intakeReview.intake.client} · {intakeReview.intake.domain}</p>
                     </div>
-                    <span className={`intake-review-risk intake-review-risk--${intakeReview.intake.risk.toLowerCase()}`}>{intakeReview.intake.risk}</span>
+                    <div className={`intake-review-rating intake-review-rating--${intakeReview.intake.risk.toLowerCase()}`}>
+                      <span className={`intake-review-risk intake-review-risk--${intakeReview.intake.risk.toLowerCase()}`}>{intakeReview.intake.risk}</span>
+                      <small>{getRiskAction(intakeReview.intake.risk)}</small>
+                    </div>
                   </header>
 
-                  <section className="intake-review-score" aria-label="Priority score">
+                  <section className={`intake-review-score intake-review-score--${intakeReview.intake.risk.toLowerCase()}`} aria-label="Priority score">
                     <div className="intake-score-value-row">
                       <strong>{intakeReview.intake.priorityScore ?? "—"}</strong>
                       <span>/100</span>
@@ -1856,7 +1855,6 @@ export default function TriageDashboard() {
                           } : current);
                         }}
                       />
-                      <small>Manual override · current value {intakeReview.intake.priorityScore ?? 0}</small>
                     </label>
                   </section>
 
@@ -1894,7 +1892,7 @@ export default function TriageDashboard() {
                     <div><dt>Urgency flags</dt><dd>{selectedUrgencyFlags.length ? selectedUrgencyFlags.join(", ") : "None selected"}</dd></div>
                     <div><dt>Signals</dt><dd>{intakeReview.signals.length}</dd></div>
                   </dl>
-                  <div className="intake-provider-note"><ShieldCheck aria-hidden="true" size={14} /><span>Score is a triage aid, not a legal conclusion. You control the final priority.</span></div>
+                  <div className="intake-provider-note"><span>Score is a triage aid, not a legal conclusion. You control the final priority.</span></div>
                   {intakeReview.documentReview && (
                     <small className="intake-review-document-note">Read {intakeReview.documentReview.processedCount} file{intakeReview.documentReview.processedCount === 1 ? "" : "s"}{intakeReview.documentReview.truncated ? " · some text shortened" : ""}.</small>
                   )}

@@ -113,8 +113,13 @@ function getIntakeReviewVisual(handoff: TriageChatHandoff): IntakeReviewVisual {
 
 function IntakeReviewGrid({ review }: { review: IntakeReviewVisual }) {
   const normalizedRisk = review.risk.toLowerCase();
-  const riskLevel = normalizedRisk === "critical" ? 3 : normalizedRisk === "high" ? 2 : 1;
-  const riskTone = normalizedRisk === "critical" ? "critical" : normalizedRisk === "high" ? "high" : "medium";
+  const riskLevel = normalizedRisk === "critical" ? 4
+    : normalizedRisk === "high" ? 3
+      : normalizedRisk === "medium" ? 2 : normalizedRisk === "low" ? 1 : 0;
+  const riskTone = normalizedRisk === "critical" || normalizedRisk === "high"
+    || normalizedRisk === "medium" || normalizedRisk === "low"
+    ? normalizedRisk
+    : "medium";
   const normalizedDeadline = review.deadline.toLowerCase();
   const deadlineLevel = /now|immediate|overdue/.test(normalizedDeadline)
     ? 3
@@ -131,7 +136,7 @@ function IntakeReviewGrid({ review }: { review: IntakeReviewVisual }) {
             <strong>{review.risk}</strong>
           </div>
           <div className="batasbot-intake-meter" aria-hidden="true">
-            {[0, 1, 2].map((segment) => <i className={segment < riskLevel ? "is-active" : ""} key={segment} />)}
+            {[0, 1, 2, 3].map((segment) => <i className={segment < riskLevel ? "is-active" : ""} key={segment} />)}
           </div>
         </div>
 

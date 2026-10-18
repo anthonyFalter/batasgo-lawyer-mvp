@@ -13,7 +13,7 @@ import {
 import { sql } from "drizzle-orm";
 
 export const workspaceRole = pgEnum("workspace_role", ["owner", "lawyer", "staff"]);
-export const intakeRisk = pgEnum("intake_risk", ["critical", "high", "medium", "unassessed"]);
+export const intakeRisk = pgEnum("intake_risk", ["critical", "high", "medium", "low", "unassessed"]);
 export const intakeStatus = pgEnum("intake_status", ["pending", "accepted", "declined"]);
 
 export const workspaces = pgTable("workspaces", {

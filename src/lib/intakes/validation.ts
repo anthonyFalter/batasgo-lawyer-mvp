@@ -87,7 +87,7 @@ export const intakeAiReviewResponseSchema = z.object({
       severityBonus: intakeAiReviewFactorSchema.extend({ score: z.number().int().min(0).max(10) }),
     }).strict(),
     priorityScore: z.number().int().min(0).max(100),
-    risk: z.enum(["Critical", "High", "Medium"]),
+    risk: z.enum(["Critical", "High", "Medium", "Low"]),
   }).strict(),
 }).strict().superRefine(({ review }, context) => {
   const total = Math.min(100,
@@ -103,7 +103,7 @@ export const intakeAiReviewResponseSchema = z.object({
       path: ["review", "priorityScore"],
     });
   }
-  const expectedRisk = total >= 80 ? "Critical" : total >= 60 ? "High" : "Medium";
+  const expectedRisk = total >= 80 ? "Critical" : total >= 60 ? "High" : total >= 30 ? "Medium" : "Low";
   if (review.risk !== expectedRisk) {
     context.addIssue({
       code: "custom",
@@ -121,7 +121,7 @@ export const intakeDTOSchema = z.object({
   id: z.string().uuid(),
   reference: z.string(),
   domain: z.string(),
-  risk: z.enum(["Critical", "High", "Medium", "Unassessed"]),
+  risk: z.enum(["Critical", "High", "Medium", "Low", "Unassessed"]),
   client: z.string(),
   summary: z.string(),
   received: z.string(),

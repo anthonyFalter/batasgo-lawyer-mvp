@@ -4,6 +4,7 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { getOrCreatePersonalWorkspace } from "@/lib/db/workspace";
 import { intakes, workspaces } from "@/lib/db/schema";
+import { getRiskFromScore } from "./triage";
 import type { IntakeDTO } from "./validation";
 
 function getReceivedOrder(receivedAt: Date) {
@@ -45,11 +46,7 @@ export function toIntakeDTO(intake: typeof intakes.$inferSelect): IntakeDTO {
     id: intake.id,
     reference: intake.reference,
     domain: intake.domain,
-    risk: intake.risk === "critical"
-      ? "Critical"
-      : intake.risk === "high"
-        ? "High"
-        : intake.risk === "unassessed" ? "Unassessed" : "Medium",
+    risk: getRiskFromScore(intake.priorityScore),
     client: intake.client,
     summary: intake.summary,
     received: formatReceived(intake.receivedAt),

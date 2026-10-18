@@ -21,7 +21,7 @@ export const runtime = "nodejs";
 
 const providerTimeoutMs = 4_000;
 const geminiHttpTimeoutMs = 10_000;
-const geminiModel = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const geminiModel = process.env.GEMINI_MODEL || "gemini-3.8-flash";
 const maxFiles = 5;
 const maxFileSize = 5 * 1024 * 1024;
 const maxTotalFileSize = 10 * 1024 * 1024;
@@ -55,6 +55,11 @@ const factorSchema = z.object({
   rationale: z.string().trim().min(1).max(180),
 }).strict();
 
+const providerFieldSourceSchema = z.object({
+  documentIndex: z.number().int().min(1).max(5).nullable(),
+  page: z.number().int().min(1).max(500).nullable(),
+}).default({ documentIndex: null, page: null });
+
 const providerExtractionSchema = z.object({
   title: z.string().trim().max(120),
   description: z.string().trim().max(1200),
@@ -65,13 +70,13 @@ const providerExtractionSchema = z.object({
   caseStage: z.union([z.literal(""), z.enum(intakeCaseStages)]),
   urgencyFlags: z.array(z.enum(intakeUrgencyFlags)).max(5),
   fieldSources: z.object({
-    title: z.object({ documentIndex: z.number().int().min(1).max(5).nullable(), page: z.number().int().min(1).max(500).nullable() }).strict(),
-    description: z.object({ documentIndex: z.number().int().min(1).max(5).nullable(), page: z.number().int().min(1).max(500).nullable() }).strict(),
-    domain: z.object({ documentIndex: z.number().int().min(1).max(5).nullable(), page: z.number().int().min(1).max(500).nullable() }).strict(),
-    deadlineAt: z.object({ documentIndex: z.number().int().min(1).max(5).nullable(), page: z.number().int().min(1).max(500).nullable() }).strict(),
-    caseStage: z.object({ documentIndex: z.number().int().min(1).max(5).nullable(), page: z.number().int().min(1).max(500).nullable() }).strict(),
-    urgencyFlags: z.object({ documentIndex: z.number().int().min(1).max(5).nullable(), page: z.number().int().min(1).max(500).nullable() }).strict(),
-  }).strict(),
+    title: providerFieldSourceSchema,
+    description: providerFieldSourceSchema,
+    domain: providerFieldSourceSchema,
+    deadlineAt: providerFieldSourceSchema,
+    caseStage: providerFieldSourceSchema,
+    urgencyFlags: providerFieldSourceSchema,
+  }),
 }).strict();
 
 const providerReviewSchema = providerExtractionSchema.extend({
@@ -82,7 +87,7 @@ const providerReviewSchema = providerExtractionSchema.extend({
     caseRiskImpact: factorSchema.extend({ score: z.number().int().min(0).max(30) }),
     proceduralStatus: factorSchema.extend({ score: z.number().int().min(0).max(20) }),
     severityBonus: factorSchema.extend({ score: z.number().int().min(0).max(10) }),
-  }).strict(),
+  }),
 }).strict();
 
 const groqResponseSchema = z.object({
@@ -669,7 +674,7 @@ async function generateWithGroq(
       ? parseProviderReview(parsed.data.choices[0].message.content?.trim() ?? "", "extract")
       : parseProviderReview(parsed.data.choices[0].message.content?.trim() ?? "", "score");
   } catch {
-    throw new ReviewProviderError("Groq", response.status);
+    throw new ReviewProviderError("Groq", response.status, false, "invalid-response");
   }
 }
 
@@ -761,6 +766,14 @@ export async function POST(request: Request) {
     generateExtraction: (prompt: string) => Promise<ProviderExtraction>;
     generateScore: (prompt: string) => Promise<ProviderReview>;
   }[] = [];
+  const groqProvider = groqApiKey && !uploaded.requiresVision
+    ? {
+        name: "Groq" as const,
+        generateExtraction: (prompt: string) => generateWithGroq(prompt, groqApiKey, "extract"),
+        generateScore: (prompt: string) => generateWithGroq(prompt, groqApiKey, "score"),
+      }
+    : null;
+  if (mode === "score" && groqProvider) providers.push(groqProvider);
   if (geminiApiKey) {
     providers.push({
       name: "Gemini",
@@ -780,13 +793,7 @@ export async function POST(request: Request) {
       ),
     });
   }
-  if (!uploaded.requiresVision && groqApiKey) {
-    providers.push({
-      name: "Groq",
-      generateExtraction: (prompt) => generateWithGroq(prompt, groqApiKey, "extract"),
-      generateScore: (prompt) => generateWithGroq(prompt, groqApiKey, "score"),
-    });
-  }
+  if (mode === "extract" && groqProvider) providers.push(groqProvider);
   if (providers.length === 0) {
     const error = uploaded.requiresVision
       ? "Image and scanned PDF reviews require Gemini Vision; no Gemini key is configured."
@@ -880,7 +887,7 @@ export async function POST(request: Request) {
       { status: 502 },
     );
   }
-  if (statuses.has(404)) {
+  if (failures.every(({ reason }) => reason === "model-not-found")) {
     return Response.json(
       { error: "An AI model is unavailable. Check GEMINI_MODEL and GROQ_MODEL in the server configuration." },
       { status: 502 },

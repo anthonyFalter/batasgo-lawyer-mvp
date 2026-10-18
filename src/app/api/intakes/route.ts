@@ -63,7 +63,9 @@ export async function POST(request: Request) {
         domain: parsed.data.domain || suggestions.specialty,
         risk: risk === "Critical"
           ? "critical"
-          : risk === "High" ? "high" : risk === "Unassessed" ? "unassessed" : "medium",
+          : risk === "High" ? "high"
+            : risk === "Medium" ? "medium"
+              : risk === "Low" ? "low" : "unassessed",
         client,
         summary,
         deadlineAt: parsed.data.deadlineAt
