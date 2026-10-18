@@ -766,11 +766,9 @@ export default function TriageDashboard() {
     intakeReviewRequestRef.current = null;
     if (intakeDialogRef.current?.open) intakeDialogRef.current.close();
     setNewIntakeOpen(false);
-    clearManualIntake();
   };
 
   const openNewIntake = () => {
-    clearManualIntake();
     setNewIntakeOpen(true);
   };
 
@@ -1020,6 +1018,7 @@ export default function TriageDashboard() {
       resetFilters();
       setSortBy("newest");
       closeNewIntake();
+      clearManualIntake();
       showToast("Intake saved to your workspace.");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Unable to save intake.");
@@ -1039,6 +1038,18 @@ export default function TriageDashboard() {
     : null;
   const scoreManuallyOverridden = calculatedIntakeScore !== null
     && intakeReview?.intake.priorityScore !== calculatedIntakeScore;
+  const hasUnsavedIntakeDraft = Boolean(
+    intakeTitle.trim()
+      || intakeDescription.trim()
+      || intakeSpecialty
+      || intakeDeadline
+      || intakeCaseStage
+      || selectedUrgencyFlags.length
+      || selectedFiles.length
+      || intakePath
+      || intakeReview
+      || intakeStage !== "choose",
+  );
 
   return (
     <WorkspaceShell
@@ -1427,11 +1438,26 @@ export default function TriageDashboard() {
             <header className="new-intake-dialog-header">
               <div className="new-intake-heading-copy">
                 <h2 id="new-intake-heading">New intake</h2>
-                <p>Capture the facts first. BatasBot scores only after you confirm them.</p>
+                <p>Capture the facts first. BatasBot scores only after you confirm them. Close anytime; your draft stays in this tab.</p>
               </div>
-              <button className="quiet-icon-button" type="button" aria-label="Close new intake" onClick={closeNewIntake}>
-                <X aria-hidden="true" size={13.4} />
-              </button>
+              <div className="new-intake-dialog-actions">
+                {hasUnsavedIntakeDraft && (
+                  <button
+                    className="intake-discard-draft"
+                    type="button"
+                    onClick={() => {
+                      if (!window.confirm("Discard this unsaved intake draft?")) return;
+                      closeNewIntake();
+                      clearManualIntake();
+                    }}
+                  >
+                    Discard draft
+                  </button>
+                )}
+                <button className="quiet-icon-button" type="button" aria-label="Close new intake" onClick={closeNewIntake}>
+                  <X aria-hidden="true" size={13.4} />
+                </button>
+              </div>
               <ol className="intake-progress" aria-label="Intake progress">
                 {[
                   ["choose", "Choose"],
@@ -1832,7 +1858,7 @@ export default function TriageDashboard() {
                     <div className="intake-score-value-row">
                       <strong>{intakeReview.intake.priorityScore ?? "—"}</strong>
                       <span>/100</span>
-                      <small>{scoreManuallyOverridden ? "Manual override" : `AI-assisted · ${intakeReview.provider}`}</small>
+                      {scoreManuallyOverridden && <small>Manual override</small>}
                     </div>
                     {intakeReview.intake.priorityScore !== null && (
                       <div className="intake-review-meter" role="progressbar" aria-label="Urgency score" aria-valuemin={0} aria-valuemax={100} aria-valuenow={intakeReview.intake.priorityScore}>
@@ -1847,6 +1873,7 @@ export default function TriageDashboard() {
                         min="0"
                         max="100"
                         value={intakeReview.intake.priorityScore ?? 0}
+                        style={{ "--score-progress": `${intakeReview.intake.priorityScore ?? 0}%` } as CSSProperties}
                         onChange={(event) => {
                           const score = Number(event.target.value);
                           setIntakeReview((current) => current ? {
@@ -1859,28 +1886,31 @@ export default function TriageDashboard() {
                   </section>
 
                   {intakeReview.factors && (
-                    <section className="intake-review-breakdown" aria-labelledby="intake-review-breakdown-heading">
-                      <h4 id="intake-review-breakdown-heading">Score breakdown</h4>
-                      <dl>
-                        {([
-                          ["Temporal deadlines", intakeReview.factors.temporalDeadlines, 50],
-                          ["Case risk & impact", intakeReview.factors.caseRiskImpact, 30],
-                          ["Procedural status", intakeReview.factors.proceduralStatus, 20],
-                          ["AI severity bonus", intakeReview.factors.severityBonus, 10],
-                        ] as const).map(([label, factor, maximum]) => (
-                          <div className="intake-review-factor" key={label}>
-                            <dt>{label}<span>{factor.score}/{maximum}</span></dt>
-                            <dd>{factor.rationale}</dd>
-                          </div>
-                        ))}
-                      </dl>
-                      <p>The AI score = min(100, deadlines + case risk/impact + procedural status + AI severity bonus). The final priority can be manually adjusted above.</p>
-                    </section>
+                    <details className="intake-review-breakdown" aria-labelledby="intake-review-breakdown-heading">
+                      <summary>
+                        <span id="intake-review-breakdown-heading">Score breakdown</span>
+                        <ChevronDown aria-hidden="true" size={14} />
+                      </summary>
+                      <div className="intake-review-breakdown-content">
+                        <dl>
+                          {([
+                            ["Temporal deadlines", intakeReview.factors.temporalDeadlines, 50],
+                            ["Case risk & impact", intakeReview.factors.caseRiskImpact, 30],
+                            ["Procedural status", intakeReview.factors.proceduralStatus, 20],
+                            ["AI severity bonus", intakeReview.factors.severityBonus, 10],
+                          ] as const).map(([label, factor, maximum]) => (
+                            <div className="intake-review-factor" key={label}>
+                              <dt>{label}<span>{factor.score}/{maximum}</span></dt>
+                              <dd>{factor.rationale}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      </div>
+                    </details>
                   )}
                   <section className="intake-result-summary">
                     <h4>BatasBot note</h4>
                     <p>{intakeReview.summary}</p>
-                    <small>Reported facts are unverified. Verify all details and deadlines.</small>
                   </section>
                 </div>
 
@@ -1892,7 +1922,7 @@ export default function TriageDashboard() {
                     <div><dt>Urgency flags</dt><dd>{selectedUrgencyFlags.length ? selectedUrgencyFlags.join(", ") : "None selected"}</dd></div>
                     <div><dt>Signals</dt><dd>{intakeReview.signals.length}</dd></div>
                   </dl>
-                  <div className="intake-provider-note"><span>Score is a triage aid, not a legal conclusion. You control the final priority.</span></div>
+
                   {intakeReview.documentReview && (
                     <small className="intake-review-document-note">Read {intakeReview.documentReview.processedCount} file{intakeReview.documentReview.processedCount === 1 ? "" : "s"}{intakeReview.documentReview.truncated ? " · some text shortened" : ""}.</small>
                   )}

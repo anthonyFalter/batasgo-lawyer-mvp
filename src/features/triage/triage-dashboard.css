@@ -1148,6 +1148,7 @@
 }
 
 .intake-board-main.is-ai-generating {
+  padding: 14px;
   border-radius: 5px;
 }
 
@@ -2556,7 +2557,34 @@
   line-height: 1.5;
 }
 
-.new-intake-dialog-header .quiet-icon-button {
+.new-intake-dialog-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.intake-discard-draft {
+  padding: 6px 8px;
+  color: #a54438;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.intake-discard-draft:hover {
+  background: #fff1ef;
+}
+
+.intake-discard-draft:focus-visible {
+  outline: 2px solid #a54438;
+  outline-offset: 2px;
+}
+
+.new-intake-dialog-actions .quiet-icon-button {
   flex: 0 0 auto;
 }
 
@@ -3296,7 +3324,7 @@
   font-size: 12px;
 }
 
-.new-intake-dialog-header .quiet-icon-button {
+.new-intake-dialog-actions .quiet-icon-button {
   width: 32px;
   height: 32px;
 }
@@ -3970,8 +3998,61 @@
 
 .intake-score-override input {
   width: 100%;
-  accent-color: #3569df;
-  transition: accent-color 180ms ease;
+  height: 18px;
+  margin: 0;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  --urgency-color: #bd3039;
+}
+
+.intake-score-override input::-webkit-slider-runnable-track {
+  height: 6px;
+  background: linear-gradient(
+    to right,
+    var(--urgency-color) 0,
+    var(--urgency-color) var(--score-progress),
+    #d4d9e2 var(--score-progress),
+    #d4d9e2 100%
+  );
+  border-radius: 999px;
+}
+
+.intake-score-override input::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  margin-top: -4px;
+  appearance: none;
+  background: var(--urgency-color);
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--urgency-color) 45%, transparent);
+}
+
+.intake-score-override input::-moz-range-track {
+  height: 6px;
+  background: #d4d9e2;
+  border-radius: 999px;
+}
+
+.intake-score-override input::-moz-range-progress {
+  height: 6px;
+  background: var(--urgency-color);
+  border-radius: 999px;
+}
+
+.intake-score-override input::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  background: var(--urgency-color);
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--urgency-color) 45%, transparent);
+}
+
+.intake-score-override input:focus-visible {
+  outline: 2px solid var(--urgency-color);
+  outline-offset: 4px;
 }
 
 .intake-review-score--critical .intake-score-value-row {
@@ -3984,6 +4065,10 @@
 
 .intake-review-score--medium .intake-score-value-row {
   color: var(--yellow-ink);
+}
+
+.intake-review-score--medium .intake-score-value-row strong {
+  color: var(--yellow);
 }
 
 .intake-review-score--low .intake-score-value-row {
@@ -4023,19 +4108,19 @@
 }
 
 .intake-review-score--critical .intake-score-override input {
-  accent-color: #bd3039;
+  --urgency-color: #bd3039;
 }
 
 .intake-review-score--high .intake-score-override input {
-  accent-color: #a45b1c;
+  --urgency-color: #a45b1c;
 }
 
 .intake-review-score--medium .intake-score-override input {
-  accent-color: var(--yellow);
+  --urgency-color: var(--yellow);
 }
 
 .intake-review-score--low .intake-score-override input {
-  accent-color: #18774d;
+  --urgency-color: #18774d;
 }
 
 .intake-review-meter,
@@ -4046,7 +4131,6 @@
 @media (prefers-reduced-motion: reduce) {
   .intake-review-rating,
   .intake-score-value-row,
-  .intake-score-override input,
   .intake-review-meter,
   .intake-review-meter > span {
     transition: none;
@@ -4060,11 +4144,44 @@
   border-radius: 6px;
 }
 
-.intake-review-breakdown h4,
+.intake-review-breakdown > summary,
 .intake-result-summary h4 {
-  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   color: #39475c;
   font-size: 11px;
+  font-weight: 700;
+}
+
+.intake-review-breakdown > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.intake-review-breakdown > summary::-webkit-details-marker {
+  display: none;
+}
+
+.intake-review-breakdown > summary:focus-visible {
+  outline: 2px solid #315fca;
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.intake-review-breakdown > summary svg {
+  flex: 0 0 auto;
+  color: #53627a;
+  transition: transform 150ms ease-out;
+}
+
+.intake-review-breakdown:not([open]) > summary svg {
+  transform: rotate(-90deg);
+}
+
+.intake-review-breakdown-content {
+  padding-top: 11px;
 }
 
 .intake-review-breakdown dl {
