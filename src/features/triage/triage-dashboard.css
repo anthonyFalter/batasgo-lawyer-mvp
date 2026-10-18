@@ -1754,6 +1754,14 @@
   flex-direction: column;
 }
 
+.schedule-empty-state {
+  margin: 0;
+  padding-top: 6.7px;
+  color: #71809a;
+  font-size: 10.72px;
+  line-height: 1.45;
+}
+
 .schedule-item {
   display: grid;
   grid-template-columns: 48.24px minmax(0, 1fr);

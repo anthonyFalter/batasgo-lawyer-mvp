@@ -24,13 +24,12 @@ import {
   apiErrorResponseSchema,
   intakeCaseStages,
   intakeAiExtractionResponseSchema,
-  intakeAiReviewResponseSchema,
   intakeListResponseSchema,
   intakeResponseSchema,
   intakeUrgencyFlags,
   type IntakeDTO,
 } from "@/lib/intakes/validation";
-import { getRiskAction, getRiskFromScore, suggestIntakeDetails } from "@/lib/intakes/triage";
+import { getRiskAction, getRiskFromScore, scoreIntakeUrgency, suggestIntakeDetails } from "@/lib/intakes/triage";
 import WorkspaceShell from "../workspace/workspace-shell";
 
 type Risk = IntakeDTO["risk"];
@@ -66,8 +65,21 @@ type DecisionFilter = "all" | Decision["result"];
 type RankedIntake = { intake: Intake; score: number; reasons: string[]; specialtyMatch: boolean };
 type AiSummaryBlock = { type: "paragraph"; text: string } | { type: "list"; items: string[] };
 type AiSummarySection = { heading: string; blocks: AiSummaryBlock[] };
+type TodayScheduleEvent = { id: string; title: string; matter: string; date: string; startTime: string };
 
 const seenDecisionIdsStorageKey = "batasgo:triage:seen-decision-ids";
+
+function getLocalDateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function formatScheduleTime(time: string) {
+  const [hours, minutes] = time.split(":").map(Number);
+  return new Date(2000, 0, 1, hours, minutes).toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 const aiSummaryHeadings = [
   "Reported issue",
@@ -391,6 +403,10 @@ export default function TriageDashboard() {
   const [seenDecisionIds, setSeenDecisionIds] = useState<Set<string>>(() => new Set());
   const [warpingIntakeIds, setWarpingIntakeIds] = useState<Set<string>>(() => new Set());
   const [isLoadingIntakes, setIsLoadingIntakes] = useState(true);
+  const [todayScheduleEvents, setTodayScheduleEvents] = useState<TodayScheduleEvent[]>([]);
+  const [isLoadingTodaySchedule, setIsLoadingTodaySchedule] = useState(true);
+  const [todayScheduleError, setTodayScheduleError] = useState(false);
+  const [todayDateKey] = useState(() => getLocalDateKey(new Date()));
   const [intakeLoadError, setIntakeLoadError] = useState("");
   const [busyIntakeId, setBusyIntakeId] = useState<string | null>(null);
   const [generatingSummaryId, setGeneratingSummaryId] = useState<string | null>(null);
@@ -421,7 +437,6 @@ export default function TriageDashboard() {
   const [intakePath, setIntakePath] = useState<"documents" | "manual" | null>(null);
   const [maskIdentifiers, setMaskIdentifiers] = useState(true);
   const [documentConsent, setDocumentConsent] = useState(false);
-  const [manualAiConsent, setManualAiConsent] = useState(false);
   const [intakeReview, setIntakeReview] = useState<IntakeReview | null>(null);
   const [isGeneratingIntakeReview, setIsGeneratingIntakeReview] = useState(false);
   const [intakeAiReviewError, setIntakeAiReviewError] = useState("");
@@ -462,6 +477,30 @@ export default function TriageDashboard() {
   useEffect(() => {
     void loadIntakes();
   }, [loadIntakes]);
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    const loadTodaySchedule = async () => {
+      try {
+        const response = await fetch("/api/calendar", { cache: "no-store" });
+        if (!response.ok) throw new Error("Unable to load calendar events.");
+        const payload = await response.json() as { events?: TodayScheduleEvent[] };
+        const events = (payload.events ?? [])
+          .filter((event) => event.date === todayDateKey)
+          .sort((a, b) => a.startTime.localeCompare(b.startTime))
+          .slice(0, 3);
+        if (isCurrent) setTodayScheduleEvents(events);
+      } catch {
+        if (isCurrent) setTodayScheduleError(true);
+      } finally {
+        if (isCurrent) setIsLoadingTodaySchedule(false);
+      }
+    };
+
+    void loadTodaySchedule();
+    return () => { isCurrent = false; };
+  }, [todayDateKey]);
 
   useEffect(() => {
     const reference = new URLSearchParams(window.location.search).get("matter")?.trim();
@@ -786,7 +825,6 @@ export default function TriageDashboard() {
     setIntakePath(null);
     setMaskIdentifiers(true);
     setDocumentConsent(false);
-    setManualAiConsent(false);
     setIntakeReview(null);
     setIntakeAiReviewError("");
     setIsGeneratingIntakeReview(false);
@@ -882,8 +920,8 @@ export default function TriageDashboard() {
     }
   };
 
-  const requestIntakeAiReview = async (includeDocuments: boolean) => {
-    if (isGeneratingIntakeReview || (includeDocuments && (!documentConsent || selectedFiles.length === 0))) return;
+  const requestIntakeExtraction = async () => {
+    if (isGeneratingIntakeReview || !documentConsent || selectedFiles.length === 0) return;
     const controller = new AbortController();
     intakeReviewRequestRef.current?.abort();
     intakeReviewRequestRef.current = controller;
@@ -899,97 +937,62 @@ export default function TriageDashboard() {
         deadlineAt: intakeDeadline || null,
         caseStage: intakeCaseStage,
         urgencyFlags: selectedUrgencyFlags,
-        documents: includeDocuments ? selectedFiles.map((file) => file.name) : [],
+        documents: selectedFiles.map((file) => file.name),
       }));
       formData.append("maskIdentifiers", String(maskIdentifiers));
-      formData.append("mode", includeDocuments ? "extract" : "score");
-      formData.append("aiConsent", String(intakePath === "documents" ? documentConsent : manualAiConsent));
-      if (includeDocuments) {
-        selectedFiles.forEach((file) => formData.append("files", file, file.name));
-      }
+      formData.append("mode", "extract");
+      formData.append("aiConsent", String(documentConsent));
+      selectedFiles.forEach((file) => formData.append("files", file, file.name));
       const response = await fetch("/api/intakes/review", {
         method: "POST",
         body: formData,
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(12_000)]),
       });
-      if (!response.ok) throw new Error(await getResponseError(response, "Unable to generate an AI review."));
+      if (!response.ok) throw new Error(await getResponseError(response, "Unable to extract details from these documents."));
       const payload: unknown = await response.json();
       if (controller.signal.aborted) return;
 
-      const previousReview = intakeReview;
-      if (includeDocuments) {
-        const parsed = intakeAiExtractionResponseSchema.safeParse(payload);
-        if (!parsed.success) throw new Error("The document extraction service returned an invalid response.");
-        const { extraction: review } = parsed.data;
-        setIntakeTitle(review.title);
-        setIntakeDescription(review.description);
-        setIntakeSpecialty(review.domain);
-        setIntakeDeadline(review.deadlineAt ?? "");
-        setIntakeCaseStage(review.caseStage);
-        setSelectedUrgencyFlags(review.urgencyFlags);
-        const filledFields = new Set<keyof IntakeFieldSources>();
-        if (review.title) filledFields.add("title");
-        if (review.description) filledFields.add("description");
-        if (review.domain) filledFields.add("domain");
-        if (review.deadlineAt) filledFields.add("deadlineAt");
-        if (review.caseStage) filledFields.add("caseStage");
-        if (review.urgencyFlags.length) filledFields.add("urgencyFlags");
-        setAiFilledFields(filledFields);
-        setIntakeReview({
-          intake: {
-            ...createIntakeDraft(),
-            client: review.title,
-            domain: review.domain,
-            deadline: review.deadlineAt ? `Due ${review.deadlineAt}` : "No deadline set",
-            deadlineAt: review.deadlineAt ? new Date(`${review.deadlineAt}T12:00:00.000Z`).toISOString() : null,
-            caseStage: review.caseStage,
-            urgencyFlags: review.urgencyFlags,
-          },
-          summary: review.summary,
-          signals: review.signals.length ? review.signals : ["No immediate urgency signals stated"],
-          source: "ai",
-          provider: review.provider,
-          documentReview: review.documentReview,
-          fieldSources: review.fieldSources,
-        });
-        setIntakeStage("details");
-      } else {
-        const parsed = intakeAiReviewResponseSchema.safeParse(payload);
-        if (!parsed.success) throw new Error("The AI scoring service returned an invalid assessment.");
-        const { review } = parsed.data;
-        const draft = previousReview?.intake ?? createIntakeDraft();
-        setIntakeReview({
-          intake: {
-            ...draft,
-            client: intakeTitle.trim() || "Untitled intake",
-            domain: intakeSpecialty || "Other",
-            summary: intakeDescription.trim() || "Details pending lawyer review.",
-            deadline: intakeDeadline ? `Due ${intakeDeadline}` : "No deadline set",
-            deadlineAt: intakeDeadline ? new Date(`${intakeDeadline}T12:00:00.000Z`).toISOString() : null,
-            caseStage: intakeCaseStage,
-            urgencyFlags: selectedUrgencyFlags,
-            documents: selectedFiles.map((file) => file.name),
-            priorityScore: review.priorityScore,
-            risk: review.risk,
-          },
-          summary: review.summary,
-          signals: review.signals.length ? review.signals : ["No immediate urgency signals stated"],
-          source: "ai",
-          provider: review.provider,
-          documentReview: previousReview?.documentReview,
-          fieldSources: previousReview?.fieldSources,
-          factors: review.factors,
-        });
-        setIntakeStage("result");
-      }
+      const parsed = intakeAiExtractionResponseSchema.safeParse(payload);
+      if (!parsed.success) throw new Error("The document extraction service returned an invalid response.");
+      const { extraction: review } = parsed.data;
+      setIntakeTitle(review.title);
+      setIntakeDescription(review.description);
+      setIntakeSpecialty(review.domain);
+      setIntakeDeadline(review.deadlineAt ?? "");
+      setIntakeCaseStage(review.caseStage);
+      setSelectedUrgencyFlags(review.urgencyFlags);
+      const filledFields = new Set<keyof IntakeFieldSources>();
+      if (review.title) filledFields.add("title");
+      if (review.description) filledFields.add("description");
+      if (review.domain) filledFields.add("domain");
+      if (review.deadlineAt) filledFields.add("deadlineAt");
+      if (review.caseStage) filledFields.add("caseStage");
+      if (review.urgencyFlags.length) filledFields.add("urgencyFlags");
+      setAiFilledFields(filledFields);
+      setIntakeReview({
+        intake: {
+          ...createIntakeDraft(),
+          client: review.title,
+          domain: review.domain,
+          deadline: review.deadlineAt ? `Due ${review.deadlineAt}` : "No deadline set",
+          deadlineAt: review.deadlineAt ? new Date(`${review.deadlineAt}T12:00:00.000Z`).toISOString() : null,
+          caseStage: review.caseStage,
+          urgencyFlags: review.urgencyFlags,
+        },
+        summary: review.summary,
+        signals: review.signals.length ? review.signals : ["No immediate urgency signals stated"],
+        source: "ai",
+        provider: review.provider,
+        documentReview: review.documentReview,
+        fieldSources: review.fieldSources,
+      });
+      setIntakeStage("details");
     } catch (error) {
       if (!controller.signal.aborted) {
         const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
         setIntakeAiReviewError(timedOut
-          ? includeDocuments
-            ? "BatasBot took too long to read this file. You can try again or switch to manual entry; your selected files are still here."
-            : "BatasBot took too long to score these details. Your work is still here; try again."
-          : error instanceof Error ? error.message : "Unable to generate an AI review.");
+          ? "BatasBot took too long to read these files. Try again or switch to manual entry; your selected files are still here."
+          : error instanceof Error ? error.message : "Unable to extract details from these documents.");
       }
     } finally {
       if (intakeReviewRequestRef.current === controller) {
@@ -1001,8 +1004,40 @@ export default function TriageDashboard() {
 
   const submitIntakeDetails = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (intakePath === "manual" && !manualAiConsent) return;
-    void requestIntakeAiReview(false);
+    const draft = intakeReview?.intake ?? createIntakeDraft();
+    const assessment = scoreIntakeUrgency({
+      title: intakeTitle,
+      description: intakeDescription,
+      deadlineAt: intakeDeadline || null,
+      caseStage: intakeCaseStage,
+      urgencyFlags: selectedUrgencyFlags,
+    });
+    setIntakeReview({
+      intake: {
+        ...draft,
+        client: intakeTitle.trim() || "Untitled intake",
+        domain: intakeSpecialty || "Other",
+        summary: intakeDescription.trim() || "Details pending lawyer review.",
+        deadline: intakeDeadline ? `Due ${intakeDeadline}` : "No deadline set",
+        deadlineAt: intakeDeadline ? new Date(`${intakeDeadline}T12:00:00.000Z`).toISOString() : null,
+        caseStage: intakeCaseStage,
+        urgencyFlags: selectedUrgencyFlags,
+        documents: selectedFiles.map((file) => file.name),
+        priorityScore: assessment.score,
+        risk: getRiskFromScore(assessment.score),
+      },
+      summary: intakeReview?.documentReview
+        ? intakeReview.summary
+        : intakeDescription.trim()
+          ? intakeDescription.trim().replace(/\s+/g, " ").split(/(?<=[.!?])\s/)[0].slice(0, 220)
+          : "Details pending lawyer review.",
+      signals: assessment.signals.length ? assessment.signals : ["No immediate urgency signals stated"],
+      source: "local",
+      documentReview: intakeReview?.documentReview,
+      fieldSources: intakeReview?.fieldSources,
+      factors: assessment.factors,
+    });
+    setIntakeStage("result");
   };
 
   const clearAiFieldSource = (field: keyof IntakeFieldSources) => {
@@ -1423,9 +1458,20 @@ export default function TriageDashboard() {
                   </button>
                 </div>
                 <div className="schedule-list">
-                  <div className="schedule-item"><time><strong>10:00 AM</strong><span>Today</span></time><div><strong>DOLE Illegal Dismissal Prep</strong><span>M. Santos · Labor Code</span></div></div>
-                  <div className="schedule-item"><time><strong>02:30 PM</strong><span>Today</span></time><div><strong>Contract Mediation Conference</strong><span>Fintrex Dev Corp · Civil Code</span></div></div>
-                  <div className="schedule-item"><time><strong>04:00 PM</strong><span>Today</span></time><div><strong>RA 10175 Evidentiary Audit</strong><span>R. Alcantara · Cybercrime</span></div></div>
+                  {isLoadingTodaySchedule ? (
+                    <p className="schedule-empty-state" role="status">Loading calendar…</p>
+                  ) : todayScheduleError ? (
+                    <p className="schedule-empty-state" role="status">Today&apos;s schedule is unavailable.</p>
+                  ) : todayScheduleEvents.length > 0 ? (
+                    todayScheduleEvents.map((event) => (
+                      <div className="schedule-item" key={event.id}>
+                        <time><strong>{formatScheduleTime(event.startTime)}</strong><span>Today</span></time>
+                        <div><strong>{event.title}</strong><span>{event.matter || "Calendar event"}</span></div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="schedule-empty-state">No events scheduled today.</p>
+                  )}
                 </div>
               </section>
               <section className="rail-panel messages-panel">
@@ -1653,7 +1699,7 @@ export default function TriageDashboard() {
                       className="intake-submit-button"
                       type="button"
                       disabled={!documentConsent || selectedFiles.length === 0 || isGeneratingIntakeReview}
-                      onClick={() => void requestIntakeAiReview(true)}
+                      onClick={() => void requestIntakeExtraction()}
                     >
                       {isGeneratingIntakeReview ? <><Sparkles aria-hidden="true" size={13} /> Reading documents…</> : <>Upload &amp; extract <ArrowRight aria-hidden="true" size={13} /></>}
                     </button>
@@ -1688,7 +1734,7 @@ export default function TriageDashboard() {
                   <div className="intake-section-heading">
                     <div>
                       <h3 id="intake-details-heading">{intakePath === "documents" ? "Review extracted details" : "Enter matter details"}</h3>
-                      <p>{intakePath === "documents" ? "BatasBot's suggestions are marked. Verify every date before scoring." : "Add the key facts BatasBot should consider."}</p>
+                      <p>{intakePath === "documents" ? "BatasBot's suggestions are marked. Verify every date before scoring." : "Add the key facts used to calculate a consistent urgency score."}</p>
                     </div>
                     {intakePath === "documents" && <span className="intake-ai-badge"><Sparkles aria-hidden="true" size={12} /> AI draft</span>}
                   </div>
@@ -1824,15 +1870,7 @@ export default function TriageDashboard() {
 
                   {intakePath === "manual" && (
                     <section className="intake-manual-privacy">
-                      <label className="intake-toggle-row">
-                        <input type="checkbox" checked={manualAiConsent} onChange={(event) => setManualAiConsent(event.target.checked)} />
-                        <span><strong>Send these confirmed details to BatasBot for scoring</strong><small>BatasBot scores only after you check this and choose the scoring action.</small></span>
-                      </label>
-                      <label className="intake-toggle-row">
-                        <input type="checkbox" checked={maskIdentifiers} onChange={(event) => setMaskIdentifiers(event.target.checked)} />
-                        <span><strong>Mask identifiers before AI review</strong><small>Pattern checks replace some names, phone numbers, addresses, and ID numbers with tokens.</small></span>
-                      </label>
-                            <p>This is partial risk reduction, not anonymization. Your details stay in this form until you choose “Score with AI”; that action sends them to BatasBot.</p>
+                      <p>Your urgency score is calculated in this browser from the confirmed details. Manual entries are not sent to an AI provider for scoring.</p>
                     </section>
                   )}
 
@@ -1840,19 +1878,21 @@ export default function TriageDashboard() {
                   <footer className="intake-board-footer">
                     <button className="intake-cancel-button" type="button" onClick={() => setIntakeStage(intakePath === "documents" ? "upload" : "choose")}>Back</button>
                     <div>
-                      <button className="intake-submit-button" type="submit" disabled={isGeneratingIntakeReview || (!intakeTitle.trim() && !intakeDescription.trim()) || (intakePath === "manual" && !manualAiConsent)}>
-                        {isGeneratingIntakeReview ? <><Sparkles aria-hidden="true" size={13} /> Scoring details…</> : <>Looks good — score with AI <ArrowRight aria-hidden="true" size={13} /></>}
+                      <button className="intake-submit-button" type="submit" disabled={!intakeTitle.trim() && !intakeDescription.trim()}>
+                        <>Looks good — calculate urgency <ArrowRight aria-hidden="true" size={13} /></>
                       </button>
                     </div>
                   </footer>
                   <span className="sr-only" role="status" aria-live="polite">
-                    {isGeneratingIntakeReview ? "BatasBot is scoring the confirmed intake details." : ""}
+                    {isGeneratingIntakeReview ? "BatasBot is extracting details from the selected documents." : ""}
                   </span>
                 </section>
 
                 <aside className="intake-board-rail" aria-label="Review guidance">
                   <div className="intake-rail-heading"><h4>Check before scoring</h4></div>
-                  <p>Confirm the names, dates, and facts against the original. AI suggestions can be wrong; they are not legal advice.</p>
+                  <p>{intakePath === "documents"
+                    ? "Confirm the names, dates, and facts against the original. AI extraction can be wrong; the urgency score is a prioritization aid, not legal advice."
+                    : "Confirm the names, dates, and facts. The urgency score is a prioritization aid, not legal advice."}</p>
                   {intakePath === "documents" && (
                     <>
                       <div className="intake-rail-divider" />
@@ -1864,8 +1904,8 @@ export default function TriageDashboard() {
                   )}
                   <div className="intake-provider-note">
                     <span>{intakePath === "documents"
-                      ? "The confirmed fields—not the original file—are sent for scoring."
-                      : "Nothing is sent to BatasBot until you choose the scoring action."}</span>
+                      ? "The confirmed fields are scored locally; the original files are not sent again."
+                      : "Your confirmed details are scored locally and are not sent to an AI provider."}</span>
                   </div>
                 </aside>
               </form>
@@ -1876,7 +1916,7 @@ export default function TriageDashboard() {
                 <div className="intake-score-main">
                   <header className="intake-review-header">
                     <div>
-                      <h3 id="intake-score-heading">AI urgency score</h3>
+                      <h3 id="intake-score-heading">Urgency score</h3>
                       <p>{intakeReview.intake.client} · {intakeReview.intake.domain}</p>
                     </div>
                     <div className={`intake-review-rating intake-review-rating--${intakeReview.intake.risk.toLowerCase()}`}>
@@ -1928,7 +1968,7 @@ export default function TriageDashboard() {
                             ["Temporal deadlines", intakeReview.factors.temporalDeadlines, 50],
                             ["Case risk & impact", intakeReview.factors.caseRiskImpact, 30],
                             ["Procedural status", intakeReview.factors.proceduralStatus, 20],
-                            ["AI severity bonus", intakeReview.factors.severityBonus, 10],
+                            ["Combined urgency bonus", intakeReview.factors.severityBonus, 10],
                           ] as const).map(([label, factor, maximum]) => (
                             <div className="intake-review-factor" key={label}>
                               <dt>{label}<span>{factor.score}/{maximum}</span></dt>
@@ -1967,7 +2007,7 @@ export default function TriageDashboard() {
                 </aside>
 
                 <footer className="intake-board-footer intake-board-footer--result">
-                  <button className="intake-cancel-button" type="button" disabled={isSavingIntake} onClick={() => setIntakeStage("details")}>Edit details &amp; rescore</button>
+                  <button className="intake-cancel-button" type="button" disabled={isSavingIntake} onClick={() => setIntakeStage("details")}>Edit details</button>
                   <button className="intake-submit-button" type="button" disabled={isSavingIntake} onClick={() => void proceedWithManualIntake()}>
                     {isSavingIntake ? "Saving…" : "Save intake"} <ArrowRight aria-hidden="true" size={13} />
                   </button>

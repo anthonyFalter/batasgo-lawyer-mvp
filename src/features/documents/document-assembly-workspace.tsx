@@ -25,6 +25,10 @@ import {
   X,
 } from "lucide-react";
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  isCitizenJournalHandoffContext,
+  type CitizenJournalHandoffContext,
+} from "@/lib/citizen/journal-handoff-context";
 import { useTypingStream } from "@/hooks/use-typing-stream";
 import DocumentTemplatePicker, {
   type DocumentTemplate,
@@ -56,7 +60,7 @@ type ImportedIntake = {
   domain: string;
   risk: string;
   summary: string;
-  result: "accepted";
+  result: "accepted" | "journal";
 };
 
 const EDITOR_TABS: EditorTab[] = ["File", "Home", "Insert", "Format", "Review Changes", "View"];
@@ -176,7 +180,7 @@ function formatBytes(size: number) {
 function isImportedIntake(value: unknown): value is ImportedIntake {
   if (!value || typeof value !== "object") return false;
   const intake = value as Partial<ImportedIntake>;
-  return intake.result === "accepted"
+  return (intake.result === "accepted" || intake.result === "journal")
     && typeof intake.id === "string"
     && typeof intake.client === "string"
     && typeof intake.domain === "string"
@@ -195,6 +199,19 @@ function escapeHtml(value: string) {
     };
     return entities[character];
   });
+}
+
+function buildJournalDraft(handoff: CitizenJournalHandoffContext) {
+  const entries = handoff.entries.length
+    ? handoff.entries.map((entry) => (
+      `<section><h2>${escapeHtml(entry.title)}</h2><p><strong>Incident date:</strong> ${escapeHtml(entry.incidentDate)}${entry.location ? `<br><strong>Location:</strong> ${escapeHtml(entry.location)}` : ""}</p><p>${escapeHtml(entry.details).replace(/\r?\n/g, "<br>")}</p></section>`
+    )).join("")
+    : "<p>No journal entry details were included in this handoff.</p>";
+  const attachments = handoff.attachments.length
+    ? `<h2>Shared attachments</h2><ul>${handoff.attachments.map((name) => `<li>${escapeHtml(name)}</li>`).join("")}</ul>`
+    : "";
+
+  return `<h1>${escapeHtml(handoff.title)}</h1><p><strong>Source:</strong> Citizen-shared journal handoff<br><strong>Reference:</strong> JOURNAL-${escapeHtml(handoff.messageId.slice(0, 8))}</p><p><em>These are client-reported notes. Verify facts against source documents before relying on them.</em></p><h2>Reported entries</h2>${entries}${attachments}`;
 }
 
 export default function DocumentAssemblyWorkspace() {
@@ -243,21 +260,63 @@ export default function DocumentAssemblyWorkspace() {
   const matterId = importedIntake?.id ?? MATTER_ID;
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("source") !== "accepted-intake") return;
+    const source = new URLSearchParams(window.location.search).get("source");
+    if (source !== "accepted-intake" && source !== "journal-handoff") return;
 
     let acceptedIntake: ImportedIntake | null = null;
+    let journalHandoff: CitizenJournalHandoffContext | null = null;
+    let storageReadFailed = false;
     try {
-      const rawIntake = window.sessionStorage.getItem("batasgo-accepted-intake");
-      const parsed: unknown = rawIntake ? JSON.parse(rawIntake) : null;
-      if (isImportedIntake(parsed)) acceptedIntake = parsed;
+      if (source === "accepted-intake") {
+        const rawIntake = window.sessionStorage.getItem("batasgo-accepted-intake");
+        const parsed: unknown = rawIntake ? JSON.parse(rawIntake) : null;
+        if (isImportedIntake(parsed)) acceptedIntake = parsed;
+        window.sessionStorage.removeItem("batasgo-accepted-intake");
+      } else {
+        const rawHandoff = window.sessionStorage.getItem("batasgo-journal-handoff");
+        const parsed: unknown = rawHandoff ? JSON.parse(rawHandoff) : null;
+        if (isCitizenJournalHandoffContext(parsed)) journalHandoff = parsed;
+        window.sessionStorage.removeItem("batasgo-journal-handoff");
+      }
     } catch {
       acceptedIntake = null;
+      journalHandoff = null;
+      storageReadFailed = true;
+      setToast(source === "journal-handoff"
+        ? "This browser could not read the journal handoff. Return to Messages and try again."
+        : "This browser could not read the accepted intake. Return to Case Overview and try again.");
     }
 
-    window.sessionStorage.removeItem("batasgo-accepted-intake");
     window.history.replaceState(null, "", window.location.pathname);
+    if (source === "journal-handoff" && !journalHandoff) {
+      if (!storageReadFailed) setToast("No journal handoff was found to import. Return to Messages and try again.");
+      return;
+    }
+    if (source === "journal-handoff") {
+      const handoff = journalHandoff;
+      if (!handoff) return;
+      const journalSummary = handoff.entries.map((entry) => entry.details).join(" ").slice(0, 1200);
+      const reference = `JOURNAL-${handoff.messageId.slice(0, 8)}`;
+      setImportedIntake({
+        id: reference,
+        client: "Citizen journal",
+        domain: "Journal handoff",
+        risk: "Unassessed",
+        summary: journalSummary || "No journal entry details were included.",
+        result: "journal",
+      });
+      setCurrentDocumentTitle(`Journal review · ${handoff.title}`.slice(0, 120));
+      setDraftHtml(buildJournalDraft(handoff));
+      setAttachments([]);
+      setIsDirty(false);
+      setSavedLabel("Draft only");
+      setWorkspaceStep("editor");
+      setAnnouncement(`${reference} opened in Document Assembly as a draft for review.`);
+      return;
+    }
+
     if (!acceptedIntake) {
-      setToast("No accepted intake was found to import.");
+      setToast("No accepted intake was found to import. Return to Case Overview and try again.");
       return;
     }
 
