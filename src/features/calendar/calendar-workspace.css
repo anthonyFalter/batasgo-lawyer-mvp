@@ -595,6 +595,7 @@
   width: 100%;
   max-width: none;
   margin: 0;
+  padding-left: 22.78px;
   display: flex;
   min-height: calc(100svh - 62.98px);
   flex-direction: column;
@@ -1852,5 +1853,17 @@
 
   .calendar-event-field--wide {
     grid-column: auto;
+  }
+}
+
+@media (max-width: 1004px) {
+  .calendar-page {
+    padding-left: 18.76px;
+  }
+}
+
+@media (max-width: 656.6px) {
+  .calendar-page {
+    padding-left: 20px;
   }
 }
