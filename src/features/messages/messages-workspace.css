@@ -342,14 +342,28 @@
 .citizen-handoff-content h3 {
   margin: 0;
   color: var(--heading);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
 }
 
-.citizen-handoff-content > p {
-  margin: 0;
+.citizen-handoff-heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
   font-size: 10px;
-  font-weight: 650;
+}
+
+.citizen-handoff-tag {
+  padding: 2px 6px;
+  color: var(--blue-ink);
+  background: var(--blue-pale);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .citizen-handoff-content > time,
@@ -407,6 +421,79 @@
 .citizen-handoff-files span {
   flex: 0 0 auto;
   color: #657188;
+}
+
+.citizen-handoff-actions {
+  display: flex;
+  max-height: 0;
+  flex-wrap: wrap;
+  gap: 6px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease-out;
+}
+
+.citizen-handoff-content:hover .citizen-handoff-actions,
+.citizen-handoff-content:focus-within .citizen-handoff-actions {
+  max-height: 120px;
+  margin-top: 3px;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.citizen-handoff-actions button {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  color: var(--blue-ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.citizen-handoff-actions button:hover:not(:disabled) {
+  background: var(--blue-pale);
+}
+
+.citizen-handoff-actions button:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.citizen-handoff-actions button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.citizen-handoff-loading {
+  animation: citizen-handoff-spin 900ms linear infinite;
+}
+
+.citizen-handoff-action-error {
+  margin: 0;
+  color: var(--urgent-ink);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+@keyframes citizen-handoff-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (hover: none), (max-width: 656.6px) {
+  .citizen-handoff-actions {
+    max-height: 140px;
+    margin-top: 3px;
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 .thread-message-meta {

@@ -17,6 +17,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import {
+  isCitizenJournalHandoffContext,
+  type CitizenJournalHandoffContext,
+} from "@/lib/citizen/journal-handoff-context";
 import { useTypingStream } from "@/hooks/use-typing-stream";
 import WorkspaceShell from "../workspace/workspace-shell";
 import ReactMarkdown from "react-markdown";
@@ -264,6 +268,22 @@ function explainTriageHandoff(handoff: TriageChatHandoff) {
   return `${handoff.id} | ${handoff.domain} | ${handoff.risk} risk. ${deadline} Summary: ${summaryText}. ${signalText}`;
 }
 
+function createJournalReviewPrompt(handoff: CitizenJournalHandoffContext) {
+  const entries = handoff.entries.length
+    ? handoff.entries.map((entry, index) => [
+      `${index + 1}. ${entry.title}`,
+      `Incident date: ${entry.incidentDate || "Not stated"}`,
+      entry.location ? `Location: ${entry.location}` : "",
+      `Client-reported details: ${entry.details}`,
+    ].filter(Boolean).join("\n")).join("\n\n")
+    : "No journal entry details were included.";
+  const attachments = handoff.attachments.length
+    ? `\n\nAttachment names (files are not included in this chat):\n${handoff.attachments.map((name) => `- ${name}`).join("\n")}`
+    : "";
+
+  return `Review this citizen-shared journal. Separate reported facts from legal conclusions, identify key facts and missing information, and suggest focused follow-up questions under Philippine law. Do not treat incident dates as legal deadlines.\n\nJournal: ${handoff.title}\n\n${entries}${attachments}`;
+}
+
 function getIntakeReviewVisual(handoff: TriageChatHandoff): IntakeReviewVisual {
   const signals = handoff.reasons
     .flatMap((reason) => reason.split(" · "))
@@ -409,7 +429,7 @@ export default function BatasBotWorkspace() {
           ]));
           if (data[0]
             && !newChatStartedRef.current
-            && new URLSearchParams(window.location.search).get("source") !== "triage") {
+            && !["triage", "citizen-journal"].includes(new URLSearchParams(window.location.search).get("source") ?? "")) {
             setActiveSessionId((current) => current ?? data[0].id);
           }
         }
@@ -419,6 +439,31 @@ export default function BatasBotWorkspace() {
         setSessionsLoading(false);
       }
     })();
+  }, []);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("source") !== "citizen-journal") return;
+
+    let handoff: CitizenJournalHandoffContext | null = null;
+    try {
+      const rawHandoff = window.sessionStorage.getItem("batasbot-citizen-journal");
+      const parsed: unknown = rawHandoff ? JSON.parse(rawHandoff) : null;
+      if (isCitizenJournalHandoffContext(parsed)) handoff = parsed;
+      window.sessionStorage.removeItem("batasbot-citizen-journal");
+    } catch {
+      handoff = null;
+      setNotice("This browser could not read the journal handoff. Return to Messages and try again.");
+    }
+
+    window.history.replaceState(null, "", window.location.pathname);
+    if (!handoff) {
+      setNotice("No journal handoff was found. Return to Messages and open the journal again.");
+      return;
+    }
+
+    newChatStartedRef.current = true;
+    setInput(createJournalReviewPrompt(handoff));
+    setNotice("Journal context is ready. Review the draft prompt, then send it to BatasBot.");
   }, []);
 
   // ── Load messages when active session changes ──────────────────────────

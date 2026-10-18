@@ -37,11 +37,12 @@ export const citizenHandoffPayloadSchema = z.object({
       "application/pdf",
       "image/jpeg",
       "image/png",
+      "text/plain",
       "audio/mpeg",
       "audio/wav",
       "video/mp4",
     ]),
-  }).strict()).max(10),
+  }).strict()).max(11),
 }).strict().superRefine((payload, context) => {
   const entryIds = new Set(payload.entries.map((entry) => entry.id));
   for (const [index, attachment] of payload.attachments.entries()) {

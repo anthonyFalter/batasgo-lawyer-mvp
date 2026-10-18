@@ -3,15 +3,22 @@
 import { useUser } from "@clerk/nextjs";
 import {
   ArrowLeft,
+  Bot,
   Check,
   CheckCheck,
+  FileText,
+  LoaderCircle,
   Mail,
   Paperclip,
+  Plus,
   Search,
   Send,
   X,
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { scoreIntakeUrgency } from "@/lib/intakes/triage";
+import { intakeResponseSchema } from "@/lib/intakes/validation";
+import type { CitizenJournalHandoffContext } from "@/lib/citizen/journal-handoff-context";
 import WorkspaceShell from "../workspace/workspace-shell";
 import "./messages-workspace.css";
 
@@ -125,6 +132,8 @@ export default function MessagesWorkspace() {
   const [showThreadOnMobile, setShowThreadOnMobile] = useState(false);
   const [toast, setToast] = useState("");
   const [error, setError] = useState("");
+  const [journalActionError, setJournalActionError] = useState<{ messageId: string; message: string } | null>(null);
+  const [savingJournalId, setSavingJournalId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingThread, setIsLoadingThread] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -354,6 +363,97 @@ export default function MessagesWorkspace() {
 
   const unavailable = (label: string) => setToast(`${label} is not available for citizen conversations.`);
 
+  const createJournalContext = (message: Message): CitizenJournalHandoffContext | null => {
+    const handoff = message.journalHandoff;
+    if (!handoff) return null;
+    return {
+      messageId: message.id,
+      title: handoff.title,
+      entries: (handoff.entries ?? []).map(({ id, title, incidentDate, location, details }) => ({
+        id,
+        title,
+        incidentDate,
+        location,
+        details,
+      })),
+      attachments: handoff.attachments.map((attachment) => attachment.fileName),
+    };
+  };
+
+  const openJournalInDocumentAssembly = (message: Message) => {
+    const handoff = createJournalContext(message);
+    if (!handoff) return;
+    try {
+      window.sessionStorage.setItem("batasgo-journal-handoff", JSON.stringify(handoff));
+    } catch {
+      setJournalActionError({ messageId: message.id, message: "This browser could not pass the journal to Document Assembly." });
+      return;
+    }
+    window.location.assign("/documents?source=journal-handoff");
+  };
+
+  const openJournalInBatasBot = (message: Message) => {
+    const handoff = createJournalContext(message);
+    if (!handoff) return;
+    try {
+      window.sessionStorage.setItem("batasbot-citizen-journal", JSON.stringify(handoff));
+    } catch {
+      setJournalActionError({ messageId: message.id, message: "This browser could not pass the journal to BatasBot." });
+      return;
+    }
+    window.location.assign("/batasbot?source=citizen-journal");
+  };
+
+  const addJournalToIntakeQueue = async (message: Message) => {
+    const handoff = message.journalHandoff;
+    if (!handoff || savingJournalId) return;
+    setSavingJournalId(message.id);
+    setJournalActionError(null);
+
+    const fullDescription = (handoff.entries ?? []).map((entry) =>
+      `${entry.title} (${entry.incidentDate}${entry.location ? ` · ${entry.location}` : ""})\n${entry.details}`,
+    ).join("\n\n");
+    const description = fullDescription.slice(0, 1200);
+    const title = `Journal: ${handoff.title}`.slice(0, 120);
+    const urgency = scoreIntakeUrgency({
+      title,
+      description,
+      deadlineAt: null,
+      caseStage: "",
+      urgencyFlags: [],
+    });
+
+    try {
+      const result = await requestApi<{ intake: unknown }>("/api/intakes", {
+        method: "POST",
+        body: JSON.stringify({
+          title,
+          description: description || "No journal entry details were included.",
+          domain: "",
+          documents: handoff.attachments.slice(0, 10).map(({ fileName }) => fileName),
+          deadlineAt: null,
+          caseStage: "",
+          urgencyFlags: [],
+          priorityScore: urgency.score,
+        }),
+      });
+      const parsed = intakeResponseSchema.safeParse(result);
+      if (!parsed.success) throw new Error("The intake service returned an invalid response.");
+      const followUp = [
+        fullDescription.length > description.length ? "Journal details were shortened to fit the intake limit." : "",
+        handoff.attachments.length > 10 ? "Only 10 attachment names can be saved with an intake." : "",
+      ].filter(Boolean).join(" ");
+      setToast(`Journal added to the intake queue as ${parsed.data.intake.reference} with urgency score ${urgency.score}/100.${followUp ? ` ${followUp}` : ""}`);
+    } catch (actionError) {
+      setJournalActionError({
+        messageId: message.id,
+        message: actionError instanceof Error ? actionError.message : "Unable to add this journal to the intake queue.",
+      });
+    } finally {
+      setSavingJournalId(null);
+    }
+  };
+
   return (
     <WorkspaceShell
       activePage="Messages"
@@ -446,8 +546,11 @@ export default function MessagesWorkspace() {
                         {message.text && <p>{message.text}</p>}
                         {message.journalHandoff && (
                           <section className="citizen-handoff-content">
-                            <h3>Journal handoff · shared as provided</h3>
-                            <p>{message.journalHandoff.title}</p>
+                            <div className="citizen-handoff-heading">
+                              <span className="citizen-handoff-tag">Journal</span>
+                              <span>Shared as provided</span>
+                            </div>
+                            <h3>{message.journalHandoff.title}</h3>
                             <time>Consent recorded {formatTime(message.journalHandoff.consentedAt)}</time>
                             {message.journalHandoff.entries?.map((entry) => (
                               <article className="citizen-handoff-entry" key={entry.id}>
@@ -467,6 +570,32 @@ export default function MessagesWorkspace() {
                                   </li>
                                 ))}
                               </ul>
+                            )}
+                            {message.direction === "inbound" && (
+                              <div className="citizen-handoff-actions" role="group" aria-label={`Actions for journal ${message.journalHandoff.title}`}>
+                                <button type="button" onClick={() => openJournalInDocumentAssembly(message)}>
+                                  <FileText aria-hidden="true" size={14} />
+                                  Open in document assembly
+                                </button>
+                                <button type="button" onClick={() => openJournalInBatasBot(message)}>
+                                  <Bot aria-hidden="true" size={14} />
+                                  Open in BatasBot
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={Boolean(savingJournalId)}
+                                  aria-busy={savingJournalId === message.id}
+                                  onClick={() => void addJournalToIntakeQueue(message)}
+                                >
+                                  {savingJournalId === message.id
+                                    ? <LoaderCircle className="citizen-handoff-loading" aria-hidden="true" size={14} />
+                                    : <Plus aria-hidden="true" size={14} />}
+                                  Add to intake queue
+                                </button>
+                              </div>
+                            )}
+                            {journalActionError?.messageId === message.id && (
+                              <p className="citizen-handoff-action-error" role="alert">{journalActionError.message}</p>
                             )}
                           </section>
                         )}

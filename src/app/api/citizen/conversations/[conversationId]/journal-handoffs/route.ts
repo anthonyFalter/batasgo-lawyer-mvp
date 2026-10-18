@@ -36,6 +36,14 @@ function detectContentType(bytes: Uint8Array): AttachmentMetadata["contentType"]
     && String.fromCharCode(...bytes.slice(8, 12)) === "WAVE"
   ) return "audio/wav";
   if (bytes.length >= 8 && String.fromCharCode(...bytes.slice(4, 8)) === "ftyp") return "video/mp4";
+  if (!bytes.includes(0)) {
+    try {
+      new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+      return "text/plain";
+    } catch {
+      return null;
+    }
+  }
   return null;
 }
 
