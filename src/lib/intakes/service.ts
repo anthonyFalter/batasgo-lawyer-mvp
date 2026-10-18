@@ -41,6 +41,7 @@ function getDeadline(deadlineAt: Date | null) {
 
 export function toIntakeDTO(intake: typeof intakes.$inferSelect): IntakeDTO {
   const deadline = getDeadline(intake.deadlineAt);
+  const summary = intake.summary.replace(/^Synthetic example:\s*/i, "");
 
   return {
     id: intake.id,
@@ -48,7 +49,7 @@ export function toIntakeDTO(intake: typeof intakes.$inferSelect): IntakeDTO {
     domain: intake.domain,
     risk: getRiskFromScore(intake.priorityScore),
     client: intake.client,
-    summary: intake.summary,
+    summary,
     received: formatReceived(intake.receivedAt),
     receivedOrder: getReceivedOrder(intake.receivedAt),
     deadline: deadline.label,

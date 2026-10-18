@@ -15,6 +15,7 @@ import { sql } from "drizzle-orm";
 export const workspaceRole = pgEnum("workspace_role", ["owner", "lawyer", "staff"]);
 export const intakeRisk = pgEnum("intake_risk", ["critical", "high", "medium", "low", "unassessed"]);
 export const intakeStatus = pgEnum("intake_status", ["pending", "accepted", "declined"]);
+export const calendarEventKind = pgEnum("calendar_event_kind", ["family", "labor", "civil", "criminal", "intake"]);
 
 export const workspaces = pgTable("workspaces", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -71,6 +72,34 @@ export const intakes = pgTable(
       table.status,
       table.receivedAt,
     ),
+  ],
+);
+
+export const calendarEvents = pgTable(
+  "calendar_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    clerkUserId: text("clerk_user_id").notNull(),
+    intakeId: uuid("intake_id").references(() => intakes.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    matter: text("matter").notNull().default(""),
+    kind: calendarEventKind("kind").notNull().default("labor"),
+    date: text("date").notNull(),
+    startTime: text("start_time").notNull().default("09:00"),
+    durationMinutes: integer("duration_minutes").notNull().default(60),
+    location: text("location").notNull().default(""),
+    details: text("details").notNull().default(""),
+    attendees: text("attendees").notNull().default(""),
+    source: text("source").notNull().default("manual"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("calendar_events_workspace_date_idx").on(table.workspaceId, table.date),
+    index("calendar_events_clerk_user_idx").on(table.clerkUserId),
   ],
 );
 

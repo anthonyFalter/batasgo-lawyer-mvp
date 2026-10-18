@@ -1151,7 +1151,6 @@ export default function TriageDashboard() {
                       <span className={`decision-history-status decision-history-status--${result}`}>
                         {result === "accepted" ? "Accepted" : "Declined"}
                       </span>
-                      {intake.isSample && <span className="intake-sample-badge">SAMPLE</span>}
                     </div>
                     <p className="decision-history-client">{intake.client}</p>
                     <p className="decision-history-context">{intake.domain} · {intake.risk} risk</p>

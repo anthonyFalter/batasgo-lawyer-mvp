@@ -43,6 +43,13 @@
       "when": 1792288574336,
       "tag": "0005_unusual_lilith",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792293846863,
+      "tag": "0006_calendar_events",
+      "breakpoints": true
     }
   ]
 }
