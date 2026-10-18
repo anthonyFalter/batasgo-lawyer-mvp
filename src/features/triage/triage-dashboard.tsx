@@ -1909,7 +1909,14 @@ export default function TriageDashboard() {
                     </details>
                   )}
                   <section className="intake-result-summary">
-                    <h4>BatasBot note</h4>
+                    <div className="intake-result-summary-header">
+                      <div className="intake-result-summary-label">
+                        <span className="intake-result-summary-badge" aria-hidden="true">
+                          <Sparkles size={9.38} fill="currentColor" strokeWidth={1.7} />
+                        </span>
+                        <h4>BatasBot Summary</h4>
+                      </div>
+                    </div>
                     <p>{intakeReview.summary}</p>
                   </section>
                 </div>

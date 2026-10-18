@@ -4215,21 +4215,55 @@
 }
 
 .intake-result-summary {
-  padding: 13px 14px;
-  background: #f7f8fa;
-  border-radius: 6px;
+  padding: 12px 13px;
+  background: linear-gradient(180deg, #f3fff4 0%, #edf8ee 100%);
+  border: 1px solid #d5e9d6;
+  border-radius: 8px;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 80%);
+}
+
+.intake-result-summary-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.intake-result-summary-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.intake-result-summary-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: #1f7f41;
+  background: linear-gradient(180deg, #e4f9e7 0%, #cfeed4 100%);
+  border: 1px solid #b8dcb8;
+  border-radius: 50%;
+  box-shadow: 0 2px 5px rgb(78 154 92 / 12%);
+}
+
+.intake-result-summary-badge svg {
+  width: 10px;
+  height: 10px;
+}
+
+.intake-result-summary h4 {
+  margin: 0;
+  color: #2f6d32;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .intake-result-summary p {
-  margin: 7px 0;
-  color: #4f5e74;
+  margin: 0;
+  color: #4d5f6d;
   font-size: 10px;
   line-height: 1.55;
-}
-
-.intake-result-summary small {
-  color: #77849a;
-  font-size: 9px;
 }
 
 .intake-score-rail dl {

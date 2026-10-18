@@ -87,10 +87,16 @@ function isTriageChatHandoff(value: unknown): value is TriageChatHandoff {
 }
 
 function explainTriageHandoff(handoff: TriageChatHandoff) {
-  const needSignals = handoff.reasons.filter((reason) =>
-    !/risk indicators$/.test(reason) && !/^(Fits|Outside profile specialty:)/.test(reason),
-  );
-  return `This intake may merit prompt review because it is marked ${handoff.risk.toLowerCase()} risk, with a deadline of ${handoff.deadline.toLowerCase()}. The intake describes: ${handoff.summary} Signals from the local preview: ${needSignals.join("; ")}. The profile lists ${handoff.specialty}; the matter is ${handoff.domain}. This is a sample-based demo explanation, not a live AI assessment. Verify the source records and deadline before deciding.`;
+  const signals = handoff.reasons
+    .filter((reason) => !/^(Fits|Outside profile specialty:)/.test(reason))
+    .slice(0, 3)
+    .join(" · ");
+  const summaryText = handoff.summary.trim().replace(/\s*\.+\s*$/, "");
+  const deadline = handoff.deadline && !/^no deadline set$/i.test(handoff.deadline)
+    ? `Deadline: ${handoff.deadline}.`
+    : "Deadline: not stated.";
+  const signalText = signals ? `Signals: ${signals}.` : "Signals: none stated.";
+  return `${handoff.id} | ${handoff.domain} | ${handoff.risk} risk. ${deadline} Summary: ${summaryText}. ${signalText}`;
 }
 
 function getIntakeReviewVisual(handoff: TriageChatHandoff): IntakeReviewVisual {
