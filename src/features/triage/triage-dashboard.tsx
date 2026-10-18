@@ -34,6 +34,7 @@ import {
   isCitizenJournalHandoffContext,
   journalIntakeHandoffStorageKey,
 } from "@/lib/citizen/journal-handoff-context";
+import { citizenRecentMessagesSchema } from "@/lib/citizen/validation";
 import { getRiskAction, getRiskFromScore, scoreIntakeUrgency, suggestIntakeDetails } from "@/lib/intakes/triage";
 import WorkspaceShell from "../workspace/workspace-shell";
 
@@ -71,6 +72,14 @@ type RankedIntake = { intake: Intake; score: number; reasons: string[]; specialt
 type AiSummaryBlock = { type: "paragraph"; text: string } | { type: "list"; items: string[] };
 type AiSummarySection = { heading: string; blocks: AiSummaryBlock[] };
 type TodayScheduleEvent = { id: string; title: string; matter: string; date: string; startTime: string };
+type RecentMessage = {
+  id: string;
+  conversationId: string;
+  client: string;
+  subject: string;
+  text: string;
+  createdAt: string;
+};
 
 const seenDecisionIdsStorageKey = "batasgo:triage:seen-decision-ids";
 
@@ -84,6 +93,19 @@ function formatScheduleTime(time: string) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function formatRelativeMessageTime(value: string) {
+  const timestamp = new Date(value).getTime();
+  if (Number.isNaN(timestamp)) return "";
+  const minutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60_000));
+  if (minutes < 1) return "now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(timestamp);
 }
 
 const aiSummaryHeadings = [
@@ -411,6 +433,10 @@ export default function TriageDashboard() {
   const [todayScheduleEvents, setTodayScheduleEvents] = useState<TodayScheduleEvent[]>([]);
   const [isLoadingTodaySchedule, setIsLoadingTodaySchedule] = useState(true);
   const [todayScheduleError, setTodayScheduleError] = useState(false);
+  const [recentMessages, setRecentMessages] = useState<RecentMessage[]>([]);
+  const [isLoadingRecentMessages, setIsLoadingRecentMessages] = useState(true);
+  const [recentMessagesError, setRecentMessagesError] = useState("");
+  const [recentMessagesReload, setRecentMessagesReload] = useState(0);
   const [todayDateKey] = useState(() => getLocalDateKey(new Date()));
   const [intakeLoadError, setIntakeLoadError] = useState("");
   const [busyIntakeId, setBusyIntakeId] = useState<string | null>(null);
@@ -550,6 +576,48 @@ export default function TriageDashboard() {
     void loadTodaySchedule();
     return () => { isCurrent = false; };
   }, [todayDateKey]);
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    const loadRecentMessages = async () => {
+      try {
+        const response = await fetch("/api/citizen/conversations", { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error(await getResponseError(response, "Unable to load recent messages."));
+        }
+        const parsed = citizenRecentMessagesSchema.safeParse(await response.json());
+        if (!parsed.success) throw new Error("The messaging service returned an invalid response.");
+        if (isCurrent) {
+          setRecentMessages(parsed.data.recentMessages);
+          setRecentMessagesError("");
+        }
+      } catch (error) {
+        if (isCurrent) {
+          setRecentMessagesError(error instanceof Error ? error.message : "Unable to load recent messages.");
+        }
+      } finally {
+        if (isCurrent) setIsLoadingRecentMessages(false);
+      }
+    };
+
+    void loadRecentMessages();
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void loadRecentMessages();
+    }, 30_000);
+    const refreshOnFocus = () => {
+      if (document.visibilityState === "visible") void loadRecentMessages();
+    };
+    window.addEventListener("focus", refreshOnFocus);
+    document.addEventListener("visibilitychange", refreshOnFocus);
+
+    return () => {
+      isCurrent = false;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refreshOnFocus);
+      document.removeEventListener("visibilitychange", refreshOnFocus);
+    };
+  }, [recentMessagesReload]);
 
   useEffect(() => {
     const reference = new URLSearchParams(window.location.search).get("matter")?.trim();
@@ -1545,16 +1613,32 @@ export default function TriageDashboard() {
                   </button>
                 </div>
                 <div className="message-list">
-                  {[
-                    ["Client Case #0847", "4m ago", "U-upload ko po ba ito dito?"],
-                    ["Atty. Clara Ocampo", "1h ago", "The Cebu Court hearing has been moved to March 1st morning."],
-                    ["Client Case #0839", "3h ago", "They sent another demand letter today. Screenshot attached."],
-                  ].map(([name, time, preview]) => (
-                    <button className="message-item" key={name} type="button" onClick={() => window.location.assign("/messages")}>
-                      <span className="message-meta"><strong>{name}</strong><time>{time}</time></span>
-                      <span className="message-preview">{preview}</span>
-                    </button>
-                  ))}
+                  {isLoadingRecentMessages ? (
+                    <p className="schedule-empty-state" role="status">Loading client messages…</p>
+                  ) : recentMessagesError ? (
+                    <div className="message-load-error" role="alert">
+                      <span>{recentMessagesError}</span>
+                      <button type="button" onClick={() => setRecentMessagesReload((count) => count + 1)}>Retry</button>
+                    </div>
+                  ) : recentMessages.length > 0 ? (
+                    recentMessages.map((message) => (
+                      <button
+                        className="message-item"
+                        key={message.id}
+                        type="button"
+                        title={message.subject}
+                        onClick={() => window.location.assign("/messages")}
+                      >
+                        <span className="message-meta">
+                          <strong>{message.client}</strong>
+                          <time dateTime={message.createdAt}>{formatRelativeMessageTime(message.createdAt)}</time>
+                        </span>
+                        <span className="message-preview">{message.text}</span>
+                      </button>
+                    ))
+                  ) : (
+                    <p className="schedule-empty-state">No client messages yet.</p>
+                  )}
                 </div>
               </section>
             </aside>

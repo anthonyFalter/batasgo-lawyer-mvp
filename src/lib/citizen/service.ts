@@ -11,6 +11,33 @@ import {
 } from "@/lib/db/schema";
 import type { CitizenApiActor } from "./api";
 
+export async function listRecentIncomingMessages(actor: CitizenApiActor) {
+  if (actor.kind !== "lawyer") return [];
+
+  const rows = await db
+    .select({
+      id: citizenMessages.id,
+      conversationId: citizenMessages.conversationId,
+      client: citizenConversations.citizenDisplayName,
+      subject: citizenConversations.subject,
+      text: citizenMessages.content,
+      createdAt: citizenMessages.createdAt,
+    })
+    .from(citizenMessages)
+    .innerJoin(citizenConversations, eq(citizenConversations.id, citizenMessages.conversationId))
+    .where(and(
+      eq(citizenConversations.workspaceId, actor.workspaceId),
+      eq(citizenMessages.sender, "citizen"),
+    ))
+    .orderBy(desc(citizenMessages.createdAt), desc(citizenMessages.id))
+    .limit(3);
+
+  return rows.map((message) => ({
+    ...message,
+    createdAt: message.createdAt.toISOString(),
+  }));
+}
+
 export async function getConversationAccess(conversationId: string, actor: CitizenApiActor) {
   const conditions = [eq(citizenConversations.id, conversationId)];
   if (actor.kind === "citizen") {
