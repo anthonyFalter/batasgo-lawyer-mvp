@@ -102,6 +102,7 @@ export default function SettingsWorkspace() {
       if (!response.ok) throw new Error(body?.error ?? "Unable to save your profile.");
       setSpecialty(body.profile.specialty);
       setBio(body.profile.bio);
+      setListed(Boolean(body.profile.listed));
       setToast("Profile saved.");
     } catch (error) {
       setToast(error instanceof Error ? error.message : "Unable to save your profile.");
@@ -185,12 +186,12 @@ export default function SettingsWorkspace() {
                 </div>
                 <p className="profile-note">
                   Your name, email, and photo come from your Clerk account. Change them from the account menu
-                  (Manage account) and they update here and in the citizen directory.
+                  (Manage account).
                 </p>
 
                 <div className="profile-form">
                   <label>
-                    <span>Specialty <small>(required to open Messages)</small></span>
+                    <span>Specialty</span>
                     <input
                       required
                       minLength={2}
@@ -199,6 +200,20 @@ export default function SettingsWorkspace() {
                       disabled={isProfileLoading}
                       onChange={(event) => setSpecialty(event.target.value)}
                     />
+                  </label>
+                  <label className="profile-directory-toggle">
+                    <input
+                      type="checkbox"
+                      checked={listed}
+                      disabled={isProfileLoading || isProfileSaving}
+                      onChange={(event) => setListed(event.target.checked)}
+                    />
+                    <span>
+                      <strong>List my profile in the citizen directory</strong>
+                      <small>
+                        Citizens can find your profile by your specialty and introduction. Lawyer verification is outside the scope of this MVP.
+                      </small>
+                    </span>
                   </label>
                   <label>
                     <span>Short introduction</span>

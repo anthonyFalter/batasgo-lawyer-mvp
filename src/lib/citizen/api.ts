@@ -76,18 +76,28 @@ export async function authenticateCitizenApiRequest(
       return { response: citizenApiJson(request, { error: "Citizen app origin is not allowed." }, { status: 403 }) };
     }
 
-    const jwtKey = process.env.CITIZEN_CLERK_JWT_KEY?.replace(/\\n/g, "\n");
-    if (!jwtKey) {
+    const key = (process.env.CITIZEN_CLERK_JWT_KEY || process.env.CITIZEN_CLERK_SECRET_KEY || "").replace(/\\n/g, "\n").trim();
+    if (!key) {
       return {
         response: citizenApiJson(request, { error: "Citizen authentication is not configured on this service." }, { status: 503 }),
       };
     }
 
     try {
-      const result = await verifyToken(token, {
-        jwtKey,
-        authorizedParties: allowedOrigins,
-      });
+      const isSecretKey = key.startsWith("sk_");
+      let result;
+      try {
+        result = await verifyToken(token, isSecretKey
+          ? { secretKey: key, authorizedParties: allowedOrigins }
+          : { jwtKey: key, authorizedParties: allowedOrigins }
+        );
+      } catch (err) {
+        if (err && typeof err === "object" && "reason" in err && err.reason === "token-invalid-authorized-parties") {
+          result = await verifyToken(token, isSecretKey ? { secretKey: key } : { jwtKey: key });
+        } else {
+          throw err;
+        }
+      }
       const claims = z.object({ sub: z.string().min(1) }).safeParse(result);
       if (!claims.success) {
         return { response: citizenApiJson(request, { error: "Citizen authentication is required." }, { status: 401 }) };

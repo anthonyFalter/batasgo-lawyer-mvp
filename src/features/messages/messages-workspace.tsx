@@ -1,5 +1,6 @@
 "use client";
 
+import { useUser } from "@clerk/nextjs";
 import {
   ArrowLeft,
   Check,
@@ -10,7 +11,6 @@ import {
   Send,
   X,
 } from "lucide-react";
-import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import WorkspaceShell from "../workspace/workspace-shell";
 import "./messages-workspace.css";
@@ -51,15 +51,7 @@ type Conversation = {
   matter: string;
   preview: string;
   time: string;
-  retention: string;
   messages: Message[];
-};
-
-type LawyerProfile = {
-  displayName: string;
-  specialty: string;
-  bio: string;
-  listed: boolean;
 };
 
 type ApiMessage = Omit<Message, "time" | "direction"> & {
@@ -73,13 +65,6 @@ type ApiConversation = {
   subject: string;
   preview: string;
   updatedAt: string;
-};
-
-const emptyProfile: LawyerProfile = {
-  displayName: "",
-  specialty: "",
-  bio: "",
-  listed: false,
 };
 
 async function requestApi<T>(path: string, init?: RequestInit): Promise<T> {
@@ -107,7 +92,31 @@ function conversationLabel(conversation: Conversation) {
   return `${conversation.client} ${conversation.matter} ${conversation.preview}`.toLowerCase();
 }
 
+function getInitials(name: string) {
+  return name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "?";
+}
+
+function ProfileAvatar({ name, imageUrl, className }: { name: string; imageUrl?: string | null; className: string }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const showImage = Boolean(imageUrl) && !imageFailed;
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [imageUrl]);
+
+  return (
+    <span className={`message-avatar ${className}`} role="img" aria-label={`${name} profile picture`}>
+      {!showImage && <span aria-hidden="true">{getInitials(name)}</span>}
+      {showImage && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={imageUrl ?? ""} alt="" onError={() => setImageFailed(true)} />
+      )}
+    </span>
+  );
+}
+
 export default function MessagesWorkspace() {
+  const { user } = useUser();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [search, setSearch] = useState("");
@@ -119,11 +128,6 @@ export default function MessagesWorkspace() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingThread, setIsLoadingThread] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
-  const [profile, setProfile] = useState(emptyProfile);
-  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
-  const [isSavingProfile, setIsSavingProfile] = useState(false);
-  const [profileLoaded, setProfileLoaded] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -165,7 +169,6 @@ export default function MessagesWorkspace() {
             matter: conversation.subject,
             preview: conversation.preview,
             time: formatTime(conversation.updatedAt),
-            retention: "Citizen message",
             messages: existing?.messages ?? [],
           };
         });
@@ -228,24 +231,10 @@ export default function MessagesWorkspace() {
     }
   }, [selectedId]);
 
-  // Initial load of conversations and profile
+  // Initial load of conversations
   useEffect(() => {
-    let active = true;
     setIsLoading(true);
     void loadConversations(false);
-
-    requestApi<{ profile: LawyerProfile | null; identity: { displayName: string } | null }>("/api/citizen/directory-profile")
-      .then(({ profile: current, identity }) => {
-        if (!active) return;
-        setProfile(current ?? { ...emptyProfile, displayName: identity?.displayName ?? "" });
-        setProfileLoaded(true);
-      })
-      .catch((requestError: unknown) => {
-        if (active) setError(requestError instanceof Error ? requestError.message : "Unable to load your citizen profile.");
-      })
-      .finally(() => { if (active) setIsLoadingProfile(false); });
-
-    return () => { active = false; };
   }, [loadConversations]);
 
   // Initial load of messages when selectedId changes
@@ -302,6 +291,7 @@ export default function MessagesWorkspace() {
   }, [conversationSearch, conversations]);
 
   const selectedConversation = conversations.find(({ id }) => id === selectedId);
+  const lawyerDisplayName = user?.fullName || user?.username || "You";
   const visibleMessages = selectedConversation?.messages.filter((message) =>
     !search.trim() || message.text.toLowerCase().includes(search.trim().toLowerCase()),
   ) ?? [];
@@ -362,51 +352,7 @@ export default function MessagesWorkspace() {
     }
   };
 
-  const saveProfile = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setIsSavingProfile(true);
-    setError("");
-    try {
-      const { profile: saved } = await requestApi<{ profile: LawyerProfile }>("/api/citizen/directory-profile", {
-        method: "PUT",
-        body: JSON.stringify({ specialty: profile.specialty, bio: profile.bio, listed: profile.listed }),
-      });
-      setProfile(saved);
-      setToast(saved.listed ? "Your unverified directory profile is now listed." : "Directory settings saved.");
-      setProfileOpen(false);
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Unable to save your directory profile.");
-    } finally {
-      setIsSavingProfile(false);
-    }
-  };
-
   const unavailable = (label: string) => setToast(`${label} is not available for citizen conversations.`);
-
-  const needsSpecialty = profileLoaded && profile.specialty.trim().length < 2;
-  if (needsSpecialty) {
-    return (
-      <WorkspaceShell
-        activePage="Messages"
-        search={search}
-        onSearchChange={setSearch}
-        onUnavailable={unavailable}
-        searchPlaceholder="Search within messages..."
-        searchLabel="Search within messages"
-      >
-        <main className="dashboard messages-page">
-          <section className="citizen-profile-gate" role="status">
-            <h2>Add your specialty to open Messages</h2>
-            <p>
-              Citizens see your Clerk name together with your specialty. Set your specialty in Settings before
-              using Messages.
-            </p>
-            <Link className="citizen-profile-gate-link" href="/settings">Go to Settings</Link>
-          </section>
-        </main>
-      </WorkspaceShell>
-    );
-  }
 
   return (
     <WorkspaceShell
@@ -422,39 +368,8 @@ export default function MessagesWorkspace() {
           <aside className="conversation-panel" aria-label="Conversations">
             <div className="conversation-panel-heading">
               <h2>Direct Messages</h2>
-              <button
-                className="citizen-profile-toggle"
-                type="button"
-                aria-expanded={profileOpen}
-                onClick={() => setProfileOpen((open) => !open)}
-              >
-                {profileOpen ? "Close profile" : "Citizen directory"}
-              </button>
             </div>
             {error && <p className="citizen-message-error" role="alert">{error}</p>}
-            {profileOpen && (
-              <form className="citizen-profile-form" onSubmit={saveProfile}>
-                <h3>Citizen directory profile</h3>
-                <p>Only listed profiles appear to citizens. BatasGO has not verified lawyer credentials.</p>
-                <p className="citizen-profile-identity">
-                  Listed as <strong>{profile.displayName || "your Clerk name"}</strong>
-                  {profile.specialty ? " \u00b7 " + profile.specialty : ""}.{" "}
-                  Your name comes from your Clerk account; edit your specialty and introduction in{" "}
-                  <Link href="/settings">Settings</Link>.
-                </p>
-                <label className="citizen-profile-opt-in">
-                  <input
-                    type="checkbox"
-                    checked={profile.listed}
-                    onChange={(event) => setProfile((current) => ({ ...current, listed: event.target.checked }))}
-                  />
-                  <span>List my profile in the citizen directory</span>
-                </label>
-                <button type="submit" disabled={isSavingProfile || isLoadingProfile}>
-                  {isSavingProfile ? "Saving…" : "Save directory settings"}
-                </button>
-              </form>
-            )}
             <label className="conversation-search">
               <Search aria-hidden="true" size={10.05} />
               <span className="sr-only">Filter conversations</span>
@@ -475,6 +390,10 @@ export default function MessagesWorkspace() {
                   aria-current={selectedId === conversation.id ? "true" : undefined}
                   onClick={() => selectConversation(conversation.id)}
                 >
+                  <ProfileAvatar
+                    name={conversation.client}
+                    className="conversation-avatar"
+                  />
                   <span className="conversation-item-copy">
                     <span className="conversation-item-top">
                       <strong>{conversation.client}</strong>
@@ -501,11 +420,14 @@ export default function MessagesWorkspace() {
                   <button className="messages-icon-button thread-back-button" type="button" aria-label="Back to inbox" onClick={() => setShowThreadOnMobile(false)}>
                     <ArrowLeft size={12.06} />
                   </button>
+                  <ProfileAvatar
+                    name={selectedConversation.client}
+                    className="thread-contact-avatar"
+                  />
                   <div className="thread-contact">
                     <h2>{selectedConversation.threadTitle}</h2>
                     <p>{selectedConversation.matter}</p>
                   </div>
-                  <span className="thread-retention">{selectedConversation.retention}</span>
                 </header>
                 <div
                 ref={messagesContainerRef}
@@ -515,6 +437,11 @@ export default function MessagesWorkspace() {
               >
                   {visibleMessages.map((message) => (
                     <article className={`thread-message thread-message--${message.direction}`} key={message.id}>
+                      <ProfileAvatar
+                        name={message.direction === "outbound" ? lawyerDisplayName : selectedConversation.client}
+                        imageUrl={message.direction === "outbound" ? user?.imageUrl : undefined}
+                        className="thread-message-avatar"
+                      />
                       <div className="thread-message-bubble">
                         {message.text && <p>{message.text}</p>}
                         {message.journalHandoff && (

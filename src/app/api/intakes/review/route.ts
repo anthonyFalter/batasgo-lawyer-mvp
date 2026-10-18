@@ -874,10 +874,10 @@ export async function POST(request: Request) {
   }
 
   const modeValue = formData.get("mode");
-  if (modeValue !== null && modeValue !== "extract" && modeValue !== "score") {
-    return Response.json({ error: "The requested intake review mode is invalid." }, { status: 400 });
+  if (modeValue !== "extract") {
+    return Response.json({ error: "Urgency scores are calculated locally; this endpoint only extracts document details." }, { status: 400 });
   }
-  const mode: IntakeReviewMode = modeValue === "extract" ? "extract" : "score";
+  const mode: IntakeReviewMode = "extract";
   if (formData.get("aiConsent") !== "true") {
     return Response.json({ error: "Confirm that you want to send these details to BatasBot before continuing." }, { status: 403 });
   }

@@ -515,6 +515,24 @@ img.profile-avatar {
   font-weight: 400;
 }
 
+.profile-form .profile-directory-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.profile-directory-toggle span {
+  display: grid;
+  gap: 3px;
+}
+
+.profile-directory-toggle strong {
+  color: #52617a;
+  font-size: 10px;
+  font-weight: 600;
+}
+
 .profile-form input,
 .profile-form textarea {
   width: 100%;
@@ -532,6 +550,14 @@ img.profile-avatar {
 .profile-form textarea:focus-visible {
   outline: 2px solid #3d7cf7;
   outline-offset: 1px;
+}
+
+.profile-directory-toggle input {
+  width: auto;
+  flex: 0 0 auto;
+  margin: 2px 0 0;
+  padding: 0;
+  accent-color: #3d7cf7;
 }
 
 .profile-form button {
