@@ -50,6 +50,20 @@
       "when": 1792293846863,
       "tag": "0006_calendar_events",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792298674962,
+      "tag": "0007_tasks",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792299151847,
+      "tag": "0008_task_automation",
+      "breakpoints": true
     }
   ]
 }

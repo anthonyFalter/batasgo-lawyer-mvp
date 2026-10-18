@@ -16,6 +16,8 @@ export const workspaceRole = pgEnum("workspace_role", ["owner", "lawyer", "staff
 export const intakeRisk = pgEnum("intake_risk", ["critical", "high", "medium", "low", "unassessed"]);
 export const intakeStatus = pgEnum("intake_status", ["pending", "accepted", "declined"]);
 export const calendarEventKind = pgEnum("calendar_event_kind", ["family", "labor", "civil", "criminal", "intake"]);
+export const taskPriority = pgEnum("task_priority", ["high", "medium", "low"]);
+export const taskSource = pgEnum("task_source", ["manual", "ai"]);
 
 export const workspaces = pgTable("workspaces", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -100,6 +102,31 @@ export const calendarEvents = pgTable(
   (table) => [
     index("calendar_events_workspace_date_idx").on(table.workspaceId, table.date),
     index("calendar_events_clerk_user_idx").on(table.clerkUserId),
+  ],
+);
+
+export const tasks = pgTable(
+  "tasks",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    clerkUserId: text("clerk_user_id").notNull(),
+    intakeId: uuid("intake_id").references(() => intakes.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    matter: text("matter").notNull().default(""),
+    priority: taskPriority("priority").notNull().default("medium"),
+    dueDate: text("due_date"),
+    completed: boolean("completed").notNull().default(false),
+    source: taskSource("source").notNull().default("manual"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("tasks_workspace_due_date_idx").on(table.workspaceId, table.dueDate),
+    index("tasks_workspace_intake_idx").on(table.workspaceId, table.intakeId),
+    index("tasks_clerk_user_idx").on(table.clerkUserId),
   ],
 );
 
