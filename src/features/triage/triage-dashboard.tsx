@@ -505,6 +505,24 @@ export default function TriageDashboard() {
   }, [todayDateKey]);
 
   useEffect(() => {
+    const reference = new URLSearchParams(window.location.search).get("matter")?.trim();
+    if (!reference || isLoadingIntakes) return;
+
+    const reviewedMatter = decisions.find(({ intake }) => intake.reference.toLowerCase() === reference.toLowerCase());
+    if (reviewedMatter) {
+      setDecisionHistoryOpen(true);
+      setDecisionFilter("all");
+      return;
+    }
+
+    const pendingMatter = intakes.find((intake) => intake.reference.toLowerCase() === reference.toLowerCase());
+    if (pendingMatter) {
+      setDecisionHistoryOpen(false);
+      setSearch(pendingMatter.reference);
+    }
+  }, [decisions, intakes, isLoadingIntakes]);
+
+  useEffect(() => {
     try {
       const storedIds = window.localStorage.getItem(seenDecisionIdsStorageKey);
       if (storedIds === null) return;
