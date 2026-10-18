@@ -6,7 +6,7 @@ import {
   citizenApiJson,
   citizenApiOptions,
 } from "@/lib/citizen/api";
-import { listActorConversations } from "@/lib/citizen/service";
+import { listActorConversations, listRecentIncomingMessages } from "@/lib/citizen/service";
 import { citizenConversationCreateSchema } from "@/lib/citizen/validation";
 
 export async function OPTIONS(request: Request) {
@@ -18,8 +18,11 @@ export async function GET(request: Request) {
   if ("response" in result) return result.response;
 
   try {
-    const conversations = await listActorConversations(result.actor);
-    return citizenApiJson(request, { conversations });
+    const [conversations, recentMessages] = await Promise.all([
+      listActorConversations(result.actor),
+      listRecentIncomingMessages(result.actor),
+    ]);
+    return citizenApiJson(request, { conversations, recentMessages });
   } catch (error) {
     console.error("Could not load citizen conversations.", error instanceof Error ? error.name : "UnknownError");
     return citizenApiJson(request, { error: "Unable to load conversations right now." }, { status: 500 });

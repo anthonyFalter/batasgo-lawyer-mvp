@@ -4,9 +4,12 @@ import {
   ArrowUp,
   Bot,
   BriefcaseBusiness,
+  CalendarClock,
   Check,
+  ChevronDown,
   Clock3,
   FileText,
+  ListChecks,
   MessageSquare,
   MoreHorizontal,
   Plus,
@@ -18,9 +21,11 @@ import {
 import Link from "next/link";
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import {
+  createCitizenJournalTextFile,
   isCitizenJournalHandoffContext,
   type CitizenJournalHandoffContext,
 } from "@/lib/citizen/journal-handoff-context";
+import { intakeAiExtractionResponseSchema } from "@/lib/intakes/validation";
 import { useTypingStream } from "@/hooks/use-typing-stream";
 import WorkspaceShell from "../workspace/workspace-shell";
 import ReactMarkdown from "react-markdown";
@@ -38,6 +43,8 @@ type ChatMessage = {
   content: string;
   links?: ChatLink[];
   intakeReview?: IntakeReviewVisual;
+  journalReview?: JournalReviewVisual;
+  attachmentName?: string;
 };
 
 type MatterTableRow = {
@@ -145,6 +152,16 @@ type IntakeReviewVisual = {
   specialtyMatch: boolean;
 };
 
+type JournalReviewVisual = {
+  sourceFile: string;
+  summary: string;
+  domain: string;
+  deadlineAt: string | null;
+  caseStage: string;
+  signals: string[];
+  truncated: boolean;
+};
+
 function isIntakeReviewVisual(value: unknown): value is IntakeReviewVisual {
   if (!value || typeof value !== "object") return false;
   const review = value as Partial<IntakeReviewVisual>;
@@ -154,6 +171,29 @@ function isIntakeReviewVisual(value: unknown): value is IntakeReviewVisual {
     && review.signals.every((signal) => typeof signal === "string")
     && typeof review.specialty === "string"
     && typeof review.specialtyMatch === "boolean";
+}
+
+function isJournalReviewVisual(value: unknown): value is JournalReviewVisual {
+  if (!value || typeof value !== "object") return false;
+  const review = value as Partial<JournalReviewVisual>;
+  return typeof review.sourceFile === "string"
+    && typeof review.summary === "string"
+    && typeof review.domain === "string"
+    && (review.deadlineAt === null || typeof review.deadlineAt === "string")
+    && typeof review.caseStage === "string"
+    && Array.isArray(review.signals)
+    && review.signals.every((signal) => typeof signal === "string")
+    && typeof review.truncated === "boolean";
+}
+
+function isCreatedChatSession(value: unknown): value is { id: string; title: string; updatedAt: string } {
+  if (!value || typeof value !== "object") return false;
+  return "id" in value
+    && typeof value.id === "string"
+    && "title" in value
+    && typeof value.title === "string"
+    && "updatedAt" in value
+    && typeof value.updatedAt === "string";
 }
 
 type ChatSession = {
@@ -170,6 +210,7 @@ type TriageChatHandoff = {
   deadline: string;
   summary: string;
   reasons: string[];
+  signals?: string[];
   specialty: string;
 };
 
@@ -252,14 +293,18 @@ function isTriageChatHandoff(value: unknown): value is TriageChatHandoff {
     && typeof handoff.summary === "string"
     && Array.isArray(handoff.reasons)
     && handoff.reasons.every((reason) => typeof reason === "string")
+    && (Array.isArray(handoff.signals) && handoff.signals.every((signal) => typeof signal === "string")
+      || handoff.signals === undefined)
     && typeof handoff.specialty === "string";
 }
 
 function explainTriageHandoff(handoff: TriageChatHandoff) {
-  const signals = handoff.reasons
-    .filter((reason) => !/^(Fits|Outside profile specialty:)/.test(reason))
-    .slice(0, 3)
-    .join(" · ");
+  const signals = handoff.signals
+    ? handoff.signals.join(" · ")
+    : handoff.reasons
+      .filter((reason) => !/^(Fits|Outside profile specialty:)/.test(reason))
+      .slice(0, 3)
+      .join(" · ");
   const summaryText = handoff.summary.trim().replace(/\s*\.+\s*$/, "");
   const deadline = handoff.deadline && !/^no deadline set$/i.test(handoff.deadline)
     ? `Deadline: ${handoff.deadline}.`
@@ -268,24 +313,8 @@ function explainTriageHandoff(handoff: TriageChatHandoff) {
   return `${handoff.id} | ${handoff.domain} | ${handoff.risk} risk. ${deadline} Summary: ${summaryText}. ${signalText}`;
 }
 
-function createJournalReviewPrompt(handoff: CitizenJournalHandoffContext) {
-  const entries = handoff.entries.length
-    ? handoff.entries.map((entry, index) => [
-      `${index + 1}. ${entry.title}`,
-      `Incident date: ${entry.incidentDate || "Not stated"}`,
-      entry.location ? `Location: ${entry.location}` : "",
-      `Client-reported details: ${entry.details}`,
-    ].filter(Boolean).join("\n")).join("\n\n")
-    : "No journal entry details were included.";
-  const attachments = handoff.attachments.length
-    ? `\n\nAttachment names (files are not included in this chat):\n${handoff.attachments.map((name) => `- ${name}`).join("\n")}`
-    : "";
-
-  return `Review this citizen-shared journal. Separate reported facts from legal conclusions, identify key facts and missing information, and suggest focused follow-up questions under Philippine law. Do not treat incident dates as legal deadlines.\n\nJournal: ${handoff.title}\n\n${entries}${attachments}`;
-}
-
 function getIntakeReviewVisual(handoff: TriageChatHandoff): IntakeReviewVisual {
-  const signals = handoff.reasons
+  const signals = handoff.signals ?? handoff.reasons
     .flatMap((reason) => reason.split(" · "))
     .filter((reason) => !/risk indicators$/i.test(reason)
       && !/^(review deadline:|closing in|time-sensitive follow-up)/i.test(reason)
@@ -368,6 +397,50 @@ function IntakeReviewGrid({ review }: { review: IntakeReviewVisual }) {
   );
 }
 
+function JournalReviewCard({ review }: { review: JournalReviewVisual }) {
+  return (
+    <section className="batasbot-journal-review" aria-label="Journal review summary">
+      <header className="batasbot-journal-review-heading">
+        <div>
+          <h3>Journal review</h3>
+          <p><FileText aria-hidden="true" size={12} /> {review.sourceFile}</p>
+        </div>
+        <span>AI-assisted summary</span>
+      </header>
+      <p className="batasbot-journal-review-summary">{review.summary}</p>
+      <div className="batasbot-journal-review-facts">
+        <div>
+          <span><BriefcaseBusiness aria-hidden="true" size={12} /> Practice area</span>
+          <strong>{review.domain}</strong>
+        </div>
+        <div>
+          <span><ListChecks aria-hidden="true" size={12} /> Case stage</span>
+          <strong>{review.caseStage || "Not stated"}</strong>
+        </div>
+        <div>
+          <span><CalendarClock aria-hidden="true" size={12} /> Legal deadline</span>
+          <strong>{review.deadlineAt || "Not identified"}</strong>
+        </div>
+      </div>
+      <div className="batasbot-journal-review-signals">
+        <h4>Reported urgency signals</h4>
+        {review.signals.length > 0 ? (
+          <ul>{review.signals.map((signal) => <li key={signal}>{signal}</li>)}</ul>
+        ) : (
+          <p>No specific urgency signals were identified in the text.</p>
+        )}
+      </div>
+      {review.truncated && (
+        <p className="batasbot-journal-review-note" role="note">
+          The text file exceeded the review limit; only the beginning was analyzed.
+        </p>
+      )}
+      <p className="batasbot-journal-review-disclaimer">
+        Based on client-reported information. Verify all facts and any deadlines against source documents.
+      </p>
+    </section>
+  );
+}
 
 
 export default function BatasBotWorkspace() {
@@ -375,6 +448,7 @@ export default function BatasBotWorkspace() {
   const [input, setInput] = useState("");
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
+  const [sessionsCollapsed, setSessionsCollapsed] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
   const [sessionPendingDeletion, setSessionPendingDeletion] = useState<ChatSession | null>(null);
@@ -383,6 +457,9 @@ export default function BatasBotWorkspace() {
   const [renameTitle, setRenameTitle] = useState("");
   const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
+  const [journalFile, setJournalFile] = useState<File | null>(null);
+  const [journalAiConsent, setJournalAiConsent] = useState(false);
+  const [isReviewingJournal, setIsReviewingJournal] = useState(false);
   // Messages for the active session are fetched from the DB, then updated optimistically
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
@@ -462,8 +539,10 @@ export default function BatasBotWorkspace() {
     }
 
     newChatStartedRef.current = true;
-    setInput(createJournalReviewPrompt(handoff));
-    setNotice("Journal context is ready. Review the draft prompt, then send it to BatasBot.");
+    setJournalFile(createCitizenJournalTextFile(handoff));
+    setJournalAiConsent(false);
+    setInput("Review this citizen-shared journal. Summarize the reported facts, practice area, any explicitly stated legal deadline or case stage, and urgency signals. Do not treat incident dates as legal deadlines.");
+    setNotice("Journal text is attached. Confirm AI review consent, then send it to BatasBot.");
   }, []);
 
   // ── Load messages when active session changes ──────────────────────────
@@ -495,6 +574,10 @@ export default function BatasBotWorkspace() {
               role: m.role,
               content: m.content,
               intakeReview: isIntakeReviewVisual(m.metadata) ? m.metadata : undefined,
+              journalReview: isJournalReviewVisual(m.metadata) ? m.metadata : undefined,
+              attachmentName: m.role === "user"
+                ? m.content.match(/^Attached journal text file: ([^\r\n]+)/)?.[1]
+                : undefined,
             })));
           }
         }
@@ -749,9 +832,136 @@ export default function BatasBotWorkspace() {
     }
   };
 
+  const reviewJournalAttachment = async () => {
+    const file = journalFile;
+    const requestText = input.trim();
+    if (!file || !requestText || !journalAiConsent || isGenerating || sessionsLoading || sendInFlightRef.current) return;
+
+    sendInFlightRef.current = true;
+    setIsSending(true);
+    setIsReviewingJournal(true);
+    setNotice("");
+    try {
+      const formData = new FormData();
+      formData.append("intake", JSON.stringify({
+        title: "",
+        description: requestText.slice(0, 1200),
+        domain: "",
+        documents: [file.name],
+        deadlineAt: null,
+        caseStage: "",
+        urgencyFlags: [],
+      }));
+      formData.append("maskIdentifiers", "true");
+      formData.append("mode", "extract");
+      formData.append("aiConsent", "true");
+      formData.append("files", file, file.name);
+
+      const reviewResponse = await fetch("/api/intakes/review", {
+        method: "POST",
+        body: formData,
+        signal: AbortSignal.timeout(30_000),
+      });
+      const reviewPayload: unknown = await reviewResponse.json().catch(() => null);
+      if (!reviewResponse.ok) {
+        const message = reviewPayload && typeof reviewPayload === "object" && "error" in reviewPayload
+          && typeof reviewPayload.error === "string"
+          ? reviewPayload.error
+          : "BatasBot could not review this journal file.";
+        throw new Error(message);
+      }
+
+      const parsedReview = intakeAiExtractionResponseSchema.safeParse(reviewPayload);
+      if (!parsedReview.success) throw new Error("BatasBot returned an invalid journal review.");
+      const { extraction } = parsedReview.data;
+      const journalReview: JournalReviewVisual = {
+        sourceFile: file.name,
+        summary: extraction.summary,
+        domain: extraction.domain,
+        deadlineAt: extraction.deadlineAt,
+        caseStage: extraction.caseStage,
+        signals: extraction.signals,
+        truncated: extraction.documentReview.truncated,
+      };
+      const assistantContent = [
+        `Summary: ${journalReview.summary}`,
+        `Practice area: ${journalReview.domain}`,
+        `Reported case stage: ${journalReview.caseStage || "Not stated"}`,
+        `Explicit legal deadline: ${journalReview.deadlineAt || "Not identified"}`,
+        `Reported urgency signals: ${journalReview.signals.length ? journalReview.signals.join("; ") : "None identified"}`,
+      ].join("\n\n");
+      const userContent = `Attached journal text file: ${file.name}\nReview request: ${requestText}`;
+      const sessionTitle = `Journal review · ${extraction.title}`;
+      const sessionResponse = await fetch("/api/chat/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: sessionTitle,
+          handoff: {
+            userContent,
+            assistantContent,
+            assistantMetadata: journalReview,
+          },
+        }),
+      });
+      const sessionPayload: unknown = await sessionResponse.json().catch(() => null);
+      if (!sessionResponse.ok || !isCreatedChatSession(sessionPayload)) {
+        const message = sessionPayload && typeof sessionPayload === "object" && "error" in sessionPayload
+          && typeof sessionPayload.error === "string"
+          ? sessionPayload.error
+          : "BatasBot finished the review, but the conversation could not be saved.";
+        throw new Error(message);
+      }
+
+      const userMessage: ChatMessage = {
+        id: `journal-${tempIdRef.current++}-user`,
+        role: "user",
+        content: userContent,
+        attachmentName: file.name,
+      };
+      const assistantMessage: ChatMessage = {
+        id: `journal-${tempIdRef.current++}-assistant`,
+        role: "assistant",
+        content: assistantContent,
+        journalReview,
+      };
+      skipSessionLoadRef.current.add(sessionPayload.id);
+      newChatStartedRef.current = true;
+      setActiveSessionId(sessionPayload.id);
+      setSessions((current) => normalizeSessions([{
+        id: sessionPayload.id,
+        title: sessionPayload.title,
+        updatedAt: sessionPayload.updatedAt,
+        preview: extraction.summary.slice(0, 80),
+      }, ...current]));
+      setMessages([userMessage, assistantMessage]);
+      setInput("");
+      setJournalFile(null);
+      setJournalAiConsent(false);
+      setNotice("Journal review complete. The uploaded text file was processed for this review and was not saved as a file.");
+    } catch (error) {
+      const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
+      setNotice(timedOut
+        ? "Journal review timed out. Your file is still attached; try again."
+        : error instanceof Error ? error.message : "Unable to review this journal file.");
+    } finally {
+      setIsSending(false);
+      setIsReviewingJournal(false);
+      sendInFlightRef.current = false;
+    }
+  };
+
+  const submitComposer = () => {
+    if (journalFile) {
+      void reviewJournalAttachment();
+      return;
+    }
+    void sendMessage(input);
+  };
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    sendMessage(input);
+    submitComposer();
   };
 
   const startNewChat = () => {
@@ -760,6 +970,8 @@ export default function BatasBotWorkspace() {
     setActiveSessionId(null);
     setMessages([]);
     setInput("");
+    setJournalFile(null);
+    setJournalAiConsent(false);
     setNotice("");
     inputRef.current?.focus();
   };
@@ -829,7 +1041,9 @@ export default function BatasBotWorkspace() {
       activePage="BatasBot"
       search={search}
       onSearchChange={setSearch}
-      onUnavailable={(label) => setNotice(`${label} is not part of this demo yet.`)}
+      onUnavailable={(label) => setNotice(label === "Document Assembly"
+        ? "This feature is not currently part of the MVP."
+        : `${label} is not part of this demo yet.`)}
       searchPlaceholder="Search your workspace..."
       searchLabel="Search your workspace"
     >
@@ -848,7 +1062,7 @@ export default function BatasBotWorkspace() {
           </button>
         </header>
 
-        <div className="batasbot-content-grid">
+        <div className={`batasbot-content-grid${sessionsCollapsed ? " is-sessions-collapsed" : ""}`}>
           <div className="batasbot-main-column">
             <section className="batasbot-chat-area" aria-label="BatasBot conversation">
               {messagesLoading ? (
@@ -875,85 +1089,129 @@ export default function BatasBotWorkspace() {
                 </div>
               ) : (
                 <div className="batasbot-thread" role="log" aria-live="polite" aria-relevant="additions text" aria-label="Chat history">
-                  {displayedMessages.map((message) => (
-                    <article className={`batasbot-thread-message batasbot-thread-message--${message.role}`} key={message.id}>
-                      {message.role === "assistant" && <span className="batasbot-thread-avatar" aria-hidden="true"><Bot size={10.05} /></span>}
-                      <div className="batasbot-thread-body">
-                        {message.role === "user" ? (
-                          <p>{message.content}</p>
-                        ) : (
-                          (() => {
-                            const matterTable = parseMatterTable(message.content);
-                            return (
-                              <>
-                                {matterTable?.before.trim() && (
-                                  <div className="batasbot-markdown">
-                                    <MatterMarkdown content={matterTable.before} />
-                                  </div>
-                                )}
-                                {matterTable ? <MatterTable rows={matterTable.rows} /> : (
-                                  <div className="batasbot-markdown">
-                                    <MatterMarkdown content={message.content} />
-                                  </div>
-                                )}
-                                {matterTable?.after.trim() && (
-                                  <div className="batasbot-markdown">
-                                    <MatterMarkdown content={matterTable.after} />
-                                  </div>
-                                )}
-                              </>
-                            );
-                          })()
-                        )}
-                        {message.intakeReview && <IntakeReviewGrid review={message.intakeReview} />}
-                        {message.links && (
-                          <div className="batasbot-thread-links">
-                            {message.links.map(({ label, href, icon: Icon }) => (
-                              <Link href={href} key={href}>
-                                <Icon aria-hidden="true" size={9.38} />
-                                {label}
-                              </Link>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </article>
-                  ))}
-                  {(isSending || replyPhase === "thinking") && (
-                    <div className="batasbot-thread-message batasbot-thread-message--assistant">
-                      <span className="batasbot-thread-avatar" aria-hidden="true"><Bot size={10.05} /></span>
-                      <div className="batasbot-thread-typing" role="status" aria-label="BatasBot is generating a reply">
-                        <span aria-hidden="true"><i /><i /><i /></span>
-                        <span>BatasBot is thinking</span>
-                      </div>
-                    </div>
-                  )}
-                  {replyPhase === "typing" && (
-                    <article className="batasbot-thread-message batasbot-thread-message--assistant">
-                      <span className="batasbot-thread-avatar" aria-hidden="true"><Bot size={10.05} /></span>
-                      <div className="batasbot-thread-body">
-                        <div className="batasbot-streaming-label" role="status">
-                          <span aria-hidden="true"><i /><i /><i /></span>
-                          <span>BatasBot is chatting</span>
-                        </div>
-                        {(() => {
-                          const matterTable = parseMatterTable(streamedReply);
-                          return matterTable ? <MatterTable rows={matterTable.rows} /> : (
-                            <div className="batasbot-markdown batasbot-streaming-text" aria-live="off">
-                              <MatterMarkdown content={streamedReply} />
+                  <div className="batasbot-thread-content">
+                    {displayedMessages.map((message) => (
+                      <article className={`batasbot-thread-message batasbot-thread-message--${message.role}`} key={message.id}>
+                        {message.role === "assistant" && <span className="batasbot-thread-avatar" aria-hidden="true"><Bot size={10.05} /></span>}
+                        <div className="batasbot-thread-body">
+                          {message.role === "user" ? (
+                            <>
+                              {message.attachmentName && (
+                                <span className="batasbot-message-file">
+                                  <FileText aria-hidden="true" size={12} />
+                                  {message.attachmentName}
+                                </span>
+                              )}
+                              <p>{message.attachmentName
+                                ? message.content.replace(/^Attached journal text file: [^\r\n]+\nReview request:\s*/, "")
+                                : message.content}</p>
+                            </>
+                          ) : (
+                            (() => {
+                              const matterTable = parseMatterTable(message.content);
+                              return (
+                                <>
+                                  {matterTable?.before.trim() && (
+                                    <div className="batasbot-markdown">
+                                      <MatterMarkdown content={matterTable.before} />
+                                    </div>
+                                  )}
+                                  {matterTable ? <MatterTable rows={matterTable.rows} /> : (
+                                    <div className="batasbot-markdown">
+                                      <MatterMarkdown content={message.journalReview?.summary ?? message.content} />
+                                    </div>
+                                  )}
+                                  {matterTable?.after.trim() && (
+                                    <div className="batasbot-markdown">
+                                      <MatterMarkdown content={matterTable.after} />
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()
+                          )}
+                          {message.intakeReview && <IntakeReviewGrid review={message.intakeReview} />}
+                          {message.journalReview && <JournalReviewCard review={message.journalReview} />}
+                          {message.links && (
+                            <div className="batasbot-thread-links">
+                              {message.links.map(({ label, href, icon: Icon }) => (
+                                <Link href={href} key={href}>
+                                  <Icon aria-hidden="true" size={9.38} />
+                                  {label}
+                                </Link>
+                              ))}
                             </div>
-                          );
-                        })()}
-                        {pendingIntakeReview && <IntakeReviewGrid review={pendingIntakeReview} />}
+                          )}
+                        </div>
+                      </article>
+                    ))}
+                    {(isSending || replyPhase === "thinking") && (
+                      <div className="batasbot-thread-message batasbot-thread-message--assistant">
+                        <span className="batasbot-thread-avatar" aria-hidden="true"><Bot size={10.05} /></span>
+                        <div className="batasbot-thread-typing" role="status" aria-label="BatasBot is generating a reply">
+                          <span aria-hidden="true"><i /><i /><i /></span>
+                          <span>BatasBot is thinking</span>
+                        </div>
                       </div>
-                    </article>
-                  )}
-                  <div ref={messagesEndRef} />
+                    )}
+                    {replyPhase === "typing" && (
+                      <article className="batasbot-thread-message batasbot-thread-message--assistant">
+                        <span className="batasbot-thread-avatar" aria-hidden="true"><Bot size={10.05} /></span>
+                        <div className="batasbot-thread-body">
+                          <div className="batasbot-streaming-label" role="status">
+                            <span aria-hidden="true"><i /><i /><i /></span>
+                            <span>BatasBot is chatting</span>
+                          </div>
+                          {(() => {
+                            const matterTable = parseMatterTable(streamedReply);
+                            return matterTable ? <MatterTable rows={matterTable.rows} /> : (
+                              <div className="batasbot-markdown batasbot-streaming-text" aria-live="off">
+                                <MatterMarkdown content={streamedReply} />
+                              </div>
+                            );
+                          })()}
+                          {pendingIntakeReview && <IntakeReviewGrid review={pendingIntakeReview} />}
+                        </div>
+                      </article>
+                    )}
+                    <div ref={messagesEndRef} />
+                  </div>
                 </div>
               )}
             </section>
 
             <div className="batasbot-compose-area">
+              {journalFile && (
+                <div className="batasbot-journal-attachment" aria-label="Attached journal file">
+                  <FileText aria-hidden="true" size={15} />
+                  <span>
+                    <strong>{journalFile.name}</strong>
+                    <small>Generated from the shared journal entries · TXT</small>
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="Remove attached journal file"
+                    disabled={isGenerating}
+                    onClick={() => {
+                      setJournalFile(null);
+                      setJournalAiConsent(false);
+                    }}
+                  >
+                    <X aria-hidden="true" size={14} />
+                  </button>
+                </div>
+              )}
+              {journalFile && (
+                <label className="batasbot-journal-consent">
+                  <input
+                    type="checkbox"
+                    checked={journalAiConsent}
+                    disabled={isGenerating}
+                    onChange={(event) => setJournalAiConsent(event.target.checked)}
+                  />
+                  <span>I’m authorized to send these client-reported notes to BatasBot for AI review.</span>
+                </label>
+              )}
               <form className="batasbot-main-composer" onSubmit={handleSubmit}>
                 <label className="sr-only" htmlFor="batasbot-main-input">Message BatasBot</label>
                 <textarea
@@ -964,29 +1222,51 @@ export default function BatasBotWorkspace() {
                   onKeyDown={(event) => {
                     if (event.key === "Enter" && !event.shiftKey) {
                       event.preventDefault();
-                      if (!isGenerating) sendMessage(input);
+                      if (!isGenerating) submitComposer();
                     }
                   }}
                   placeholder="Message BatasBot..."
                   rows={1}
                 />
-                <button type="submit" aria-label="Send message" disabled={!input.trim() || isGenerating}>
-                  <ArrowUp aria-hidden="true" size={11.39} />
+                <button type="submit" aria-label={journalFile ? "Send journal for review" : "Send message"} disabled={!input.trim() || isGenerating || sessionsLoading || Boolean(journalFile && !journalAiConsent)}>
+                  {isReviewingJournal
+                    ? <span className="batasbot-send-loading" aria-hidden="true" />
+                    : <ArrowUp aria-hidden="true" size={11.39} />}
                 </button>
               </form>
-              <p className="batasbot-main-disclaimer">BatasBot responses are for professional reference only — not legal advice. Always verify citations.</p>
+              <p className="batasbot-main-disclaimer">{journalFile
+                ? "Submitting sends this text file to configured AI providers. The raw file is processed for review, not retained as a file."
+                : "BatasBot responses are for professional reference only — not legal advice. Always verify citations."}</p>
             </div>
           </div>
 
-          <aside className="batasbot-sessions-panel" aria-labelledby="batasbot-sessions-title">
+          <aside
+            className={`batasbot-sessions-panel${sessionsCollapsed ? " is-collapsed" : ""}`}
+            aria-label="Chat sessions"
+          >
             <div className="batasbot-panel-heading">
               <div>
                 <h2 id="batasbot-sessions-title">Sessions</h2>
                 <span>{sessions.length} conversations</span>
               </div>
-              <MessageSquare aria-hidden="true" size={12.06} />
+              <button
+                className="batasbot-panel-toggle"
+                type="button"
+                aria-label={sessionsCollapsed ? "Expand sessions" : "Collapse sessions"}
+                aria-controls="batasbot-session-list"
+                aria-expanded={!sessionsCollapsed}
+                title={sessionsCollapsed ? "Expand sessions" : "Collapse sessions"}
+                onClick={() => setSessionsCollapsed((collapsed) => !collapsed)}
+              >
+                <MessageSquare aria-hidden="true" size={12.06} />
+                <ChevronDown
+                  className="batasbot-panel-toggle-chevron"
+                  aria-hidden="true"
+                  size={10.72}
+                />
+              </button>
             </div>
-            <div className="batasbot-session-list" aria-label="Chat sessions">
+            <div id="batasbot-session-list" className="batasbot-session-list" aria-label="Chat sessions">
               {sessionsLoading && <p className="batasbot-session-empty">Loading…</p>}
               {!sessionsLoading && visibleSessions.map((session) => (
                 <div

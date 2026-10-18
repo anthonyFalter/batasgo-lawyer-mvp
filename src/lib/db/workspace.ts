@@ -13,6 +13,23 @@ export async function getOrCreatePersonalWorkspace(clerkUserId: string) {
 
   if (membership) return membership.workspaceId;
 
+  const [existingWorkspace] = await db
+    .select({ id: workspaces.id })
+    .from(workspaces)
+    .where(eq(workspaces.createdByClerkUserId, clerkUserId))
+    .limit(1);
+  if (existingWorkspace) {
+    await db
+      .insert(workspaceMemberships)
+      .values({
+        workspaceId: existingWorkspace.id,
+        clerkUserId,
+        role: "owner",
+      })
+      .onConflictDoNothing();
+    return existingWorkspace.id;
+  }
+
   const [createdWorkspace] = await db
     .insert(workspaces)
     .values({
@@ -22,7 +39,7 @@ export async function getOrCreatePersonalWorkspace(clerkUserId: string) {
     .onConflictDoNothing({ target: workspaces.createdByClerkUserId })
     .returning({ id: workspaces.id });
 
-  const [existingWorkspace] = createdWorkspace
+  const [resolvedWorkspace] = createdWorkspace
     ? [createdWorkspace]
     : await db
         .select({ id: workspaces.id })
@@ -30,18 +47,18 @@ export async function getOrCreatePersonalWorkspace(clerkUserId: string) {
         .where(eq(workspaces.createdByClerkUserId, clerkUserId))
         .limit(1);
 
-  if (!existingWorkspace) {
+  if (!resolvedWorkspace) {
     throw new Error("Unable to resolve a workspace for the authenticated user.");
   }
 
   await db
     .insert(workspaceMemberships)
     .values({
-      workspaceId: existingWorkspace.id,
+      workspaceId: resolvedWorkspace.id,
       clerkUserId,
       role: "owner",
     })
     .onConflictDoNothing();
 
-  return existingWorkspace.id;
+  return resolvedWorkspace.id;
 }

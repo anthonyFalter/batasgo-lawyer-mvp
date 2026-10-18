@@ -9,7 +9,6 @@ import {
   Bot,
   Check,
   ChevronDown,
-  ClipboardCopy,
   Download,
   Eye,
   FileText,
@@ -20,6 +19,7 @@ import {
   Redo2,
   Save,
   Send,
+  Sparkles,
   Underline,
   Undo2,
   X,
@@ -56,23 +56,42 @@ type Attachment = {
 
 type ImportedIntake = {
   id: string;
+  intakeId?: string;
   client: string;
   domain: string;
   risk: string;
   summary: string;
+  documents: string[];
   result: "accepted" | "journal";
 };
 
-const EDITOR_TABS: EditorTab[] = ["File", "Home", "Insert", "Format", "Review Changes", "View"];
-const TOTAL_CLAIM = "₱2,999,997.66";
-const MATTER_ID = "INTAKE-2024-0847";
-const DOCUMENT_TITLE = "DOLE SENA Form 1 & Position Paper";
+type WorkspaceIntake = {
+  id: string;
+  reference: string;
+  domain: string;
+  risk: string;
+  client: string;
+  summary: string;
+  documents: string[];
+  status: "pending" | "accepted" | "declined";
+  caseStage: string;
+  deadline: string;
+  urgencyFlags: string[];
+};
 
-const DEFAULT_ATTACHMENTS: Attachment[] = [
-  { id: "exhibit-a", name: "POEA_Standard_Contract_Verified.pdf", kind: "PDF", detail: "Exh. A · 1.4 MB" },
-  { id: "exhibit-b", name: "Remittance_Slips_Consolidated.png", kind: "PNG", detail: "Exh. B · 840 KB" },
-  { id: "exhibit-c", name: "WhatsApp_Termination_Notice.pdf", kind: "PDF", detail: "Exh. C · Constructive dismissal notice" },
-];
+type SavedDocument = {
+  id: string;
+  intakeId: string | null;
+  title: string;
+  documentType: string;
+  status: string;
+  fontFamily: string;
+  matterReference?: string | null;
+  updatedAt: string;
+};
+
+const EDITOR_TABS: EditorTab[] = ["File", "Home", "Insert", "Format", "Review Changes", "View"];
+const DOCUMENT_TITLE = "DOLE SENA Form 1 & Position Paper";
 
 const REVIEW_CHECKS: { id: ReviewCheckId; title: string; detail: string }[] = [
   {
@@ -97,31 +116,31 @@ const INITIAL_DRAFT = `
   <p>REPUBLIC OF THE PHILIPPINES</p>
   <p>DEPARTMENT OF LABOR AND EMPLOYMENT</p>
   <p>NATIONAL CONCILIATION AND MEDIATION BOARD</p>
-  <p class="legal-office">SINGLE ENTRY APPROACH (SENA) ASSISTANCE DESK — REGION NCR</p>
+  <p class="legal-office">SINGLE ENTRY APPROACH (SENA) ASSISTANCE DESK — [Region to be confirmed]</p>
 </div>
 <div class="legal-parties">
   <div>
-    <p><strong>Juan Dela Cruz,</strong><br><em>Requesting Party / Complainant,</em></p>
+    <p><strong>[Client name — To be confirmed],</strong><br><em>Requesting Party / Complainant,</em></p>
     <p class="legal-versus">— versus —</p>
-    <p><strong>JDELCRUZ GLOBAL MANPOWER &amp; LOGISTICS CORP.</strong><br>and/or <strong>MariaCruz TRANSLOGISTICS LLC,</strong><br><em>Responding Parties / Agency.</em></p>
+    <p><strong>[Responding party — To be confirmed]</strong><br><em>Responding Party / Agency.</em></p>
   </div>
-  <div class="legal-docket"><strong>SENA DOCKET REF. NO.</strong><br>NCR-SENA-2024-02-0847</div>
+  <div class="legal-docket"><strong>SENA DOCKET REF. NO.</strong><br>[Reference to be confirmed]</div>
 </div>
 <hr>
 <h2>REQUEST FOR ASSISTANCE &amp; STATEMENT OF MONETARY CLAIMS</h2>
 <p class="legal-intro"><strong>COMES NOW,</strong> the Requesting Party, assisted by counsel, and respectfully submits this Statement of Monetary Claims before this Honorable Office, and avers that:</p>
 <h3>I. PARTIES AND JURISDICTIONAL FACTS</h3>
-<p>1. Requesting Party <strong>Juan Dela Cruz</strong> is an Overseas Filipino Worker (OFW) of legal age, residing in Makati City, where process and notices of this office may be formally served.</p>
-<p>2. Responding Agency <strong>JDELCRUZ Global Manpower &amp; Logistics Corp.</strong> is a domestic recruitment corporation. The relevant employment records are attached as supporting exhibits for review.</p>
+<p>1. Requesting Party <strong>[Client name — To be confirmed]</strong> is of legal age and resides at <strong>[Address — To be confirmed]</strong>.</p>
+<p>2. Responding Party <strong>[Responding party — To be confirmed]</strong> is described in the available matter records. The relevant records are attached as supporting exhibits for review.</p>
 <h3>II. STATEMENT OF FACTS &amp; CONSTRUCTIVE DISMISSAL</h3>
-<p>3. The Requesting Party states that employment ended following the events described in the attached notices and supporting records. The dates and circumstances in this draft must be verified against the source documents before filing.</p>
-<p>4. The Requesting Party seeks a review of the claims set out below. Each amount should be reconciled with the applicable records and legal basis.</p>
+<p>3. The Requesting Party states that the matter arose from the facts described in the available intake summary and source records. The dates and circumstances in this draft must be verified before filing.</p>
+<p>4. The Requesting Party seeks a review of the claims set out below. Each amount and legal basis should be reconciled with the source records.</p>
 <h3>III. PRAYER</h3>
 <p>WHEREFORE, premises considered, the Requesting Party respectfully requests appropriate assistance and such other relief as may be proper after independent review.</p>
-<p class="legal-amount">Total monetary claim: <strong data-total-placeholder>INSERT COMPUTED TOTAL</strong></p>
+<p class="legal-amount">Total monetary claim: <strong>[Amount to be confirmed]</strong></p>
 <p>Respectfully submitted,</p>
-<p class="legal-signature"><strong>ATTY. JUAN DELA CRUZ</strong><br>Counsel for the Requesting Party</p>
-<p class="legal-disclaimer">DEMO DRAFT · Verify all facts and legal authorities before use. This sample is not legal advice and is not connected to a live client matter.</p>
+<p class="legal-signature"><strong>[Attorney name — To be confirmed]</strong><br>Counsel for the Requesting Party</p>
+<p class="legal-disclaimer">Drafting aid · Verify all facts, documents, and legal authorities before use.</p>
 `;
 
 const BUILT_IN_TEMPLATES: DocumentTemplate[] = [
@@ -185,7 +204,8 @@ function isImportedIntake(value: unknown): value is ImportedIntake {
     && typeof intake.client === "string"
     && typeof intake.domain === "string"
     && typeof intake.risk === "string"
-    && typeof intake.summary === "string";
+    && typeof intake.summary === "string"
+    && Array.isArray(intake.documents);
 }
 
 function escapeHtml(value: string) {
@@ -214,14 +234,34 @@ function buildJournalDraft(handoff: CitizenJournalHandoffContext) {
   return `<h1>${escapeHtml(handoff.title)}</h1><p><strong>Source:</strong> Citizen-shared journal handoff<br><strong>Reference:</strong> JOURNAL-${escapeHtml(handoff.messageId.slice(0, 8))}</p><p><em>These are client-reported notes. Verify facts against source documents before relying on them.</em></p><h2>Reported entries</h2>${entries}${attachments}`;
 }
 
+function prefillTemplate(markup: string, intake: ImportedIntake | null) {
+  if (!intake) return markup;
+  const values: Record<string, string> = {
+    "Client name": intake.client,
+    "Matter or subject": intake.id,
+    "Matter type": intake.domain,
+    "brief description of matter": intake.summary,
+    "Question presented": intake.summary,
+  };
+  return markup.replace(/\[([^\]]+)\]/g, (placeholder, label: string) =>
+    values[label] ?? `[${label} — To be confirmed]`);
+}
+
 export default function DocumentAssemblyWorkspace() {
   const [search, setSearch] = useState("");
   const [workspaceStep, setWorkspaceStep] = useState<"templates" | "editor">("templates");
   const [importedIntake, setImportedIntake] = useState<ImportedIntake | null>(null);
+  const [workspaceIntakes, setWorkspaceIntakes] = useState<WorkspaceIntake[]>([]);
+  const [loadedIntakeId, setLoadedIntakeId] = useState<string | null>(null);
+  const [matterPrompt, setMatterPrompt] = useState<{ template: DocumentTemplate | null; recommend: boolean; templates: DocumentTemplate[] } | null>(null);
+  const [promptMatterId, setPromptMatterId] = useState("");
+  const [isRecommendingTemplate, setIsRecommendingTemplate] = useState(false);
+  const [documentId, setDocumentId] = useState<string | null>(null);
+  const [savedDocuments, setSavedDocuments] = useState<SavedDocument[]>([]);
   const [currentDocumentTitle, setCurrentDocumentTitle] = useState(DOCUMENT_TITLE);
   const [draftHtml, setDraftHtml] = useState(INITIAL_DRAFT);
   const [draftFontFamily, setDraftFontFamily] = useState("Georgia");
-  const [attachments, setAttachments] = useState(DEFAULT_ATTACHMENTS);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [activeTab, setActiveTab] = useState<EditorTab>("Home");
   const [summaryExpanded, setSummaryExpanded] = useState(true);
   const [referenceCollapsed, setReferenceCollapsed] = useState(false);
@@ -257,7 +297,71 @@ export default function DocumentAssemblyWorkspace() {
   const chatMessagesEndRef = useRef<HTMLDivElement>(null);
   const matterReferenceTabRef = useRef<HTMLButtonElement>(null);
   const batasbotTabRef = useRef<HTMLButtonElement>(null);
-  const matterId = importedIntake?.id ?? MATTER_ID;
+  const matterId = importedIntake?.id ?? "No matter selected";
+
+  const selectMatter = (intake: WorkspaceIntake) => {
+    if (intake.status !== "accepted") return;
+
+    setImportedIntake({
+      intakeId: intake.id,
+      id: intake.reference,
+      client: intake.client,
+      domain: intake.domain,
+      risk: intake.risk,
+      summary: intake.summary,
+      documents: intake.documents,
+      result: "accepted",
+    });
+    setAttachments(intake.documents.map((name, index) => ({
+      id: `matter-document-${intake.id}-${index}`,
+      name,
+      kind: name.split(".").pop()?.slice(0, 4).toUpperCase() || "FILE",
+      detail: "Matter record",
+    })));
+  };
+
+  const promptForMatter = (template: DocumentTemplate | null, recommend = false, templates = BUILT_IN_TEMPLATES) => {
+    setMatterPrompt({ template, recommend, templates });
+    setPromptMatterId(importedIntake?.intakeId ?? "");
+  };
+
+  const chooseMatterForTemplate = async (intake: WorkspaceIntake) => {
+    if (intake.status !== "accepted" || !matterPrompt) return;
+    selectMatter(intake);
+    if (!matterPrompt.recommend) {
+      chooseTemplate(matterPrompt.template ?? BUILT_IN_TEMPLATES[0]);
+      setMatterPrompt(null);
+      return;
+    }
+
+    setIsRecommendingTemplate(true);
+    try {
+      const response = await fetch("/api/documents/recommend-template", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          matter: {
+            reference: intake.reference,
+            client: intake.client,
+            domain: intake.domain,
+            summary: intake.summary,
+          },
+          templates: matterPrompt.templates.map(({ id, name, category, description }) => ({ id, name, category, description })),
+        }),
+      });
+      const data = await response.json() as { templateId?: string; rationale?: string; error?: string };
+      if (!response.ok || !data.templateId) throw new Error(data.error || "BatasBot could not recommend a template.");
+      const recommended = matterPrompt.templates.find((template) => template.id === data.templateId);
+      if (!recommended) throw new Error("BatasBot returned an unavailable template.");
+      chooseTemplate(recommended);
+      setToast(`${recommended.name} recommended${data.rationale ? `: ${data.rationale}` : "."}`);
+      setMatterPrompt(null);
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "BatasBot could not recommend a template.");
+    } finally {
+      setIsRecommendingTemplate(false);
+    }
+  };
 
   useEffect(() => {
     const source = new URLSearchParams(window.location.search).get("source");
@@ -303,6 +407,7 @@ export default function DocumentAssemblyWorkspace() {
         domain: "Journal handoff",
         risk: "Unassessed",
         summary: journalSummary || "No journal entry details were included.",
+        documents: handoff.attachments,
         result: "journal",
       });
       setCurrentDocumentTitle(`Journal review · ${handoff.title}`.slice(0, 120));
@@ -321,9 +426,69 @@ export default function DocumentAssemblyWorkspace() {
     }
 
     setImportedIntake(acceptedIntake);
-    setAttachments([]);
+    setAttachments(acceptedIntake.documents.map((name, index) => ({
+      id: `matter-document-${index}`,
+      name,
+      kind: name.split(".").pop()?.slice(0, 4).toUpperCase() || "FILE",
+      detail: "Matter record",
+    })));
     setAnnouncement(`${acceptedIntake.id} imported. Choose a document template to continue.`);
   }, []);
+
+  useEffect(() => {
+    void fetch("/api/intakes", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Unable to load workspace matters.");
+        const data = await response.json() as { intakes?: WorkspaceIntake[] };
+        setWorkspaceIntakes((data.intakes ?? []).filter((intake) => intake.status === "accepted"));
+      })
+      .catch((error: unknown) => setToast(error instanceof Error ? error.message : "Unable to load workspace matters."))
+  }, []);
+
+  useEffect(() => {
+    const documentToLoad = new URLSearchParams(window.location.search).get("document");
+    void fetch("/api/documents")
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Unable to load saved documents.");
+        const data = await response.json() as { documents?: SavedDocument[] };
+        setSavedDocuments(data.documents ?? []);
+        if (!documentToLoad) return;
+        const detailResponse = await fetch(`/api/documents/${encodeURIComponent(documentToLoad)}`);
+        const detail = await detailResponse.json() as { document?: { id: string; intakeId: string | null; title: string; contentHtml: string; fontFamily: string; reviewChecks?: Record<string, boolean> }; error?: string };
+        if (!detailResponse.ok || !detail.document) throw new Error(detail.error || "Unable to load saved document.");
+        setDocumentId(detail.document.id);
+        setLoadedIntakeId(detail.document.intakeId);
+        setCurrentDocumentTitle(detail.document.title);
+        setDraftHtml(detail.document.contentHtml);
+        setDraftFontFamily(detail.document.fontFamily);
+        if (detail.document.reviewChecks) setReviewChecks(detail.document.reviewChecks as Record<ReviewCheckId, boolean>);
+        setWorkspaceStep("editor");
+        window.history.replaceState(null, "", window.location.pathname);
+      })
+      .catch((error: unknown) => setToast(error instanceof Error ? error.message : "Unable to load saved documents."));
+  }, []);
+
+  useEffect(() => {
+    if (!loadedIntakeId || importedIntake?.intakeId === loadedIntakeId) return;
+    const intake = workspaceIntakes.find((candidate) => candidate.id === loadedIntakeId);
+    if (!intake) return;
+    setImportedIntake({
+      intakeId: intake.id,
+      id: intake.reference,
+      client: intake.client,
+      domain: intake.domain,
+      risk: intake.risk,
+      summary: intake.summary,
+      documents: intake.documents,
+      result: "accepted",
+    });
+    setAttachments(intake.documents.map((name, index) => ({
+      id: `matter-document-${intake.id}-${index}`,
+      name,
+      kind: name.split(".").pop()?.slice(0, 4).toUpperCase() || "FILE",
+      detail: "Matter record",
+    })));
+  }, [importedIntake?.intakeId, loadedIntakeId, workspaceIntakes]);
 
   useEffect(() => {
     if (reviewOpen) firstReviewCheckRef.current?.focus();
@@ -354,25 +519,36 @@ export default function DocumentAssemblyWorkspace() {
   };
 
   const saveDraft = () => {
-    setIsDirty(false);
-    setSavedLabel("Saved for this preview");
-    setToast("Draft saved in this preview. It will not persist after you leave.");
-    setAnnouncement("Draft saved for this preview.");
+    void persistDraft();
   };
 
-  const insertComputedTotal = () => {
-    const editor = editorRef.current;
-    if (!editor) return;
-
-    const placeholder = editor.querySelector("[data-total-placeholder]");
-    if (placeholder) {
-      placeholder.replaceWith(document.createTextNode(TOTAL_CLAIM));
-    } else {
-      editor.focus();
-      document.execCommand("insertText", false, ` Total monetary claim: ${TOTAL_CLAIM}`);
+  const persistDraft = async () => {
+    const contentHtml = sanitizeTemplateMarkup(editorRef.current?.innerHTML ?? draftHtml);
+    try {
+      const response = await fetch(documentId ? `/api/documents/${documentId}` : "/api/documents", {
+        method: documentId ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(documentId
+          ? { title: currentDocumentTitle, contentHtml, fontFamily: draftFontFamily, reviewChecks }
+          : {
+            intakeId: importedIntake?.intakeId ?? null,
+            title: currentDocumentTitle,
+            documentType: "legal-draft",
+            contentHtml,
+            fontFamily: draftFontFamily,
+          }),
+      });
+      const data = await response.json() as { document?: { id: string }; error?: string };
+      if (!response.ok || !data.document) throw new Error(data.error || "Unable to save document.");
+      setDocumentId(data.document.id);
+      setDraftHtml(contentHtml);
+      setIsDirty(false);
+      setSavedLabel("Saved");
+      setToast("Draft saved to your workspace.");
+      setAnnouncement("Draft saved to your workspace.");
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Unable to save draft.");
     }
-    markDirty();
-    setToast(`Computed total ${TOTAL_CLAIM} inserted into the draft.`);
   };
 
   const addAttachments = (files: FileList | null) => {
@@ -385,7 +561,7 @@ export default function DocumentAssemblyWorkspace() {
     }));
     setAttachments((current) => [...current, ...additions]);
     markDirty();
-    setToast(`${additions.length} file${additions.length === 1 ? "" : "s"} added to this demo.`);
+    setToast(`${additions.length} file${additions.length === 1 ? "" : "s"} added to this document.`);
     setAnnouncement(`${additions.length} file${additions.length === 1 ? "" : "s"} added to exhibits.`);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -395,13 +571,16 @@ export default function DocumentAssemblyWorkspace() {
     if (!content || isChatGenerating) return;
 
     const query = content.toLowerCase();
-    let response = "I can help you organize a review checklist. This preview is not connected to matter records or legal sources, so verify all facts, calculations, and legal authorities independently.";
+    const matterLabel = importedIntake ? `${importedIntake.id} for ${importedIntake.client}` : "the current document";
+    let response = `I can help organize a review of ${matterLabel}. Verify all facts, calculations, and legal authorities against the source records before relying on this draft.`;
     if (query.includes("summar")) {
-      response = "For this sample document, compare the parties and employment details with the exhibits, reconcile each claim amount with its source records, and verify the legal basis before exporting. This preview is not connected to live matter records or legal sources.";
+      response = importedIntake
+        ? `Matter summary: ${importedIntake.summary} Compare this summary with the exhibits and confirm any missing facts before exporting.`
+        : "No matter is selected. Choose a workspace matter before asking for a matter summary.";
     } else if (query.includes("claim") || query.includes("calculation") || query.includes("amount")) {
-      response = `The sample workspace shows a total claim of ${TOTAL_CLAIM}. Check each component against the original records and confirm the applicable legal basis; this demo cannot verify the calculation.`;
+      response = "No claim amount is stored in the matter record. Reconcile each amount against the source documents and use [Amount to be confirmed] until the calculation has been independently verified.";
     } else if (query.includes("draft") || query.includes("review")) {
-      response = "A careful review can check party names and dates against source documents, confirm each amount and citation independently, and redact sensitive information before sharing. This demo does not verify the draft.";
+      response = `Review ${matterLabel} by checking party names, dates, amounts, citations, and privacy-sensitive information against the attached records.`;
     }
 
     const userMessage = { id: nextChatMessageId.current++, role: "user" as const, content };
@@ -436,14 +615,14 @@ export default function DocumentAssemblyWorkspace() {
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     setReviewOpen(false);
     setSavedLabel("Review copy exported");
-    setToast("Review copy exported. The draft remains local to this demo.");
+    setToast("Review copy exported. Your saved draft remains available in the workspace.");
     setAnnouncement("Review copy exported.");
     reviewTriggerRef.current?.focus();
   };
 
   const chooseTemplate = (template: DocumentTemplate) => {
     setCurrentDocumentTitle(template.name);
-    setDraftHtml(template.html);
+    setDraftHtml(prefillTemplate(template.html, importedIntake));
     setDraftFontFamily(template.analysis?.fontFamily ?? "Georgia");
     setIsDirty(false);
     setSavedLabel("Draft only");
@@ -463,14 +642,34 @@ export default function DocumentAssemblyWorkspace() {
       activePage="Document Assembly"
       search={search}
       onSearchChange={setSearch}
-      onUnavailable={(label) => setToast(`${label} is not part of this demo yet.`)}
+      onUnavailable={(label) => setToast(`${label} is not available in this workspace yet.`)}
       searchPlaceholder="Search this matter's documents..."
       searchLabel="Search this matter's documents"
       compactNavigation
     >
       <main className={`document-assembly${workspaceStep === "templates" ? " document-assembly--template-picker" : ""}`}>
         <div className="document-template-stage" hidden={workspaceStep !== "templates"}>
-          <DocumentTemplatePicker templates={BUILT_IN_TEMPLATES} onSelect={chooseTemplate} />
+          {savedDocuments.length > 0 && (
+            <section className="document-saved-drafts" aria-labelledby="saved-drafts-heading">
+              <div>
+                <h2 id="saved-drafts-heading">Saved drafts</h2>
+                <p>Continue a document saved in your workspace.</p>
+              </div>
+              <div className="document-saved-drafts-list">
+                {savedDocuments.map((document) => (
+                  <a key={document.id} href={`/documents?document=${encodeURIComponent(document.id)}`}>
+                    <strong>{document.title}</strong>
+                    <span>{document.matterReference ?? "Unlinked matter"} · {new Date(document.updatedAt).toLocaleDateString("en-PH")}</span>
+                  </a>
+                ))}
+              </div>
+            </section>
+          )}
+          <DocumentTemplatePicker
+            templates={BUILT_IN_TEMPLATES}
+            onSelect={(template) => promptForMatter(template)}
+            onRecommend={(templates) => promptForMatter(null, true, templates)}
+          />
         </div>
 
         <div className="document-editor-stage" hidden={workspaceStep !== "editor"}>
@@ -553,7 +752,7 @@ export default function DocumentAssemblyWorkspace() {
                   {summaryExpanded && (
                 <div className="matter-snapshot">
                   <div className="matter-snapshot-top">
-                    <span className="matter-domain">{importedIntake?.domain ?? "OFW Landbased / Logistics"}</span>
+                    <span className="matter-domain">{importedIntake?.domain ?? "No matter selected"}</span>
                     <span className="matter-reference-id">{matterId}</span>
                   </div>
                   {importedIntake ? (
@@ -564,37 +763,15 @@ export default function DocumentAssemblyWorkspace() {
                       </dl>
                       <p className="document-imported-summary">{importedIntake.summary}</p>
                     </>
-                  ) : (
-                    <dl className="matter-parties">
-                      <div><dt>Complainant</dt><dd>Juan Dela Cruz · Client #0847</dd></div>
-                      <div><dt>Responding agency</dt><dd>JDELCRUZ Global Manpower &amp; Logistics Corp.</dd></div>
-                      <div><dt>Principal / foreign employer</dt><dd>MariaCruz TransLogistics LLC · Riyadh, KSA</dd></div>
-                    </dl>
-                  )}
+                  ) : <p className="document-imported-summary">Choose a matter to view its client details, summary, and source records.</p>}
                 </div>
               )}
 
-              {!importedIntake && (
+              {importedIntake && (
                 <div className="matter-facts" aria-label="Matter facts">
-                  <div><span>Client tenure</span><strong>9 yrs, 29 days</strong></div>
-                  <div><span>Last basic wage</span><strong>₱99,999 / mo</strong></div>
+                  <div><span>Status</span><strong>{workspaceIntakes.find((intake) => intake.id === importedIntake.intakeId)?.status ?? (importedIntake.result === "journal" ? "journal" : "imported")}</strong></div>
+                  <div><span>Case stage</span><strong>{workspaceIntakes.find((intake) => intake.id === importedIntake.intakeId)?.caseStage || "Not specified"}</strong></div>
                 </div>
-              )}
-
-              {!importedIntake && (
-                <section className="claim-calculation" aria-labelledby="claim-title">
-                  <h3 id="claim-title">Computation flow</h3>
-                  <dl>
-                    <div><dt>Art. 298 separation pay (1 mo/yr)</dt><dd>₱999,999.00</dd></div>
-                    <div><dt>Illegal placement fee reimbursement</dt><dd>₱999,999.00</dd></div>
-                    <div><dt>Prorated 13th month &amp; backwages</dt><dd>₱999,999.66</dd></div>
-                    <div className="claim-total"><dt>Total monetary claim</dt><dd>{TOTAL_CLAIM}</dd></div>
-                  </dl>
-                  <button type="button" onClick={insertComputedTotal}>
-                    <ClipboardCopy aria-hidden="true" size={9.38} />
-                    Insert computed sum into draft
-                  </button>
-                </section>
               )}
 
               <section className="exhibits-section" aria-labelledby="exhibits-title">
@@ -620,7 +797,7 @@ export default function DocumentAssemblyWorkspace() {
                       <li className="exhibit-item" key={attachment.id}>
                         <span className={`exhibit-file-type exhibit-file-type--${attachment.kind.toLowerCase()}`}>{attachment.kind}</span>
                         <span className="exhibit-file-copy"><strong title={attachment.name}>{attachment.name}</strong><small>{attachment.detail}</small></span>
-                        <button type="button" className="exhibit-preview-button" aria-label={`Preview ${attachment.name}`} onClick={() => setToast(`Preview for ${attachment.name} is not connected in this demo.`)}>
+                        <button type="button" className="exhibit-preview-button" aria-label={`Preview ${attachment.name}`} onClick={() => setToast(`Preview for ${attachment.name} is not available yet.`)}>
                           <Eye aria-hidden="true" size={10.72} />
                         </button>
                       </li>
@@ -635,17 +812,10 @@ export default function DocumentAssemblyWorkspace() {
                 )}
               </section>
 
-              {!importedIntake && (
-                <section className="client-statement">
-                  <div><strong>Client direct statement</strong><span>Voice note transcription</span></div>
-                  <p>“I have the contract and remittance slips ready for review.”</p>
-                  <time>3 min ago · Sample</time>
-                </section>
-              )}
               <p className="document-reference-note">
                 {importedIntake
-                  ? "Imported intake context is sample data. Template text is not prefilled from these details; verify and adapt it before use."
-                  : "Sample matter information for interface preview. No client data or files are connected."}
+                  ? "Matter details come from your workspace intake. Verify all facts against the source records before use."
+                  : "No matter is selected. Choose a workspace matter before drafting or saving a linked document."}
               </p>
                 </div>
               )}
@@ -712,7 +882,7 @@ export default function DocumentAssemblyWorkspace() {
                       <Send aria-hidden="true" size={10.05} />
                     </button>
                   </form>
-                  <p className="batasbot-disclaimer">BatasBot preview · Replies are sample text, not legal advice.</p>
+                  <p className="batasbot-disclaimer">BatasBot review guidance · Verify facts and legal authorities independently.</p>
                 </section>
               )}
             </div>
@@ -834,7 +1004,7 @@ export default function DocumentAssemblyWorkspace() {
               />
             </div>
             <footer className="document-editor-footer">
-              <span><span className="document-footer-dot" /> Local draft · Changes are not sent to a server</span>
+              <span><span className="document-footer-dot" /> Workspace draft · Changes are saved when you choose Save draft</span>
               <span>{isDirty ? "Unsaved" : savedLabel}</span>
             </footer>
           </section>
@@ -892,6 +1062,61 @@ export default function DocumentAssemblyWorkspace() {
           </div>
         )}
         </div>
+
+        {matterPrompt && (
+          <div className="document-matter-modal-scrim" onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !isRecommendingTemplate) setMatterPrompt(null);
+          }}>
+            <section className="document-matter-modal" role="dialog" aria-modal="true" aria-labelledby="document-matter-modal-title">
+              <header>
+                <div>
+                  <h2 id="document-matter-modal-title">{matterPrompt.recommend ? "Choose a matter for BatasBot" : "Choose a matter for this template"}</h2>
+                  <p>{matterPrompt.recommend
+                    ? "BatasBot will compare the accepted matter with your available templates and recommend the best fit."
+                    : `Select an accepted matter to use with “${matterPrompt.template?.name ?? "this template"}”.`}</p>
+                </div>
+                <button type="button" className="document-icon-button" aria-label="Close matter selection" disabled={isRecommendingTemplate} onClick={() => setMatterPrompt(null)}>
+                  <X size={12.06} />
+                </button>
+              </header>
+              <div className="document-matter-modal-list">
+                {workspaceIntakes.length ? (
+                  <>
+                    <label className="document-matter-modal-select-label" htmlFor="document-matter-modal-select">Accepted matter</label>
+                    <select
+                      id="document-matter-modal-select"
+                      className="document-matter-modal-select"
+                      value={promptMatterId}
+                      onChange={(event) => setPromptMatterId(event.target.value)}
+                      disabled={isRecommendingTemplate}
+                    >
+                      <option value="">Select an accepted matter</option>
+                      {workspaceIntakes.map((intake) => (
+                        <option key={intake.id} value={intake.id}>
+                          {intake.reference} · {intake.client} · {intake.domain}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="document-matter-modal-submit"
+                      onClick={() => {
+                        const selected = workspaceIntakes.find((intake) => intake.id === promptMatterId);
+                        if (selected) void chooseMatterForTemplate(selected);
+                      }}
+                      disabled={!promptMatterId || isRecommendingTemplate}
+                    >
+                      {matterPrompt.recommend ? "Recommend template" : "Use matter"} <Sparkles aria-hidden="true" size={10.05} />
+                    </button>
+                  </>
+                ) : (
+                  <p className="document-matter-modal-empty">No accepted matters are available. Accept a matter in Case Overview before assembling a document.</p>
+                )}
+              </div>
+              {isRecommendingTemplate && <p className="document-matter-modal-status" role="status">BatasBot is reviewing the matter and templates...</p>}
+            </section>
+          </div>
+        )}
 
         {toast && (
           <div className="document-toast" role="status">

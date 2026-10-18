@@ -1,8 +1,8 @@
 # BatasGO
 
-BatasGO is a lawyer-facing workspace prototype for reviewing client inquiries and managing related casework. Its backend-enabled MVP workflows include a persistent intake triage queue and citizen messages/journal handoffs; documents, calendar, tasks, and BatasBot remain local demonstrations.
+BatasGO is a lawyer-facing workspace prototype for reviewing client inquiries and managing related casework. Its backend-enabled MVP workflows include a persistent intake triage queue, citizen messages/journal handoffs, and BatasBot; documents, calendar, and tasks remain local demonstrations.
 
-This project uses Next.js. Clerk-authenticated intake records and accept/decline decisions are saved in Neon, scoped to the signed-in user's workspace. Development workspaces are seeded with clearly labeled synthetic examples. Other workspace features still use local sample content and are not live legal services or records.
+This project uses Next.js. Clerk-authenticated intake records and accept/decline decisions are saved in Neon, scoped to the signed-in user's workspace. Development workspaces are seeded with clearly labeled synthetic examples. Document Assembly, Calendar, and Tasks use local sample content and are not live legal services or records.
 
 ## Technology
 
@@ -66,7 +66,7 @@ Open [http://localhost:3000](http://localhost:3000) for the BatasGO intro and wo
 | `/sign-in` | Clerk sign-in page. |
 | `/sign-up` | Clerk sign-up page. |
 
-Case Overview intake records and decisions, BatasBot conversation sessions, and citizen conversations/messages/handoffs persist in Neon; BatasBot sessions can be deleted from the session list. Document Assembly, Calendar, and Tasks use demo data in the browser and are not saved to a server. Citizen handoff files are stored as binary data in Postgres and are accessible only to the participating citizen and lawyer workspace. Saved intakes retain selected document names and structured deadline, stage, and urgency details, not file contents. Document review requires consent before upload; readable text can be pseudonymized before provider transmission, but masking is partial and cannot be reliably applied to scans or images. Uploaded intake contents are processed in memory by BatasGO and are not persisted; AI providers receive the content needed for the requested output and apply their own handling and retention terms.
+Case Overview intake records and decisions, BatasBot conversation sessions, and citizen conversations/messages/handoffs persist in Neon; BatasBot sessions can be deleted from the session list. Document Assembly, Calendar, and Tasks use demo data in the browser and are not saved to a server. Citizen handoff files are stored as binary data in Postgres and are accessible only to the participating citizen and lawyer workspace. Opening a journal in BatasBot or choosing “Add to intake queue” creates a named `.txt` file from its shared entries. The intake action opens the New intake document-review path with that file selected; the lawyer must explicitly consent before it is uploaded for AI extraction. File contents are processed in memory, not retained as a file. The generated BatasBot review summary and file name are saved in the BatasBot conversation. Saved intakes retain structured deadline, stage, and urgency details plus selected document names, but not file contents. Triage signal summaries are consistently derived from those saved fields. Readable text can be pseudonymized before provider transmission, but masking is partial and cannot be reliably applied to scans or images. AI providers receive content needed for the requested output and apply their own handling and retention terms.
 
 ## Intake API
 
@@ -95,7 +95,7 @@ Citizen journal handoff entries and media are delivered as selected; no citizen-
 
 ## Security and sensitive data
 
-Manually entered intake details are persisted to Neon when saved, and citizen messages/handoffs are persisted when sent, so use synthetic data until database location, retention, access controls, and organizational approval are confirmed. Manual intake details are sent to AI only after the lawyer requests scoring; citizen journal handoffs are not sent to an AI provider by this integration.
+Manually entered intake details are persisted to Neon when saved, and citizen messages/handoffs are persisted when sent, so use synthetic data until database location, retention, access controls, and organizational approval are confirmed. Manual intake details are sent to AI only after the lawyer requests scoring. Citizen journal handoffs are not sent to an AI provider automatically; the lawyer can explicitly begin document review through “Add to intake queue” and must consent in the intake workflow before upload.
 
 - **Authorize every data operation.** Never trust client-supplied user, workspace, or matter IDs as proof of access. Keep health-check responses minimal and free of secrets or internal configuration.
 - **Keep keys and credentials secret.** Store them in local environment files or the deployment platform's secret manager; never commit them or put them in source code. `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is intended to be public; keep `CLERK_SECRET_KEY`, `CITIZEN_CLERK_JWT_KEY`, `DATABASE_URL`, and `GEMINI_API_KEY` server-only. The `.env*` files are ignored by Git, and `.env.example` contains placeholders only. Rotate any credential that may have been exposed.

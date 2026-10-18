@@ -10,6 +10,17 @@ export const citizenMessageCreateSchema = z.object({
   text: z.string().trim().min(1).max(4000),
 }).strict();
 
+export const citizenRecentMessagesSchema = z.object({
+  recentMessages: z.array(z.object({
+    id: z.string().uuid(),
+    conversationId: z.string().uuid(),
+    client: z.string().min(1),
+    subject: z.string().min(1),
+    text: z.string(),
+    createdAt: z.string().datetime({ offset: true }),
+  }).strict()).max(3),
+});
+
 export const citizenLawyerProfileSchema = z.object({
   specialty: z.string().trim().min(2).max(100),
   bio: z.string().trim().max(600).default(""),

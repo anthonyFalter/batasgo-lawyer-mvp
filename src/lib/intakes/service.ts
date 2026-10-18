@@ -4,7 +4,7 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { getOrCreatePersonalWorkspace } from "@/lib/db/workspace";
 import { intakes, workspaces } from "@/lib/db/schema";
-import { getRiskFromScore } from "./triage";
+import { getRiskFromScore, scoreIntakeUrgency } from "./triage";
 import type { IntakeDTO } from "./validation";
 
 function getReceivedOrder(receivedAt: Date) {
@@ -42,6 +42,13 @@ function getDeadline(deadlineAt: Date | null) {
 export function toIntakeDTO(intake: typeof intakes.$inferSelect): IntakeDTO {
   const deadline = getDeadline(intake.deadlineAt);
   const summary = intake.summary.replace(/^Synthetic example:\s*/i, "");
+  const signals = scoreIntakeUrgency({
+    title: intake.client,
+    description: summary,
+    deadlineAt: intake.deadlineAt?.toISOString() ?? null,
+    caseStage: intake.caseStage,
+    urgencyFlags: intake.urgencyFlags,
+  }).signals;
 
   return {
     id: intake.id,
@@ -57,6 +64,7 @@ export function toIntakeDTO(intake: typeof intakes.$inferSelect): IntakeDTO {
     deadlineAt: intake.deadlineAt?.toISOString() ?? null,
     caseStage: intake.caseStage,
     urgencyFlags: intake.urgencyFlags,
+    signals,
     documents: intake.documents,
     priorityScore: intake.priorityScore,
     status: intake.status,

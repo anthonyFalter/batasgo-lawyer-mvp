@@ -29,6 +29,12 @@ import {
   intakeUrgencyFlags,
   type IntakeDTO,
 } from "@/lib/intakes/validation";
+import {
+  createCitizenJournalTextFile,
+  isCitizenJournalHandoffContext,
+  journalIntakeHandoffStorageKey,
+} from "@/lib/citizen/journal-handoff-context";
+import { citizenRecentMessagesSchema } from "@/lib/citizen/validation";
 import { getRiskAction, getRiskFromScore, scoreIntakeUrgency, suggestIntakeDetails } from "@/lib/intakes/triage";
 import WorkspaceShell from "../workspace/workspace-shell";
 
@@ -66,6 +72,14 @@ type RankedIntake = { intake: Intake; score: number; reasons: string[]; specialt
 type AiSummaryBlock = { type: "paragraph"; text: string } | { type: "list"; items: string[] };
 type AiSummarySection = { heading: string; blocks: AiSummaryBlock[] };
 type TodayScheduleEvent = { id: string; title: string; matter: string; date: string; startTime: string };
+type RecentMessage = {
+  id: string;
+  conversationId: string;
+  client: string;
+  subject: string;
+  text: string;
+  createdAt: string;
+};
 
 const seenDecisionIdsStorageKey = "batasgo:triage:seen-decision-ids";
 
@@ -79,6 +93,19 @@ function formatScheduleTime(time: string) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function formatRelativeMessageTime(value: string) {
+  const timestamp = new Date(value).getTime();
+  if (Number.isNaN(timestamp)) return "";
+  const minutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60_000));
+  if (minutes < 1) return "now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(timestamp);
 }
 
 const aiSummaryHeadings = [
@@ -406,6 +433,10 @@ export default function TriageDashboard() {
   const [todayScheduleEvents, setTodayScheduleEvents] = useState<TodayScheduleEvent[]>([]);
   const [isLoadingTodaySchedule, setIsLoadingTodaySchedule] = useState(true);
   const [todayScheduleError, setTodayScheduleError] = useState(false);
+  const [recentMessages, setRecentMessages] = useState<RecentMessage[]>([]);
+  const [isLoadingRecentMessages, setIsLoadingRecentMessages] = useState(true);
+  const [recentMessagesError, setRecentMessagesError] = useState("");
+  const [recentMessagesReload, setRecentMessagesReload] = useState(0);
   const [todayDateKey] = useState(() => getLocalDateKey(new Date()));
   const [intakeLoadError, setIntakeLoadError] = useState("");
   const [busyIntakeId, setBusyIntakeId] = useState<string | null>(null);
@@ -447,6 +478,7 @@ export default function TriageDashboard() {
   const intakeDialogRef = useRef<HTMLDialogElement>(null);
   const documentInputRef = useRef<HTMLInputElement>(null);
   const intakeReviewRequestRef = useRef<AbortController | null>(null);
+  const journalIntakeHandoffHandledRef = useRef(false);
 
   const handleSummaryTypingComplete = useCallback((id: string) => {
     setTypingSummaryId((current) => current === id ? null : current);
@@ -479,6 +511,49 @@ export default function TriageDashboard() {
   }, [loadIntakes]);
 
   useEffect(() => {
+    if (journalIntakeHandoffHandledRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("source") !== "journal-intake") return;
+    journalIntakeHandoffHandledRef.current = true;
+
+    try {
+      const storedHandoff = window.sessionStorage.getItem(journalIntakeHandoffStorageKey);
+      if (!storedHandoff) {
+        throw new Error("The journal details were not available. Return to Messages and try again.");
+      }
+      const parsedHandoff: unknown = JSON.parse(storedHandoff);
+      if (!isCitizenJournalHandoffContext(parsedHandoff)) {
+        throw new Error("The transferred journal details are invalid. Return to Messages and try again.");
+      }
+
+      const journalFile = createCitizenJournalTextFile(parsedHandoff);
+      setIntakeTitle(`Journal: ${parsedHandoff.title}`.slice(0, 120));
+      setIntakeDescription("");
+      setIntakeSpecialty("");
+      setIntakeDeadline("");
+      setIntakeCaseStage("");
+      setSelectedUrgencyFlags([]);
+      setAiFilledFields(new Set());
+      setSelectedFiles([journalFile]);
+      setIntakePath("documents");
+      setIntakeStage("upload");
+      setDocumentConsent(false);
+      setMaskIdentifiers(true);
+      setIntakeReview(null);
+      setIntakeAiReviewError("");
+      setNewIntakeOpen(true);
+      window.sessionStorage.removeItem(journalIntakeHandoffStorageKey);
+      const nextUrl = new URL(window.location.href);
+      nextUrl.searchParams.delete("source");
+      window.history.replaceState(window.history.state, "", `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`);
+    } catch (error) {
+      setToast(error instanceof Error
+        ? `Unable to open this journal in a new intake: ${error.message}`
+        : "Unable to open this journal in a new intake.");
+    }
+  }, []);
+
+  useEffect(() => {
     let isCurrent = true;
 
     const loadTodaySchedule = async () => {
@@ -501,6 +576,48 @@ export default function TriageDashboard() {
     void loadTodaySchedule();
     return () => { isCurrent = false; };
   }, [todayDateKey]);
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    const loadRecentMessages = async () => {
+      try {
+        const response = await fetch("/api/citizen/conversations", { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error(await getResponseError(response, "Unable to load recent messages."));
+        }
+        const parsed = citizenRecentMessagesSchema.safeParse(await response.json());
+        if (!parsed.success) throw new Error("The messaging service returned an invalid response.");
+        if (isCurrent) {
+          setRecentMessages(parsed.data.recentMessages);
+          setRecentMessagesError("");
+        }
+      } catch (error) {
+        if (isCurrent) {
+          setRecentMessagesError(error instanceof Error ? error.message : "Unable to load recent messages.");
+        }
+      } finally {
+        if (isCurrent) setIsLoadingRecentMessages(false);
+      }
+    };
+
+    void loadRecentMessages();
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void loadRecentMessages();
+    }, 30_000);
+    const refreshOnFocus = () => {
+      if (document.visibilityState === "visible") void loadRecentMessages();
+    };
+    window.addEventListener("focus", refreshOnFocus);
+    document.addEventListener("visibilitychange", refreshOnFocus);
+
+    return () => {
+      isCurrent = false;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refreshOnFocus);
+      document.removeEventListener("visibilitychange", refreshOnFocus);
+    };
+  }, [recentMessagesReload]);
 
   useEffect(() => {
     const reference = new URLSearchParams(window.location.search).get("matter")?.trim();
@@ -766,21 +883,8 @@ export default function TriageDashboard() {
   };
 
   const importAcceptedMatter = (intake: Intake) => {
-    try {
-      window.sessionStorage.setItem("batasgo-accepted-intake", JSON.stringify({
-        id: intake.reference,
-        client: intake.client,
-        domain: intake.domain,
-        risk: intake.risk,
-        summary: intake.summary,
-        result: "accepted",
-      }));
-    } catch {
-      showToast("This browser could not pass the accepted intake to Document Assembly.");
-      return;
-    }
-
-    window.location.assign("/documents?source=accepted-intake");
+    void intake;
+    showToast("This feature is not currently part of the MVP.");
   };
 
   const resetFilters = () => {
@@ -794,6 +898,14 @@ export default function TriageDashboard() {
   const reviewRecommendedIntake = () => {
     if (!recommendation) return;
 
+    const urgencyAssessment = scoreIntakeUrgency({
+      title: recommendation.intake.client,
+      description: recommendation.intake.summary,
+      deadlineAt: recommendation.intake.deadlineAt,
+      caseStage: recommendation.intake.caseStage,
+      urgencyFlags: recommendation.intake.urgencyFlags,
+    });
+
     try {
       window.sessionStorage.setItem("batasbot-triage-handoff", JSON.stringify({
         id: recommendation.intake.reference,
@@ -802,6 +914,9 @@ export default function TriageDashboard() {
         deadline: recommendation.intake.deadline,
         summary: recommendation.intake.summary,
         reasons: recommendation.reasons,
+        signals: recommendation.intake.signals.length
+          ? recommendation.intake.signals
+          : urgencyAssessment.signals,
         specialty: profileSpecialty,
       }));
     } catch {
@@ -856,6 +971,7 @@ export default function TriageDashboard() {
     deadlineAt: intakeDeadline ? new Date(`${intakeDeadline}T12:00:00.000Z`).toISOString() : null,
     caseStage: intakeCaseStage,
     urgencyFlags: selectedUrgencyFlags,
+    signals: [],
     documents: selectedFiles.map((file) => file.name),
     priorityScore: null,
     status: "pending",
@@ -894,8 +1010,8 @@ export default function TriageDashboard() {
     setSelectedFiles((current) => [...current, ...filesWithinTotalLimit]);
   };
 
-  const generateSampleSummary = async (intake: Intake) => {
-    if (!intake.isSample || intake.aiSummary || generatingSummaryId === intake.id) return;
+  const generateIntakeSummary = async (intake: Intake) => {
+    if (intake.aiSummary || generatingSummaryId === intake.id) return;
     setGeneratingSummaryId(intake.id);
     try {
       const response = await fetch(`/api/intakes/${intake.id}/summary`, {
@@ -980,7 +1096,7 @@ export default function TriageDashboard() {
           urgencyFlags: review.urgencyFlags,
         },
         summary: review.summary,
-        signals: review.signals.length ? review.signals : ["No immediate urgency signals stated"],
+        signals: review.signals,
         source: "ai",
         provider: review.provider,
         documentReview: review.documentReview,
@@ -1031,7 +1147,7 @@ export default function TriageDashboard() {
         : intakeDescription.trim()
           ? intakeDescription.trim().replace(/\s+/g, " ").split(/(?<=[.!?])\s/)[0].slice(0, 220)
           : "Details pending lawyer review.",
-      signals: assessment.signals.length ? assessment.signals : ["No immediate urgency signals stated"],
+      signals: assessment.signals,
       source: "local",
       documentReview: intakeReview?.documentReview,
       fieldSources: intakeReview?.fieldSources,
@@ -1094,7 +1210,9 @@ export default function TriageDashboard() {
     }
   };
 
-  const unavailable = (label: string) => showToast(`${label} is not part of this demo yet.`);
+  const unavailable = (label: string) => showToast(label === "Document Assembly"
+    ? "This feature is not currently part of the MVP."
+    : `${label} is not part of this demo yet.`);
   const calculatedIntakeScore = intakeReview?.factors
     ? Math.min(100,
         intakeReview.factors.temporalDeadlines.score
@@ -1308,53 +1426,55 @@ export default function TriageDashboard() {
                     </div>
                     <h3>{intake.client}</h3>
                     <p className="intake-summary">{intake.summary}</p>
-                    {intake.isSample && (
-                      <section
-                        className={`sample-ai-summary${generatingSummaryId === intake.id ? " is-generating" : ""}`}
-                        aria-label="Synthetic sample AI summary"
-                        aria-busy={generatingSummaryId === intake.id}
-                      >
-                        {intake.aiSummary ? (
-                          <details
-                            className="sample-ai-summary-details"
-                            open={expandedAiSummaryIds.has(intake.id)}
-                            onToggle={(event) => {
-                              const isOpen = event.currentTarget.open;
-                              setExpandedAiSummaryIds((current) => {
-                                const next = new Set(current);
-                                if (isOpen) next.add(intake.id);
-                                else next.delete(intake.id);
-                                return next;
-                              });
-                            }}
-                          >
-                            <summary>
-                              <span className="sample-ai-summary-title">
-                                <Sparkles aria-hidden="true" size={13.4} fill="currentColor" strokeWidth={1.7} />
-                                <strong>AI Summary</strong>
-                              </span>
-                              <ChevronDown aria-hidden="true" size={12} />
-                            </summary>
-                            <AiSummaryContent
-                              id={intake.id}
-                              summary={intake.aiSummary}
-                              shouldAnimate={typingSummaryId === intake.id}
-                              onComplete={handleSummaryTypingComplete}
-                            />
-                            <small>AI-generated from synthetic text only. Verify all facts.</small>
-                          </details>
-                        ) : (
-                          <button
-                            type="button"
-                            disabled={generatingSummaryId === intake.id}
-                            onClick={() => void generateSampleSummary(intake)}
-                          >
-                            <Sparkles aria-hidden="true" size={9.38} />
-                            {generatingSummaryId === intake.id ? "Generating summary…" : "AI Summary"}
-                          </button>
-                        )}
-                      </section>
-                    )}
+                    <section
+                      className={`sample-ai-summary${generatingSummaryId === intake.id ? " is-generating" : ""}`}
+                      aria-label={`AI summary for ${intake.reference}`}
+                      aria-busy={generatingSummaryId === intake.id}
+                    >
+                      {intake.aiSummary ? (
+                        <details
+                          className="sample-ai-summary-details"
+                          open={expandedAiSummaryIds.has(intake.id)}
+                          onToggle={(event) => {
+                            const isOpen = event.currentTarget.open;
+                            setExpandedAiSummaryIds((current) => {
+                              const next = new Set(current);
+                              if (isOpen) next.add(intake.id);
+                              else next.delete(intake.id);
+                              return next;
+                            });
+                          }}
+                        >
+                          <summary>
+                            <span className="sample-ai-summary-title">
+                              <Sparkles aria-hidden="true" size={13.4} fill="currentColor" strokeWidth={1.7} />
+                              <strong>AI Summary</strong>
+                            </span>
+                            <ChevronDown aria-hidden="true" size={12} />
+                          </summary>
+                          <AiSummaryContent
+                            id={intake.id}
+                            summary={intake.aiSummary}
+                            shouldAnimate={typingSummaryId === intake.id}
+                            onComplete={handleSummaryTypingComplete}
+                          />
+                          <small>
+                            {intake.isSample
+                              ? "AI-generated from synthetic text only. Verify all facts."
+                              : "AI-generated from intake details. Verify all facts and deadlines."}
+                          </small>
+                        </details>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={generatingSummaryId === intake.id}
+                          onClick={() => void generateIntakeSummary(intake)}
+                        >
+                          <Sparkles aria-hidden="true" size={9.38} />
+                          {generatingSummaryId === intake.id ? "Generating summary…" : "AI Summary"}
+                        </button>
+                      )}
+                    </section>
                     {intake.documents && intake.documents.length > 0 && (
                       <div className="intake-document-summary" title={intake.documents.join(", ")}>
                         <Paperclip aria-hidden="true" size={9.38} />
@@ -1482,16 +1602,32 @@ export default function TriageDashboard() {
                   </button>
                 </div>
                 <div className="message-list">
-                  {[
-                    ["Client Case #0847", "4m ago", "U-upload ko po ba ito dito?"],
-                    ["Atty. Clara Ocampo", "1h ago", "The Cebu Court hearing has been moved to March 1st morning."],
-                    ["Client Case #0839", "3h ago", "They sent another demand letter today. Screenshot attached."],
-                  ].map(([name, time, preview]) => (
-                    <button className="message-item" key={name} type="button" onClick={() => window.location.assign("/messages")}>
-                      <span className="message-meta"><strong>{name}</strong><time>{time}</time></span>
-                      <span className="message-preview">{preview}</span>
-                    </button>
-                  ))}
+                  {isLoadingRecentMessages ? (
+                    <p className="schedule-empty-state" role="status">Loading client messages…</p>
+                  ) : recentMessagesError ? (
+                    <div className="message-load-error" role="alert">
+                      <span>{recentMessagesError}</span>
+                      <button type="button" onClick={() => setRecentMessagesReload((count) => count + 1)}>Retry</button>
+                    </div>
+                  ) : recentMessages.length > 0 ? (
+                    recentMessages.map((message) => (
+                      <button
+                        className="message-item"
+                        key={message.id}
+                        type="button"
+                        title={message.subject}
+                        onClick={() => window.location.assign("/messages")}
+                      >
+                        <span className="message-meta">
+                          <strong>{message.client}</strong>
+                          <time dateTime={message.createdAt}>{formatRelativeMessageTime(message.createdAt)}</time>
+                        </span>
+                        <span className="message-preview">{message.text}</span>
+                      </button>
+                    ))
+                  ) : (
+                    <p className="schedule-empty-state">No client messages yet.</p>
+                  )}
                 </div>
               </section>
             </aside>
