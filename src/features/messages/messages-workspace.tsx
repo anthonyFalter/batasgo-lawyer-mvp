@@ -11,7 +11,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import WorkspaceShell from "../workspace/workspace-shell";
 import "./messages-workspace.css";
 
@@ -125,31 +125,114 @@ export default function MessagesWorkspace() {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileLoaded, setProfileLoaded] = useState(false);
 
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const prevMessagesLengthRef = useRef(0);
+  const isNearBottomRef = useRef(true);
+  const isFetchingConversationsRef = useRef(false);
+  const isFetchingMessagesRef = useRef(false);
+
+  const scrollToBottom = useCallback((smooth = true) => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
+    } else if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior: smooth ? "smooth" : "auto",
+      });
+    }
+  }, []);
+
+  const handleMessagesScroll = useCallback(() => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    isNearBottomRef.current = distanceToBottom < 120;
+  }, []);
+
+  const loadConversations = useCallback(async (isBackground = false) => {
+    if (isFetchingConversationsRef.current) return;
+    isFetchingConversationsRef.current = true;
+    try {
+      const { conversations: rows } = await requestApi<{ conversations: ApiConversation[] }>("/api/citizen/conversations");
+      setConversations((current) => {
+        const next: Conversation[] = rows.map((conversation) => {
+          const existing = current.find((c) => c.id === conversation.id);
+          return {
+            id: conversation.id,
+            client: conversation.client,
+            threadTitle: `Citizen conversation · ${conversation.subject}`,
+            matter: conversation.subject,
+            preview: conversation.preview,
+            time: formatTime(conversation.updatedAt),
+            retention: "Citizen message",
+            messages: existing?.messages ?? [],
+          };
+        });
+        return next;
+      });
+
+      setSelectedId((current) => {
+        if (current && rows.some((r) => r.id === current)) return current;
+        return current || rows[0]?.id || "";
+      });
+
+      if (!isBackground) setError("");
+    } catch (requestError: unknown) {
+      if (!isBackground) {
+        setError(requestError instanceof Error ? requestError.message : "Unable to load citizen conversations.");
+      }
+    } finally {
+      isFetchingConversationsRef.current = false;
+      if (!isBackground) setIsLoading(false);
+    }
+  }, []);
+
+  const loadMessages = useCallback(async (isBackground = false) => {
+    if (!selectedId) return;
+    if (isFetchingMessagesRef.current) return;
+    isFetchingMessagesRef.current = true;
+    try {
+      const { messages } = await requestApi<{ messages: ApiMessage[] }>(
+        `/api/citizen/conversations/${encodeURIComponent(selectedId)}/messages`,
+      );
+      const next = messages.map((message) => ({
+        id: message.id,
+        text: message.text,
+        time: formatTime(message.createdAt),
+        direction: message.sender === "lawyer" ? ("outbound" as const) : ("inbound" as const),
+        journalHandoff: message.journalHandoff,
+      }));
+
+      setConversations((current) =>
+        current.map((conversation) => {
+          if (conversation.id !== selectedId) return conversation;
+          const lastMsg = next[next.length - 1];
+          return {
+            ...conversation,
+            preview: lastMsg?.text ?? conversation.preview,
+            time: lastMsg ? lastMsg.time : conversation.time,
+            messages: next,
+          };
+        }),
+      );
+
+      if (!isBackground) setError("");
+    } catch (requestError) {
+      if (!isBackground) {
+        setError(requestError instanceof Error ? requestError.message : "Unable to load conversation messages.");
+      }
+    } finally {
+      isFetchingMessagesRef.current = false;
+      if (!isBackground) setIsLoadingThread(false);
+    }
+  }, [selectedId]);
+
+  // Initial load of conversations and profile
   useEffect(() => {
     let active = true;
-    requestApi<{ conversations: ApiConversation[] }>("/api/citizen/conversations")
-      .then(({ conversations: rows }) => {
-        if (!active) return;
-        const next = rows.map((conversation) => ({
-          id: conversation.id,
-          client: conversation.client,
-          threadTitle: `Citizen conversation · ${conversation.subject}`,
-          matter: conversation.subject,
-          preview: conversation.preview,
-          time: formatTime(conversation.updatedAt),
-          retention: "Citizen message",
-          messages: [],
-        }));
-        setConversations(next);
-        setSelectedId((current) => next.some((conversation) => conversation.id === current) ? current : next[0]?.id ?? "");
-        setError("");
-      })
-      .catch((requestError: unknown) => {
-        if (active) setError(requestError instanceof Error ? requestError.message : "Unable to load citizen conversations.");
-      })
-      .finally(() => {
-        if (active) setIsLoading(false);
-      });
+    setIsLoading(true);
+    void loadConversations(false);
 
     requestApi<{ profile: LawyerProfile | null; identity: { displayName: string } | null }>("/api/citizen/directory-profile")
       .then(({ profile: current, identity }) => {
@@ -163,42 +246,55 @@ export default function MessagesWorkspace() {
       .finally(() => { if (active) setIsLoadingProfile(false); });
 
     return () => { active = false; };
-  }, []);
+  }, [loadConversations]);
 
+  // Initial load of messages when selectedId changes
   useEffect(() => {
     if (!selectedId) return;
-    let active = true;
-    const loadMessages = async () => {
-      try {
-        const { messages } = await requestApi<{ messages: ApiMessage[] }>(
-          `/api/citizen/conversations/${encodeURIComponent(selectedId)}/messages`,
-        );
-        if (!active) return;
-        const next = messages.map((message) => ({
-          id: message.id,
-          text: message.text,
-          time: formatTime(message.createdAt),
-          direction: message.sender === "lawyer" ? "outbound" as const : "inbound" as const,
-          journalHandoff: message.journalHandoff,
-        }));
-        setConversations((current) => current.map((conversation) =>
-          conversation.id === selectedId ? { ...conversation, messages: next } : conversation,
-        ));
-      } catch (requestError) {
-        if (active) setError(requestError instanceof Error ? requestError.message : "Unable to load conversation messages.");
-      } finally {
-        if (active) setIsLoadingThread(false);
+    setIsLoadingThread(true);
+    void loadMessages(false);
+  }, [selectedId, loadMessages]);
+
+  // Reset scroll state on conversation switch
+  useEffect(() => {
+    prevMessagesLengthRef.current = 0;
+    isNearBottomRef.current = true;
+  }, [selectedId]);
+
+  // Responsive polling for messages and conversations + focus and visibility refresh
+  useEffect(() => {
+    const messagesIntervalMs = 2500;
+    const conversationsIntervalMs = 4000;
+
+    const messagesTimer = window.setInterval(() => {
+      if (document.visibilityState === "visible" && selectedId) {
+        void loadMessages(true);
+      }
+    }, messagesIntervalMs);
+
+    const conversationsTimer = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void loadConversations(true);
+      }
+    }, conversationsIntervalMs);
+
+    const handleFocusOrVisible = () => {
+      if (document.visibilityState === "visible") {
+        if (selectedId) void loadMessages(true);
+        void loadConversations(true);
       }
     };
 
-    setIsLoadingThread(true);
-    void loadMessages();
-    const interval = window.setInterval(() => { void loadMessages(); }, 12_000);
+    window.addEventListener("focus", handleFocusOrVisible);
+    document.addEventListener("visibilitychange", handleFocusOrVisible);
+
     return () => {
-      active = false;
-      window.clearInterval(interval);
+      window.clearInterval(messagesTimer);
+      window.clearInterval(conversationsTimer);
+      window.removeEventListener("focus", handleFocusOrVisible);
+      document.removeEventListener("visibilitychange", handleFocusOrVisible);
     };
-  }, [selectedId]);
+  }, [selectedId, loadMessages, loadConversations]);
 
   const visibleConversations = useMemo(() => {
     const query = conversationSearch.trim().toLowerCase();
@@ -209,6 +305,23 @@ export default function MessagesWorkspace() {
   const visibleMessages = selectedConversation?.messages.filter((message) =>
     !search.trim() || message.text.toLowerCase().includes(search.trim().toLowerCase()),
   ) ?? [];
+
+  // Auto-scroll when messages change or new ones arrive
+  useEffect(() => {
+    const currentLength = selectedConversation?.messages.length ?? 0;
+    const prevLength = prevMessagesLengthRef.current;
+    if (currentLength > 0) {
+      const isInitial = prevLength === 0;
+      const hasNewMessage = currentLength > prevLength;
+      const lastMessage = selectedConversation?.messages[currentLength - 1];
+      const isOutbound = lastMessage?.direction === "outbound";
+
+      if (isInitial || isOutbound || (hasNewMessage && isNearBottomRef.current)) {
+        scrollToBottom(!isInitial);
+      }
+    }
+    prevMessagesLengthRef.current = currentLength;
+  }, [selectedConversation?.messages, scrollToBottom]);
 
   const selectConversation = (id: string) => {
     setSelectedId(id);
@@ -240,6 +353,8 @@ export default function MessagesWorkspace() {
           : conversation),
       );
       setMessageDraft("");
+      scrollToBottom(true);
+      void loadConversations(true);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Unable to send this message.");
     } finally {
@@ -392,7 +507,12 @@ export default function MessagesWorkspace() {
                   </div>
                   <span className="thread-retention">{selectedConversation.retention}</span>
                 </header>
-                <div className="thread-messages" aria-live="polite">
+                <div
+                ref={messagesContainerRef}
+                onScroll={handleMessagesScroll}
+                className="thread-messages"
+                aria-live="polite"
+              >
                   {visibleMessages.map((message) => (
                     <article className={`thread-message thread-message--${message.direction}`} key={message.id}>
                       <div className="thread-message-bubble">
@@ -434,6 +554,7 @@ export default function MessagesWorkspace() {
                   {!isLoadingThread && visibleMessages.length === 0 && (
                     <div className="thread-search-empty" role="status">{search ? "No messages match your search." : "No messages in this conversation yet."}</div>
                   )}
+                  <div ref={messagesEndRef} />
                 </div>
                 <form className="message-composer" onSubmit={sendMessage}>
                   <div className="composer-input-wrap">
