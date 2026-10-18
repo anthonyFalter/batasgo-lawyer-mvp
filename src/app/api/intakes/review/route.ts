@@ -879,7 +879,7 @@ export async function POST(request: Request) {
   }
   const mode: IntakeReviewMode = modeValue === "extract" ? "extract" : "score";
   if (formData.get("aiConsent") !== "true") {
-    return Response.json({ error: "Confirm that you want to send these details to an AI provider before continuing." }, { status: 403 });
+    return Response.json({ error: "Confirm that you want to send these details to BatasBot before continuing." }, { status: 403 });
   }
 
   const intakeField = formData.get("intake");
@@ -916,7 +916,7 @@ export async function POST(request: Request) {
   }
   if (maskIdentifiers && uploaded.requiresVision) {
     return Response.json({
-      error: "Identifier masking cannot be reliably applied to scanned images or scanned PDFs. Turn masking off only if you approve sending the full image to the AI provider, or switch to manual entry.",
+      error: "Identifier masking cannot be reliably applied to scanned images or scanned PDFs. Turn masking off only if you approve sending the full image to BatasBot, or switch to manual entry.",
     }, { status: 400 });
   }
 
@@ -971,8 +971,8 @@ export async function POST(request: Request) {
   }
   if (providers.length === 0) {
     const error = uploaded.requiresVision
-      ? "Image and scanned PDF reviews require Gemini Vision; no Gemini key is configured."
-      : "No AI review provider is configured on the server.";
+      ? "Image and scanned PDF review is not configured for BatasBot."
+      : "BatasBot is not configured on the server.";
     return Response.json({ error }, { status: 503 });
   }
 
@@ -989,7 +989,7 @@ export async function POST(request: Request) {
         const result = intakeAiExtractionResponseSchema.safeParse({
           extraction: {
             ...assessment,
-            provider: provider.name,
+            provider: "BatasBot",
             fieldSources: mapFieldSources(assessment.fieldSources, uploaded.documents),
             documentReview: {
               processedCount: uploaded.documents.length,
@@ -1015,7 +1015,7 @@ export async function POST(request: Request) {
       const result = intakeAiReviewResponseSchema.safeParse({
         review: {
           ...assessment,
-          provider: provider.name,
+          provider: "BatasBot",
           fieldSources: mapFieldSources(assessment.fieldSources, uploaded.documents),
           documentReview: {
             processedCount: uploaded.documents.length,
@@ -1049,25 +1049,25 @@ export async function POST(request: Request) {
   const statuses = new Set(failures.map(({ status }) => status));
   if ([...statuses].some((status) => status === 401 || status === 403)) {
     return Response.json(
-      { error: "AI provider authentication failed. Check the server-side provider API keys." },
+      { error: "BatasBot is temporarily unavailable. Check the server configuration or try again later." },
       { status: 502 },
     );
   }
   if (failures.some(({ status }) => status === 503 || status === 429)) {
     return Response.json({
       error: mode === "extract"
-        ? "An AI provider is currently busy. The documents were not extracted; try again or switch to manual entry."
-        : "An AI provider is currently busy. No score was generated; try again in a moment.",
+        ? "BatasBot is currently busy. The documents were not extracted; try again or switch to manual entry."
+        : "BatasBot is currently busy. No score was generated; try again in a moment.",
     }, { status: 503 });
   }
   if (failures.every(({ reason }) => reason === "model-not-found")) {
     return Response.json(
-      { error: "An AI model is unavailable. Check GEMINI_MODEL and GROQ_MODEL in the server configuration." },
+      { error: "BatasBot is temporarily unavailable. Try again later or contact an administrator." },
       { status: 502 },
     );
   }
   return Response.json(
-    { error: "AI providers did not return a valid review. Check the server logs for provider or model errors." },
+    { error: "BatasBot could not return a valid review. Try again or switch to manual entry." },
     { status: 502 },
   );
 }

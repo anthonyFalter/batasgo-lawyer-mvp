@@ -182,7 +182,7 @@ export async function POST(
       } : null,
     ].filter((provider) => provider !== null);
     if (configuredProviders.length === 0) {
-      return Response.json({ error: "No AI summary provider is configured on the server." }, { status: 503 });
+      return Response.json({ error: "BatasBot is not configured on the server." }, { status: 503 });
     }
 
     const prompt = getSummaryPrompt(intake);
@@ -221,18 +221,18 @@ export async function POST(
         && failures.every(({ status }) => status === 503 || status === 429);
       if (allProvidersBusy) {
         return Response.json(
-          { error: "AI providers are temporarily busy. Please try generating the summary again shortly." },
+          { error: "BatasBot is temporarily busy. Please try generating the summary again shortly." },
           { status: 503 },
         );
       }
       return Response.json(
-        { error: "All configured AI providers failed to generate a summary. Please try again later." },
+        { error: "BatasBot could not generate a summary. Please try again later." },
         { status: 502 },
       );
     }
 
     if (!summary || summary.length > 2_000) {
-      return Response.json({ error: "Gemini returned an unusable summary. Try again later." }, { status: 502 });
+      return Response.json({ error: "BatasBot returned an unusable summary. Try again later." }, { status: 502 });
     }
 
     const [updated] = await db

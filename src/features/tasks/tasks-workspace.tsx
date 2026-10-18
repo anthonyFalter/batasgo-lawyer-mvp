@@ -263,7 +263,7 @@ export default function TasksWorkspace() {
       const response = await fetch("/api/intakes", { cache: "no-store" });
       if (!response.ok) throw new Error(await getTaskApiError(response, "Unable to load active intakes."));
       const payload = await response.json() as { intakes?: IntakeForTaskAutomation[] };
-      setIntakeOptions((payload.intakes ?? []).filter((intake) => intake.status === "pending"));
+      setIntakeOptions((payload.intakes ?? []).filter((intake) => intake.status === "pending" || intake.status === "accepted"));
     } catch (error) {
       setToast(error instanceof Error ? error.message : "Unable to load active intakes.");
     } finally {
@@ -307,7 +307,6 @@ export default function TasksWorkspace() {
       if (!response.ok) throw new Error(await getTaskApiError(response, "Unable to generate tasks."));
       const payload = await response.json() as {
         tasks?: Task[];
-        provider?: string;
         skippedIntakeReferences?: string[];
       };
       const generatedTasks = payload.tasks ?? [];
@@ -321,7 +320,7 @@ export default function TasksWorkspace() {
       const skippedCount = payload.skippedIntakeReferences?.length ?? 0;
       setToast(skippedCount
         ? `${generatedTasks.length} tasks generated; ${skippedCount} intake already had AI tasks.`
-        : `${generatedTasks.length} AI tasks generated with ${payload.provider ?? "AI"}.`);
+        : `${generatedTasks.length} BatasBot tasks generated.`);
     } catch (error) {
       setToast(error instanceof Error ? error.message : "Unable to generate tasks.");
     } finally {
@@ -413,8 +412,8 @@ export default function TasksWorkspace() {
             <section className="task-ai-import" aria-label="Generate tasks from active intakes">
               <div className="task-ai-import-heading">
                 <div>
-                  <h2>Generate tasks from active intakes</h2>
-                  <p>Select up to five pending intakes. Generated tasks are saved automatically.</p>
+                  <h2>Generate tasks from intakes</h2>
+                  <p>Select up to five pending or accepted intakes. Generated tasks are saved automatically.</p>
                 </div>
                 <button className="task-ai-close" type="button" aria-label="Close intake task generator" onClick={closeIntakeAutomation}>
                   <X aria-hidden="true" size={12.06} />
@@ -438,6 +437,7 @@ export default function TasksWorkspace() {
                         <span className="task-ai-intake-copy">
                           <span className="task-ai-intake-title">
                             <strong>{intake.client}</strong>
+                            <small>{intake.status === "accepted" ? "Accepted" : "Pending"}</small>
                             {intake.isSample && <small>Sample</small>}
                             {alreadyGenerated && <small>Tasks generated</small>}
                           </span>
@@ -449,13 +449,13 @@ export default function TasksWorkspace() {
                   })}
                 </div>
               ) : (
-                <p className="task-ai-loading">No pending intakes available.</p>
+                <p className="task-ai-loading">No pending or accepted intakes available.</p>
               )}
 
               <div className="task-ai-privacy-options">
                 <label className="task-ai-consent">
                   <input type="checkbox" checked={aiConsent} onChange={(event) => setAiConsent(event.target.checked)} />
-                  <span>I consent to sending selected intake details to the configured AI provider.</span>
+                  <span>I consent to sending selected intake details to BatasBot to generate tasks.</span>
                 </label>
                 <label className="task-ai-consent">
                   <input type="checkbox" checked={maskIdentifiers} onChange={(event) => setMaskIdentifiers(event.target.checked)} />

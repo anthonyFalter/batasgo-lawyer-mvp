@@ -455,7 +455,7 @@
 .task-table-heading,
 .task-row {
   display: grid;
-  grid-template-columns: minmax(154.1px, 1fr) minmax(60.3px, 0.24fr) minmax(80.4px, 0.32fr) minmax(63.65px, 0.25fr) 21.44px;
+  grid-template-columns: minmax(154.1px, 1fr) minmax(60.3px, 0.24fr) minmax(80.4px, 0.32fr) minmax(63.65px, 0.25fr) 42.88px;
   align-items: center;
   column-gap: 9.38px;
   padding-right: 12.06px;

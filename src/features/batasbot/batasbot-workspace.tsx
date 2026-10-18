@@ -575,7 +575,7 @@ export default function BatasBotWorkspace() {
                   <ArrowUp aria-hidden="true" size={11.39} />
                 </button>
               </form>
-              <p className="batasbot-main-disclaimer">BatasBot uses Gemini AI with Groq as a fallback. Responses are for professional reference only — not legal advice. Always verify citations.</p>
+              <p className="batasbot-main-disclaimer">BatasBot responses are for professional reference only — not legal advice. Always verify citations.</p>
             </div>
           </div>
 

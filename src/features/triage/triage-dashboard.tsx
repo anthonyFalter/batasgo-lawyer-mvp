@@ -48,7 +48,7 @@ type IntakeReview = {
   summary: string;
   signals: string[];
   source: "local" | "ai";
-  provider?: "Gemini" | "Groq";
+  provider?: "BatasBot";
   documentReview?: { processedCount: number; truncated: boolean; visionUsed: boolean };
   fieldSources?: IntakeFieldSources;
   factors?: IntakeReviewFactors;
@@ -1521,7 +1521,7 @@ export default function TriageDashboard() {
                   <span className="intake-method-icon"><FilePenLine aria-hidden="true" size={18} /></span>
                   <span className="intake-method-copy">
                     <strong>Enter details manually</strong>
-                    <small>Nothing is sent to an AI provider until you ask BatasBot to score it.</small>
+                    <small>Nothing is sent to BatasBot until you ask it to score the details.</small>
                   </span>
                   <ArrowRight aria-hidden="true" size={15} />
                 </button>
@@ -1556,12 +1556,12 @@ export default function TriageDashboard() {
                       />
                       <span>
                         <strong>I consent to AI document review</strong>
-                        <small>Document contents are sent to the configured AI provider. When masking is on, detectable identifiers in readable text are replaced before sending.</small>
+                        <small>Document contents are sent to BatasBot. When masking is on, detectable identifiers in readable text are replaced before sending.</small>
                       </span>
                     </label>
                     <p>
                       When this site uses HTTPS, the request is encrypted in transit. BatasGO does not save uploaded contents.
-                      The AI provider processes document contents to generate the requested extraction; its own handling and retention terms apply.
+                      BatasBot processes document contents to generate the requested extraction. Applicable data handling and retention terms apply.
                     </p>
                   </div>
 
@@ -1680,7 +1680,7 @@ export default function TriageDashboard() {
                       <Check aria-hidden="true" size={14} />
                       <span>
                         Read {intakeReview.documentReview.processedCount} file{intakeReview.documentReview.processedCount === 1 ? "" : "s"}.
-                        {intakeReview.documentReview.visionUsed ? " Image review used Gemini Vision." : ""}
+                        {intakeReview.documentReview.visionUsed ? " BatasBot reviewed image content." : ""}
                         {intakeReview.documentReview.truncated ? " Some text was shortened." : ""}
                       </span>
                     </div>
@@ -1808,13 +1808,13 @@ export default function TriageDashboard() {
                     <section className="intake-manual-privacy">
                       <label className="intake-toggle-row">
                         <input type="checkbox" checked={manualAiConsent} onChange={(event) => setManualAiConsent(event.target.checked)} />
-                        <span><strong>Send these confirmed details to an AI provider for scoring</strong><small>BatasBot scores only after you check this and choose the scoring action.</small></span>
+                        <span><strong>Send these confirmed details to BatasBot for scoring</strong><small>BatasBot scores only after you check this and choose the scoring action.</small></span>
                       </label>
                       <label className="intake-toggle-row">
                         <input type="checkbox" checked={maskIdentifiers} onChange={(event) => setMaskIdentifiers(event.target.checked)} />
                         <span><strong>Mask identifiers before AI review</strong><small>Pattern checks replace some names, phone numbers, addresses, and ID numbers with tokens.</small></span>
                       </label>
-                            <p>This is partial risk reduction, not anonymization. Your details stay in this form until you choose “Score with AI”; that action sends them to the configured provider.</p>
+                            <p>This is partial risk reduction, not anonymization. Your details stay in this form until you choose “Score with AI”; that action sends them to BatasBot.</p>
                     </section>
                   )}
 
@@ -1847,7 +1847,7 @@ export default function TriageDashboard() {
                   <div className="intake-provider-note">
                     <span>{intakePath === "documents"
                       ? "The confirmed fields—not the original file—are sent for scoring."
-                      : "Nothing is sent to an AI provider until you choose the scoring action."}</span>
+                      : "Nothing is sent to BatasBot until you choose the scoring action."}</span>
                   </div>
                 </aside>
               </form>

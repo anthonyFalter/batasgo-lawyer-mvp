@@ -249,7 +249,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Task automation request is invalid." }, { status: 400 });
   }
   if (!parsed.data.aiConsent) {
-    return Response.json({ error: "Consent is required before sending intake details to an AI provider." }, { status: 403 });
+    return Response.json({ error: "Consent is required before sending intake details to BatasBot." }, { status: 403 });
   }
 
   try {
@@ -259,12 +259,12 @@ export async function POST(request: Request) {
       .from(intakes)
       .where(and(
         eq(intakes.workspaceId, workspaceId),
-        eq(intakes.status, "pending"),
+        inArray(intakes.status, ["pending", "accepted"]),
         inArray(intakes.id, parsed.data.intakeIds),
       ));
 
     if (selectedIntakes.length !== parsed.data.intakeIds.length) {
-      return Response.json({ error: "One or more selected intakes are unavailable or no longer active." }, { status: 404 });
+      return Response.json({ error: "One or more selected intakes are unavailable, declined, or no longer eligible." }, { status: 404 });
     }
 
     const existingAutomatedTasks = await db
@@ -284,7 +284,7 @@ export async function POST(request: Request) {
     const groqApiKey = process.env.GROQ_API_KEY;
     const geminiApiKey = process.env.GEMINI_API_KEY;
     if (!groqApiKey && !geminiApiKey) {
-      return Response.json({ error: "No AI task provider is configured on the server." }, { status: 503 });
+      return Response.json({ error: "BatasBot is not configured on the server." }, { status: 503 });
     }
 
     const { prompt, restore } = getIntakePrompt(candidates, parsed.data.maskIdentifiers);
@@ -314,12 +314,12 @@ export async function POST(request: Request) {
         return Response.json({ error: "AI task generation timed out. No tasks were created; try again." }, { status: 504 });
       }
       if (failures.some(({ status }) => status === 429 || status === 503)) {
-        return Response.json({ error: "AI providers are busy. No tasks were created; try again shortly." }, { status: 503 });
+        return Response.json({ error: "BatasBot is temporarily busy. No tasks were created; try again shortly." }, { status: 503 });
       }
       if (failures.some(({ status }) => status === 401 || status === 403)) {
-        return Response.json({ error: "AI provider authentication failed. Check the server-side provider keys." }, { status: 502 });
+        return Response.json({ error: "BatasBot is temporarily unavailable. Check the server configuration or try again later." }, { status: 502 });
       }
-      return Response.json({ error: "AI providers could not generate tasks for these intakes." }, { status: 502 });
+      return Response.json({ error: "BatasBot could not generate tasks for these intakes." }, { status: 502 });
     }
 
     const intakeByReference = new Map(candidates.map((intake) => [intake.reference, intake]));
@@ -355,7 +355,6 @@ export async function POST(request: Request) {
 
     return Response.json({
       tasks: createdTasks,
-      provider: providerName,
       skippedIntakeReferences,
     }, { status: 201, headers: { "Cache-Control": "no-store" } });
   } catch (error) {

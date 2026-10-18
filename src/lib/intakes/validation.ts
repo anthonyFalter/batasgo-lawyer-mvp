@@ -47,7 +47,7 @@ const intakeAiReviewFactorSchema = z.object({
 }).strict();
 
 const intakeAiReviewBaseSchema = z.object({
-  provider: z.enum(["Gemini", "Groq"]),
+  provider: z.literal("BatasBot"),
   title: z.string().trim().min(1).max(120),
   description: z.string().trim().min(1).max(1200),
   domain: z.enum(intakeDomains),
