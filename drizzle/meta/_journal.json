@@ -29,6 +29,41 @@
       "when": 1792261929672,
       "tag": "0003_typical_onslaught",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792284499132,
+      "tag": "0004_lying_sister_grimm",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792288574336,
+      "tag": "0005_unusual_lilith",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792293846863,
+      "tag": "0006_calendar_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792298674962,
+      "tag": "0007_tasks",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792299151847,
+      "tag": "0008_task_automation",
+      "breakpoints": true
     }
   ]
 }

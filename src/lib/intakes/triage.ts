@@ -1,10 +1,26 @@
-export type IntakeRisk = "Critical" | "High" | "Medium" | "Unassessed";
+export type IntakeRisk = "Critical" | "High" | "Medium" | "Low" | "Unassessed";
 
 export function getRiskFromScore(score: number | null): IntakeRisk {
   if (score === null) return "Unassessed";
   if (score >= 80) return "Critical";
   if (score >= 60) return "High";
-  return "Medium";
+  if (score >= 30) return "Medium";
+  return "Low";
+}
+
+export function getRiskAction(risk: IntakeRisk): string {
+  switch (risk) {
+    case "Critical":
+      return "Act today";
+    case "High":
+      return "Act this week";
+    case "Medium":
+      return "Needs attention soon";
+    case "Low":
+      return "Routine · no time pressure";
+    case "Unassessed":
+      return "Needs review";
+  }
 }
 
 export function suggestIntakeDetails(title: string, description: string) {
@@ -19,7 +35,7 @@ export function suggestIntakeDetails(title: string, description: string) {
           ? "Immigration"
           : /contract|company|corporate|business|shareholder/.test(source)
             ? "Corporate & Commercial"
-              : "Other";
+            : "Other";
   const deadlineMentioned = /\b(deadline|hearing|court date|filing date|file by|due by|summons|statute of limitations)\b/.test(source);
   const daysUntilDeadline = source.match(/\b(?:within|in)\s+(\d{1,3})\s+days?\b/)?.[1];
   const deadlineTodayOrTomorrow = /\b(?:due )?(?:today|tomorrow|within 24 hours|within 48 hours)\b/.test(source);

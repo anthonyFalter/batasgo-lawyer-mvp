@@ -639,6 +639,14 @@
   color: #a45b1c;
 }
 
+.batasbot-intake-stat--medium .batasbot-intake-stat-heading strong {
+  color: var(--yellow-ink);
+}
+
+.batasbot-intake-stat--low .batasbot-intake-stat-heading strong {
+  color: #18774d;
+}
+
 .batasbot-intake-meter {
   display: flex;
   gap: 3.35px;
@@ -675,7 +683,11 @@
 }
 
 .batasbot-intake-stat--medium .batasbot-intake-meter .is-active {
-  background: #ffc83d;
+  background: var(--yellow);
+}
+
+.batasbot-intake-stat--low .batasbot-intake-meter .is-active {
+  background: #279466;
 }
 
 .batasbot-intake-stat--deadline:not(.is-immediate) .batasbot-intake-meter .is-active {
