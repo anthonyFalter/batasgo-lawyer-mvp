@@ -545,6 +545,20 @@ export default function TriageDashboard() {
     (count, { intake }) => count + (seenDecisionIds.has(intake.id) ? 0 : 1),
     0,
   );
+  const queueStats = useMemo(() => {
+    const acceptedCount = decisions.filter(({ result }) => result === "accepted").length;
+    const reviewedCount = decisions.length;
+    const pendingCount = intakes.length;
+    const activeCases = pendingCount + acceptedCount;
+    const approvalRate = reviewedCount === 0 ? 0 : Math.round((acceptedCount / reviewedCount) * 100);
+
+    return {
+      pendingCount,
+      activeCases,
+      reviewedCount,
+      approvalRate,
+    };
+  }, [decisions, intakes]);
 
   const showToast = (message: string, undoable = false) => {
     setToast(message);
@@ -1376,12 +1390,12 @@ export default function TriageDashboard() {
                 )}
               </section>
               <section className="rail-panel diagnostics-panel">
-                <div className="rail-panel-heading"><h2>Queue Diagnostics</h2><span className="live-indicator"><span /> DEMO</span></div>
+                <div className="rail-panel-heading"><h2>Queue Diagnostics</h2></div>
                 <div className="stat-grid">
-                  <div className="stat-tile"><strong>{Math.max(0, 12 - decisions.length)}</strong><span>Pending intake</span></div>
-                  <div className="stat-tile"><strong>{34 + decisions.filter(({ result }) => result === "accepted").length}</strong><span>Active cases</span></div>
-                  <div className="stat-tile"><strong>8</strong><span>This week consults</span></div>
-                  <div className="stat-tile"><strong>94.8%</strong><span>Client satisfaction</span></div>
+                  <div className="stat-tile"><strong>{queueStats.pendingCount}</strong><span>Pending intake</span></div>
+                  <div className="stat-tile"><strong>{queueStats.activeCases}</strong><span>Active cases</span></div>
+                  <div className="stat-tile"><strong>{queueStats.reviewedCount}</strong><span>Reviewed matters</span></div>
+                  <div className="stat-tile"><strong>{queueStats.approvalRate}%</strong><span>Acceptance rate</span></div>
                 </div>
               </section>
               <section className="rail-panel schedule-panel">
