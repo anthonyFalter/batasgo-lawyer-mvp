@@ -883,21 +883,8 @@ export default function TriageDashboard() {
   };
 
   const importAcceptedMatter = (intake: Intake) => {
-    try {
-      window.sessionStorage.setItem("batasgo-accepted-intake", JSON.stringify({
-        id: intake.reference,
-        client: intake.client,
-        domain: intake.domain,
-        risk: intake.risk,
-        summary: intake.summary,
-        result: "accepted",
-      }));
-    } catch {
-      showToast("This browser could not pass the accepted intake to Document Assembly.");
-      return;
-    }
-
-    window.location.assign("/documents?source=accepted-intake");
+    void intake;
+    showToast("This feature is not currently part of the MVP.");
   };
 
   const resetFilters = () => {
@@ -1223,7 +1210,9 @@ export default function TriageDashboard() {
     }
   };
 
-  const unavailable = (label: string) => showToast(`${label} is not part of this demo yet.`);
+  const unavailable = (label: string) => showToast(label === "Document Assembly"
+    ? "This feature is not currently part of the MVP."
+    : `${label} is not part of this demo yet.`);
   const calculatedIntakeScore = intakeReview?.factors
     ? Math.min(100,
         intakeReview.factors.temporalDeadlines.score

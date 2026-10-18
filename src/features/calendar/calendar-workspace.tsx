@@ -294,7 +294,9 @@ export default function CalendarWorkspace() {
     }
   };
 
-  const unavailable = (label: string) => setToast(`${label} is not part of this demo yet.`);
+  const unavailable = (label: string) => setToast(label === "Document Assembly"
+    ? "This feature is not currently part of the MVP."
+    : `${label} is not part of this demo yet.`);
   const timeRows = [
     { label: "08:00 AM", minute: 0 },
     { label: "10:00 AM", minute: 120 },

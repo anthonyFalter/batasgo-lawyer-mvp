@@ -68,7 +68,9 @@ export default function SettingsWorkspace() {
     setToggles((current) => ({ ...current, [key]: !current[key] }));
   };
 
-  const unavailable = (label: string) => setToast(`${label} is not part of this demo yet.`);
+  const unavailable = (label: string) => setToast(label === "Document Assembly"
+    ? "This feature is not currently part of the MVP."
+    : `${label} is not part of this demo yet.`);
 
   useEffect(() => {
     let active = true;

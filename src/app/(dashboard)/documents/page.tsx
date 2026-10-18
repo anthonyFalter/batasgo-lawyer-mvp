@@ -1,5 +1,5 @@
-import DocumentAssemblyWorkspace from "@/features/documents/document-assembly-workspace";
+import DocumentAssemblyUnavailable from "@/features/documents/document-assembly-unavailable";
 
 export default function DocumentsPage() {
-  return <DocumentAssemblyWorkspace />;
+  return <DocumentAssemblyUnavailable />;
 }

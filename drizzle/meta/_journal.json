@@ -78,6 +78,13 @@
       "when": 1792309528735,
       "tag": "0010_moaning_sugar_man",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792327549048,
+      "tag": "0011_soft_tempest",
+      "breakpoints": true
     }
   ]
 }

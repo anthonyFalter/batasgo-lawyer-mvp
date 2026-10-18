@@ -17,6 +17,7 @@ import { sql } from "drizzle-orm";
 export const workspaceRole = pgEnum("workspace_role", ["owner", "lawyer", "staff"]);
 export const intakeRisk = pgEnum("intake_risk", ["critical", "high", "medium", "low", "unassessed"]);
 export const intakeStatus = pgEnum("intake_status", ["pending", "accepted", "declined"]);
+export const documentStatus = pgEnum("document_status", ["draft", "in_review", "final", "archived"]);
 export const calendarEventKind = pgEnum("calendar_event_kind", ["family", "labor", "civil", "criminal", "intake"]);
 export const taskPriority = pgEnum("task_priority", ["high", "medium", "low"]);
 export const taskSource = pgEnum("task_source", ["manual", "ai"]);
@@ -84,6 +85,47 @@ export const intakes = pgTable(
       table.status,
       table.receivedAt,
     ),
+  ],
+);
+
+export const documents = pgTable(
+  "documents",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    intakeId: uuid("intake_id").references(() => intakes.id, { onDelete: "set null" }),
+    clerkUserId: text("clerk_user_id").notNull(),
+    title: text("title").notNull(),
+    documentType: text("document_type").notNull(),
+    status: documentStatus("status").notNull().default("draft"),
+    contentHtml: text("content_html").notNull(),
+    fontFamily: text("font_family").notNull().default("Georgia"),
+    reviewChecks: jsonb("review_checks").notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("documents_workspace_updated_idx").on(table.workspaceId, table.updatedAt),
+    index("documents_workspace_intake_idx").on(table.workspaceId, table.intakeId),
+  ],
+);
+
+export const documentVersions = pgTable(
+  "document_versions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    documentId: uuid("document_id")
+      .notNull()
+      .references(() => documents.id, { onDelete: "cascade" }),
+    clerkUserId: text("clerk_user_id").notNull(),
+    contentHtml: text("content_html").notNull(),
+    plainText: text("plain_text").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("document_versions_document_created_idx").on(table.documentId, table.createdAt),
   ],
 );
 

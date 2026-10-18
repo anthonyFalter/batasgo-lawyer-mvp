@@ -27,7 +27,7 @@ const navItems = [
   { label: "Messages", icon: Mail, href: "/messages" },
   { label: "Calendar", icon: CalendarDays, href: "/calendar" },
   { label: "Tasks", icon: ListChecks, href: "/tasks" },
-  { label: "Document Assembly", icon: FilePenLine, href: "/documents" },
+  { label: "Document Assembly", icon: FilePenLine },
   { label: "BatasBot", icon: Bot, href: "/batasbot" },
   { label: "Settings", icon: Settings, href: "/settings" },
 ];

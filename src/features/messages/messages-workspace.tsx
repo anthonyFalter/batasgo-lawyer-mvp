@@ -362,7 +362,9 @@ export default function MessagesWorkspace() {
     }
   };
 
-  const unavailable = (label: string) => setToast(`${label} is not available for citizen conversations.`);
+  const unavailable = (label: string) => setToast(label === "Document Assembly"
+    ? "This feature is not currently part of the MVP."
+    : `${label} is not available for citizen conversations.`);
 
   const createJournalContext = (message: Message): CitizenJournalHandoffContext | null => {
     const handoff = message.journalHandoff;
@@ -382,15 +384,10 @@ export default function MessagesWorkspace() {
   };
 
   const openJournalInDocumentAssembly = (message: Message) => {
-    const handoff = createJournalContext(message);
-    if (!handoff) return;
-    try {
-      window.sessionStorage.setItem("batasgo-journal-handoff", JSON.stringify(handoff));
-    } catch {
-      setJournalActionError({ messageId: message.id, message: "This browser could not pass the journal to Document Assembly." });
-      return;
-    }
-    window.location.assign("/documents?source=journal-handoff");
+    setJournalActionError({
+      messageId: message.id,
+      message: "This feature is not currently part of the MVP.",
+    });
   };
 
   const openJournalInBatasBot = (message: Message) => {

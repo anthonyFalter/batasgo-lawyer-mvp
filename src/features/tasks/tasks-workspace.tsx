@@ -354,7 +354,9 @@ export default function TasksWorkspace() {
       activePage="Tasks"
       search={search}
       onSearchChange={setSearch}
-      onUnavailable={(label) => setToast(`${label} is not available yet.`)}
+      onUnavailable={(label) => setToast(label === "Document Assembly"
+        ? "This feature is not currently part of the MVP."
+        : `${label} is not available yet.`)}
       searchPlaceholder="Search tasks and matters..."
       searchLabel="Search tasks and matters"
     >

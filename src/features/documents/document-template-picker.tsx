@@ -36,6 +36,7 @@ export type DocumentTemplate = {
 type DocumentTemplatePickerProps = {
   templates: DocumentTemplate[];
   onSelect: (template: DocumentTemplate) => void;
+  onRecommend?: (templates: DocumentTemplate[]) => void;
 };
 
 const CATEGORIES = ["All templates", "Pleadings", "Correspondence", "Research", "Client notes", "My templates"];
@@ -238,7 +239,7 @@ function displayName(fileName: string) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-export default function DocumentTemplatePicker({ templates, onSelect }: DocumentTemplatePickerProps) {
+export default function DocumentTemplatePicker({ templates, onSelect, onRecommend }: DocumentTemplatePickerProps) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All templates");
   const [uploadedTemplates, setUploadedTemplates] = useState<DocumentTemplate[]>([]);
@@ -293,6 +294,7 @@ export default function DocumentTemplatePicker({ templates, onSelect }: Document
       return matchesCategory && matchesSearch;
     });
   }, [category, search, templates, uploadedTemplates]);
+  const allTemplates = useMemo(() => [...uploadedTemplates, ...templates], [templates, uploadedTemplates]);
 
   const handleUpload = async (file?: File) => {
     if (!file) return;
@@ -358,6 +360,12 @@ export default function DocumentTemplatePicker({ templates, onSelect }: Document
           <h1 id="template-picker-title">Start a document</h1>
         </div>
         <div className="template-upload-actions">
+          {onRecommend && (
+            <button type="button" className="template-recommend-button" onClick={() => onRecommend(allTemplates)}>
+              <Sparkles aria-hidden="true" size={12.06} />
+              Let BatasBot choose
+            </button>
+          )}
           <input
             ref={uploadRef}
             className="template-upload-input"

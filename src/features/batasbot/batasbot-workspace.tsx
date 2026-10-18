@@ -1041,7 +1041,9 @@ export default function BatasBotWorkspace() {
       activePage="BatasBot"
       search={search}
       onSearchChange={setSearch}
-      onUnavailable={(label) => setNotice(`${label} is not part of this demo yet.`)}
+      onUnavailable={(label) => setNotice(label === "Document Assembly"
+        ? "This feature is not currently part of the MVP."
+        : `${label} is not part of this demo yet.`)}
       searchPlaceholder="Search your workspace..."
       searchLabel="Search your workspace"
     >
