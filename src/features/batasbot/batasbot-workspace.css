@@ -1009,6 +1009,229 @@
   white-space: nowrap;
 }
 
+.batasbot-journal-review {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 12px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  animation: batasbot-intake-review-in 280ms cubic-bezier(.16, 1, .3, 1) both;
+}
+
+.batasbot-journal-review-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.batasbot-journal-review-heading h3 {
+  margin: 0;
+  color: var(--heading);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.batasbot-journal-review-heading p {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.batasbot-journal-review-heading > span {
+  flex: 0 0 auto;
+  padding: 4px 7px;
+  color: var(--blue-deep);
+  background: #edf2ff;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.batasbot-journal-review-summary {
+  margin: 0;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.batasbot-journal-review-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.batasbot-journal-review-facts > div {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+  padding: 8px;
+  background: #f7f8fa;
+  border: 1px solid #edf0f4;
+  border-radius: var(--radius-control);
+}
+
+.batasbot-journal-review-facts span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.batasbot-journal-review-facts strong {
+  color: var(--heading);
+  font-size: 11px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.batasbot-journal-review-signals h4 {
+  margin: 0 0 5px;
+  color: var(--heading);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.batasbot-journal-review-signals ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 17px;
+  color: var(--ink);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.batasbot-journal-review-signals > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.batasbot-journal-review-note,
+.batasbot-journal-review-disclaimer {
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.batasbot-journal-review-note {
+  color: #3f3b2b;
+}
+
+.batasbot-message-file {
+  display: inline-flex;
+  max-width: min(100%, 360px);
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 5px;
+  padding: 5px 8px;
+  color: var(--blue-deep);
+  background: #edf2ff;
+  border-radius: var(--radius-control);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.batasbot-journal-attachment {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 7px;
+  padding: 9px 10px;
+  color: var(--blue-deep);
+  background: #f5f7ff;
+  border: 1px solid #dce5ff;
+  border-radius: var(--radius-control);
+}
+
+.batasbot-journal-attachment > span {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 2px;
+}
+
+.batasbot-journal-attachment strong {
+  color: var(--heading);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.batasbot-journal-attachment small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.batasbot-journal-attachment button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+
+.batasbot-journal-attachment button:hover:not(:disabled) {
+  color: var(--heading);
+  background: #e8edfa;
+}
+
+.batasbot-journal-attachment button:focus-visible {
+  outline: 2px solid #86a7ff;
+  outline-offset: 2px;
+}
+
+.batasbot-journal-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 0 0 7px;
+  color: var(--ink);
+  font-size: 11px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.batasbot-journal-consent input {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  margin: 0;
+  accent-color: var(--blue);
+}
+
+.batasbot-journal-consent input:focus-visible {
+  outline: 2px solid #86a7ff;
+  outline-offset: 2px;
+}
+
+.batasbot-send-loading {
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgb(255 255 255 / 55%);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: batasbot-send-spin 700ms linear infinite;
+}
+
+@keyframes batasbot-send-spin {
+  to { transform: rotate(360deg); }
+}
+
 @keyframes batasbot-intake-review-in {
   from {
     opacity: 0;
@@ -1400,6 +1623,10 @@
   .batasbot-compose-area {
     width: calc(100% - 14.74px);
     padding-bottom: 6.03px;
+  }
+
+  .batasbot-journal-review-facts {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

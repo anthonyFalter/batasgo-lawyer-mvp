@@ -1,8 +1,8 @@
 # BatasGO
 
-BatasGO is a lawyer-facing workspace prototype for reviewing client inquiries and managing related casework. Its backend-enabled MVP workflows include a persistent intake triage queue and citizen messages/journal handoffs; documents, calendar, tasks, and BatasBot remain local demonstrations.
+BatasGO is a lawyer-facing workspace prototype for reviewing client inquiries and managing related casework. Its backend-enabled MVP workflows include a persistent intake triage queue, citizen messages/journal handoffs, and BatasBot; documents, calendar, and tasks remain local demonstrations.
 
-This project uses Next.js. Clerk-authenticated intake records and accept/decline decisions are saved in Neon, scoped to the signed-in user's workspace. Development workspaces are seeded with clearly labeled synthetic examples. Other workspace features still use local sample content and are not live legal services or records.
+This project uses Next.js. Clerk-authenticated intake records and accept/decline decisions are saved in Neon, scoped to the signed-in user's workspace. Development workspaces are seeded with clearly labeled synthetic examples. Document Assembly, Calendar, and Tasks use local sample content and are not live legal services or records.
 
 ## Technology
 
@@ -66,7 +66,7 @@ Open [http://localhost:3000](http://localhost:3000) for the BatasGO intro and wo
 | `/sign-in` | Clerk sign-in page. |
 | `/sign-up` | Clerk sign-up page. |
 
-Case Overview intake records and decisions, BatasBot conversation sessions, and citizen conversations/messages/handoffs persist in Neon; BatasBot sessions can be deleted from the session list. Document Assembly, Calendar, and Tasks use demo data in the browser and are not saved to a server. Citizen handoff files are stored as binary data in Postgres and are accessible only to the participating citizen and lawyer workspace. Saved intakes retain selected document names and structured deadline, stage, and urgency details, not file contents. Document review requires consent before upload; readable text can be pseudonymized before provider transmission, but masking is partial and cannot be reliably applied to scans or images. Uploaded intake contents are processed in memory by BatasGO and are not persisted; AI providers receive the content needed for the requested output and apply their own handling and retention terms.
+Case Overview intake records and decisions, BatasBot conversation sessions, and citizen conversations/messages/handoffs persist in Neon; BatasBot sessions can be deleted from the session list. Document Assembly, Calendar, and Tasks use demo data in the browser and are not saved to a server. Citizen handoff files are stored as binary data in Postgres and are accessible only to the participating citizen and lawyer workspace. Opening a journal in BatasBot creates a named `.txt` file from its shared entries; after explicit lawyer consent, the file is uploaded for AI extraction and its contents are processed in memory, not retained as a file. The generated review summary and file name are saved in the BatasBot conversation. Saved intakes retain selected document names and structured deadline, stage, and urgency details, not file contents. Document review requires consent before upload; readable text can be pseudonymized before provider transmission, but masking is partial and cannot be reliably applied to scans or images. Uploaded intake contents are processed in memory by BatasGO and are not persisted; AI providers receive the content needed for the requested output and apply their own handling and retention terms.
 
 ## Intake API
 

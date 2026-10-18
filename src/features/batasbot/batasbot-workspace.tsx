@@ -4,9 +4,11 @@ import {
   ArrowUp,
   Bot,
   BriefcaseBusiness,
+  CalendarClock,
   Check,
   Clock3,
   FileText,
+  ListChecks,
   MessageSquare,
   MoreHorizontal,
   Plus,
@@ -21,6 +23,7 @@ import {
   isCitizenJournalHandoffContext,
   type CitizenJournalHandoffContext,
 } from "@/lib/citizen/journal-handoff-context";
+import { intakeAiExtractionResponseSchema } from "@/lib/intakes/validation";
 import { useTypingStream } from "@/hooks/use-typing-stream";
 import WorkspaceShell from "../workspace/workspace-shell";
 import ReactMarkdown from "react-markdown";
@@ -38,6 +41,8 @@ type ChatMessage = {
   content: string;
   links?: ChatLink[];
   intakeReview?: IntakeReviewVisual;
+  journalReview?: JournalReviewVisual;
+  attachmentName?: string;
 };
 
 type MatterTableRow = {
@@ -145,6 +150,16 @@ type IntakeReviewVisual = {
   specialtyMatch: boolean;
 };
 
+type JournalReviewVisual = {
+  sourceFile: string;
+  summary: string;
+  domain: string;
+  deadlineAt: string | null;
+  caseStage: string;
+  signals: string[];
+  truncated: boolean;
+};
+
 function isIntakeReviewVisual(value: unknown): value is IntakeReviewVisual {
   if (!value || typeof value !== "object") return false;
   const review = value as Partial<IntakeReviewVisual>;
@@ -154,6 +169,29 @@ function isIntakeReviewVisual(value: unknown): value is IntakeReviewVisual {
     && review.signals.every((signal) => typeof signal === "string")
     && typeof review.specialty === "string"
     && typeof review.specialtyMatch === "boolean";
+}
+
+function isJournalReviewVisual(value: unknown): value is JournalReviewVisual {
+  if (!value || typeof value !== "object") return false;
+  const review = value as Partial<JournalReviewVisual>;
+  return typeof review.sourceFile === "string"
+    && typeof review.summary === "string"
+    && typeof review.domain === "string"
+    && (review.deadlineAt === null || typeof review.deadlineAt === "string")
+    && typeof review.caseStage === "string"
+    && Array.isArray(review.signals)
+    && review.signals.every((signal) => typeof signal === "string")
+    && typeof review.truncated === "boolean";
+}
+
+function isCreatedChatSession(value: unknown): value is { id: string; title: string; updatedAt: string } {
+  if (!value || typeof value !== "object") return false;
+  return "id" in value
+    && typeof value.id === "string"
+    && "title" in value
+    && typeof value.title === "string"
+    && "updatedAt" in value
+    && typeof value.updatedAt === "string";
 }
 
 type ChatSession = {
@@ -268,20 +306,39 @@ function explainTriageHandoff(handoff: TriageChatHandoff) {
   return `${handoff.id} | ${handoff.domain} | ${handoff.risk} risk. ${deadline} Summary: ${summaryText}. ${signalText}`;
 }
 
-function createJournalReviewPrompt(handoff: CitizenJournalHandoffContext) {
+function createJournalTextFile(handoff: CitizenJournalHandoffContext) {
   const entries = handoff.entries.length
     ? handoff.entries.map((entry, index) => [
-      `${index + 1}. ${entry.title}`,
+      `ENTRY ${index + 1}: ${entry.title}`,
       `Incident date: ${entry.incidentDate || "Not stated"}`,
       entry.location ? `Location: ${entry.location}` : "",
-      `Client-reported details: ${entry.details}`,
+      "Client-reported details:",
+      entry.details,
     ].filter(Boolean).join("\n")).join("\n\n")
     : "No journal entry details were included.";
-  const attachments = handoff.attachments.length
-    ? `\n\nAttachment names (files are not included in this chat):\n${handoff.attachments.map((name) => `- ${name}`).join("\n")}`
+  const attachmentList = handoff.attachments.length
+    ? `\n\nOther attachments shared with this journal (not included in this text file):\n${handoff.attachments.map((name) => `- ${name}`).join("\n")}`
     : "";
+  const safeTitle = handoff.title
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 48) || "citizen-journal";
+  const contents = [
+    "BATASGO CITIZEN JOURNAL HANDOFF",
+    `Journal: ${handoff.title}`,
+    `Reference: ${handoff.messageId}`,
+    "",
+    "The following information was shared by the citizen. Treat it as unverified reported facts.",
+    "Incident dates below are not legal deadlines unless independently confirmed.",
+    "",
+    entries,
+    attachmentList,
+  ].join("\n");
 
-  return `Review this citizen-shared journal. Separate reported facts from legal conclusions, identify key facts and missing information, and suggest focused follow-up questions under Philippine law. Do not treat incident dates as legal deadlines.\n\nJournal: ${handoff.title}\n\n${entries}${attachments}`;
+  return new File([contents], `${safeTitle}-journal.txt`, { type: "text/plain" });
 }
 
 function getIntakeReviewVisual(handoff: TriageChatHandoff): IntakeReviewVisual {
@@ -368,6 +425,50 @@ function IntakeReviewGrid({ review }: { review: IntakeReviewVisual }) {
   );
 }
 
+function JournalReviewCard({ review }: { review: JournalReviewVisual }) {
+  return (
+    <section className="batasbot-journal-review" aria-label="Journal review summary">
+      <header className="batasbot-journal-review-heading">
+        <div>
+          <h3>Journal review</h3>
+          <p><FileText aria-hidden="true" size={12} /> {review.sourceFile}</p>
+        </div>
+        <span>AI-assisted summary</span>
+      </header>
+      <p className="batasbot-journal-review-summary">{review.summary}</p>
+      <div className="batasbot-journal-review-facts">
+        <div>
+          <span><BriefcaseBusiness aria-hidden="true" size={12} /> Practice area</span>
+          <strong>{review.domain}</strong>
+        </div>
+        <div>
+          <span><ListChecks aria-hidden="true" size={12} /> Case stage</span>
+          <strong>{review.caseStage || "Not stated"}</strong>
+        </div>
+        <div>
+          <span><CalendarClock aria-hidden="true" size={12} /> Legal deadline</span>
+          <strong>{review.deadlineAt || "Not identified"}</strong>
+        </div>
+      </div>
+      <div className="batasbot-journal-review-signals">
+        <h4>Reported urgency signals</h4>
+        {review.signals.length > 0 ? (
+          <ul>{review.signals.map((signal) => <li key={signal}>{signal}</li>)}</ul>
+        ) : (
+          <p>No specific urgency signals were identified in the text.</p>
+        )}
+      </div>
+      {review.truncated && (
+        <p className="batasbot-journal-review-note" role="note">
+          The text file exceeded the review limit; only the beginning was analyzed.
+        </p>
+      )}
+      <p className="batasbot-journal-review-disclaimer">
+        Based on client-reported information. Verify all facts and any deadlines against source documents.
+      </p>
+    </section>
+  );
+}
 
 
 export default function BatasBotWorkspace() {
@@ -383,6 +484,9 @@ export default function BatasBotWorkspace() {
   const [renameTitle, setRenameTitle] = useState("");
   const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
+  const [journalFile, setJournalFile] = useState<File | null>(null);
+  const [journalAiConsent, setJournalAiConsent] = useState(false);
+  const [isReviewingJournal, setIsReviewingJournal] = useState(false);
   // Messages for the active session are fetched from the DB, then updated optimistically
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
@@ -462,8 +566,10 @@ export default function BatasBotWorkspace() {
     }
 
     newChatStartedRef.current = true;
-    setInput(createJournalReviewPrompt(handoff));
-    setNotice("Journal context is ready. Review the draft prompt, then send it to BatasBot.");
+    setJournalFile(createJournalTextFile(handoff));
+    setJournalAiConsent(false);
+    setInput("Review this citizen-shared journal. Summarize the reported facts, practice area, any explicitly stated legal deadline or case stage, and urgency signals. Do not treat incident dates as legal deadlines.");
+    setNotice("Journal text is attached. Confirm AI review consent, then send it to BatasBot.");
   }, []);
 
   // ── Load messages when active session changes ──────────────────────────
@@ -495,6 +601,10 @@ export default function BatasBotWorkspace() {
               role: m.role,
               content: m.content,
               intakeReview: isIntakeReviewVisual(m.metadata) ? m.metadata : undefined,
+              journalReview: isJournalReviewVisual(m.metadata) ? m.metadata : undefined,
+              attachmentName: m.role === "user"
+                ? m.content.match(/^Attached journal text file: ([^\r\n]+)/)?.[1]
+                : undefined,
             })));
           }
         }
@@ -749,9 +859,136 @@ export default function BatasBotWorkspace() {
     }
   };
 
+  const reviewJournalAttachment = async () => {
+    const file = journalFile;
+    const requestText = input.trim();
+    if (!file || !requestText || !journalAiConsent || isGenerating || sessionsLoading || sendInFlightRef.current) return;
+
+    sendInFlightRef.current = true;
+    setIsSending(true);
+    setIsReviewingJournal(true);
+    setNotice("");
+    try {
+      const formData = new FormData();
+      formData.append("intake", JSON.stringify({
+        title: "",
+        description: requestText.slice(0, 1200),
+        domain: "",
+        documents: [file.name],
+        deadlineAt: null,
+        caseStage: "",
+        urgencyFlags: [],
+      }));
+      formData.append("maskIdentifiers", "true");
+      formData.append("mode", "extract");
+      formData.append("aiConsent", "true");
+      formData.append("files", file, file.name);
+
+      const reviewResponse = await fetch("/api/intakes/review", {
+        method: "POST",
+        body: formData,
+        signal: AbortSignal.timeout(30_000),
+      });
+      const reviewPayload: unknown = await reviewResponse.json().catch(() => null);
+      if (!reviewResponse.ok) {
+        const message = reviewPayload && typeof reviewPayload === "object" && "error" in reviewPayload
+          && typeof reviewPayload.error === "string"
+          ? reviewPayload.error
+          : "BatasBot could not review this journal file.";
+        throw new Error(message);
+      }
+
+      const parsedReview = intakeAiExtractionResponseSchema.safeParse(reviewPayload);
+      if (!parsedReview.success) throw new Error("BatasBot returned an invalid journal review.");
+      const { extraction } = parsedReview.data;
+      const journalReview: JournalReviewVisual = {
+        sourceFile: file.name,
+        summary: extraction.summary,
+        domain: extraction.domain,
+        deadlineAt: extraction.deadlineAt,
+        caseStage: extraction.caseStage,
+        signals: extraction.signals,
+        truncated: extraction.documentReview.truncated,
+      };
+      const assistantContent = [
+        `Summary: ${journalReview.summary}`,
+        `Practice area: ${journalReview.domain}`,
+        `Reported case stage: ${journalReview.caseStage || "Not stated"}`,
+        `Explicit legal deadline: ${journalReview.deadlineAt || "Not identified"}`,
+        `Reported urgency signals: ${journalReview.signals.length ? journalReview.signals.join("; ") : "None identified"}`,
+      ].join("\n\n");
+      const userContent = `Attached journal text file: ${file.name}\nReview request: ${requestText}`;
+      const sessionTitle = `Journal review · ${extraction.title}`;
+      const sessionResponse = await fetch("/api/chat/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: sessionTitle,
+          handoff: {
+            userContent,
+            assistantContent,
+            assistantMetadata: journalReview,
+          },
+        }),
+      });
+      const sessionPayload: unknown = await sessionResponse.json().catch(() => null);
+      if (!sessionResponse.ok || !isCreatedChatSession(sessionPayload)) {
+        const message = sessionPayload && typeof sessionPayload === "object" && "error" in sessionPayload
+          && typeof sessionPayload.error === "string"
+          ? sessionPayload.error
+          : "BatasBot finished the review, but the conversation could not be saved.";
+        throw new Error(message);
+      }
+
+      const userMessage: ChatMessage = {
+        id: `journal-${tempIdRef.current++}-user`,
+        role: "user",
+        content: userContent,
+        attachmentName: file.name,
+      };
+      const assistantMessage: ChatMessage = {
+        id: `journal-${tempIdRef.current++}-assistant`,
+        role: "assistant",
+        content: assistantContent,
+        journalReview,
+      };
+      skipSessionLoadRef.current.add(sessionPayload.id);
+      newChatStartedRef.current = true;
+      setActiveSessionId(sessionPayload.id);
+      setSessions((current) => normalizeSessions([{
+        id: sessionPayload.id,
+        title: sessionPayload.title,
+        updatedAt: sessionPayload.updatedAt,
+        preview: extraction.summary.slice(0, 80),
+      }, ...current]));
+      setMessages([userMessage, assistantMessage]);
+      setInput("");
+      setJournalFile(null);
+      setJournalAiConsent(false);
+      setNotice("Journal review complete. The uploaded text file was processed for this review and was not saved as a file.");
+    } catch (error) {
+      const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
+      setNotice(timedOut
+        ? "Journal review timed out. Your file is still attached; try again."
+        : error instanceof Error ? error.message : "Unable to review this journal file.");
+    } finally {
+      setIsSending(false);
+      setIsReviewingJournal(false);
+      sendInFlightRef.current = false;
+    }
+  };
+
+  const submitComposer = () => {
+    if (journalFile) {
+      void reviewJournalAttachment();
+      return;
+    }
+    void sendMessage(input);
+  };
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    sendMessage(input);
+    submitComposer();
   };
 
   const startNewChat = () => {
@@ -760,6 +997,8 @@ export default function BatasBotWorkspace() {
     setActiveSessionId(null);
     setMessages([]);
     setInput("");
+    setJournalFile(null);
+    setJournalAiConsent(false);
     setNotice("");
     inputRef.current?.focus();
   };
@@ -880,7 +1119,17 @@ export default function BatasBotWorkspace() {
                       {message.role === "assistant" && <span className="batasbot-thread-avatar" aria-hidden="true"><Bot size={10.05} /></span>}
                       <div className="batasbot-thread-body">
                         {message.role === "user" ? (
-                          <p>{message.content}</p>
+                          <>
+                            {message.attachmentName && (
+                              <span className="batasbot-message-file">
+                                <FileText aria-hidden="true" size={12} />
+                                {message.attachmentName}
+                              </span>
+                            )}
+                            <p>{message.attachmentName
+                              ? message.content.replace(/^Attached journal text file: [^\r\n]+\nReview request:\s*/, "")
+                              : message.content}</p>
+                          </>
                         ) : (
                           (() => {
                             const matterTable = parseMatterTable(message.content);
@@ -893,7 +1142,7 @@ export default function BatasBotWorkspace() {
                                 )}
                                 {matterTable ? <MatterTable rows={matterTable.rows} /> : (
                                   <div className="batasbot-markdown">
-                                    <MatterMarkdown content={message.content} />
+                                    <MatterMarkdown content={message.journalReview?.summary ?? message.content} />
                                   </div>
                                 )}
                                 {matterTable?.after.trim() && (
@@ -906,6 +1155,7 @@ export default function BatasBotWorkspace() {
                           })()
                         )}
                         {message.intakeReview && <IntakeReviewGrid review={message.intakeReview} />}
+                        {message.journalReview && <JournalReviewCard review={message.journalReview} />}
                         {message.links && (
                           <div className="batasbot-thread-links">
                             {message.links.map(({ label, href, icon: Icon }) => (
@@ -954,6 +1204,37 @@ export default function BatasBotWorkspace() {
             </section>
 
             <div className="batasbot-compose-area">
+              {journalFile && (
+                <div className="batasbot-journal-attachment" aria-label="Attached journal file">
+                  <FileText aria-hidden="true" size={15} />
+                  <span>
+                    <strong>{journalFile.name}</strong>
+                    <small>Generated from the shared journal entries · TXT</small>
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="Remove attached journal file"
+                    disabled={isGenerating}
+                    onClick={() => {
+                      setJournalFile(null);
+                      setJournalAiConsent(false);
+                    }}
+                  >
+                    <X aria-hidden="true" size={14} />
+                  </button>
+                </div>
+              )}
+              {journalFile && (
+                <label className="batasbot-journal-consent">
+                  <input
+                    type="checkbox"
+                    checked={journalAiConsent}
+                    disabled={isGenerating}
+                    onChange={(event) => setJournalAiConsent(event.target.checked)}
+                  />
+                  <span>I’m authorized to send these client-reported notes to BatasBot for AI review.</span>
+                </label>
+              )}
               <form className="batasbot-main-composer" onSubmit={handleSubmit}>
                 <label className="sr-only" htmlFor="batasbot-main-input">Message BatasBot</label>
                 <textarea
@@ -964,17 +1245,21 @@ export default function BatasBotWorkspace() {
                   onKeyDown={(event) => {
                     if (event.key === "Enter" && !event.shiftKey) {
                       event.preventDefault();
-                      if (!isGenerating) sendMessage(input);
+                      if (!isGenerating) submitComposer();
                     }
                   }}
                   placeholder="Message BatasBot..."
                   rows={1}
                 />
-                <button type="submit" aria-label="Send message" disabled={!input.trim() || isGenerating}>
-                  <ArrowUp aria-hidden="true" size={11.39} />
+                <button type="submit" aria-label={journalFile ? "Send journal for review" : "Send message"} disabled={!input.trim() || isGenerating || sessionsLoading || Boolean(journalFile && !journalAiConsent)}>
+                  {isReviewingJournal
+                    ? <span className="batasbot-send-loading" aria-hidden="true" />
+                    : <ArrowUp aria-hidden="true" size={11.39} />}
                 </button>
               </form>
-              <p className="batasbot-main-disclaimer">BatasBot responses are for professional reference only — not legal advice. Always verify citations.</p>
+              <p className="batasbot-main-disclaimer">{journalFile
+                ? "Submitting sends this text file to configured AI providers. The raw file is processed for review, not retained as a file."
+                : "BatasBot responses are for professional reference only — not legal advice. Always verify citations."}</p>
             </div>
           </div>
 
