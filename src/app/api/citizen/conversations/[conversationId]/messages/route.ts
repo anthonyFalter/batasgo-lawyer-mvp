@@ -6,7 +6,9 @@ import {
   citizenApiJson,
   citizenApiOptions,
 } from "@/lib/citizen/api";
+import { logCitizenAccess } from "@/lib/citizen/audit";
 import { getConversationAccess, listConversationMessages } from "@/lib/citizen/service";
+import { encryptText } from "@/lib/citizen/message-crypto";
 import { citizenMessageCreateSchema } from "@/lib/citizen/validation";
 import { isSameOriginRequest } from "@/lib/intakes/validation";
 
@@ -24,8 +26,22 @@ export async function GET(request: Request, { params }: RouteContext) {
   try {
     const conversation = await getConversationAccess(conversationId, result.actor);
     if (!conversation) {
+      await logCitizenAccess({
+        actor: result.actor,
+        conversationId,
+        action: "message.read",
+        outcome: "denied",
+      });
       return citizenApiJson(request, { error: "Conversation not found." }, { status: 404 });
     }
+
+    await logCitizenAccess({
+      actor: result.actor,
+      workspaceId: conversation.workspaceId,
+      conversationId,
+      action: "message.read",
+      outcome: "allowed",
+    });
 
     return citizenApiJson(request, {
       messages: await listConversationMessages(conversationId, result.actor),
@@ -40,6 +56,13 @@ export async function POST(request: Request, { params }: RouteContext) {
   const result = await authenticateCitizenApiRequest(request);
   if ("response" in result) return result.response;
   if (result.actor.kind === "lawyer" && !isSameOriginRequest(request)) {
+    const { conversationId } = await params;
+    await logCitizenAccess({
+      actor: result.actor,
+      conversationId,
+      action: "message.send",
+      outcome: "denied",
+    });
     return citizenApiJson(request, { error: "Request origin is not allowed." }, { status: 403 });
   }
 
@@ -59,8 +82,22 @@ export async function POST(request: Request, { params }: RouteContext) {
   try {
     const conversation = await getConversationAccess(conversationId, result.actor);
     if (!conversation) {
+      await logCitizenAccess({
+        actor: result.actor,
+        conversationId,
+        action: "message.send",
+        outcome: "denied",
+      });
       return citizenApiJson(request, { error: "Conversation not found." }, { status: 404 });
     }
+
+    await logCitizenAccess({
+      actor: result.actor,
+      workspaceId: conversation.workspaceId,
+      conversationId,
+      action: "message.send",
+      outcome: "allowed",
+    });
 
     const [message] = await db
       .insert(citizenMessages)
@@ -68,14 +105,14 @@ export async function POST(request: Request, { params }: RouteContext) {
         conversationId,
         sender: result.actor.kind,
         senderId: result.actor.kind === "citizen" ? result.actor.citizenId : result.actor.clerkUserId,
-        content: parsed.data.text,
+        content: encryptText(parsed.data.text),
       })
       .returning();
 
     await db
       .update(citizenConversations)
       .set({
-        lastMessagePreview: parsed.data.text.slice(0, 240),
+        lastMessagePreview: encryptText(parsed.data.text.slice(0, 240)),
         lastMessageAt: message.createdAt,
         updatedAt: message.createdAt,
       })
@@ -87,7 +124,7 @@ export async function POST(request: Request, { params }: RouteContext) {
         sender: message.sender,
         senderId: message.senderId,
         kind: message.kind,
-        text: message.content,
+        text: parsed.data.text,
         createdAt: message.createdAt.toISOString(),
         journalHandoff: null,
       },
