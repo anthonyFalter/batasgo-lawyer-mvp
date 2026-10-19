@@ -24,6 +24,14 @@ export const taskSource = pgEnum("task_source", ["manual", "ai"]);
 export const citizenMessageSender = pgEnum("citizen_message_sender", ["citizen", "lawyer"]);
 export const citizenMessageKind = pgEnum("citizen_message_kind", ["text", "journal_handoff"]);
 
+export const adminFeatureSettings = pgTable("admin_feature_settings", {
+  id: text("id").primaryKey().default("default"),
+  citizenDirectoryEnabled: boolean("citizen_directory_enabled").notNull().default(true),
+  citizenMessagingEnabled: boolean("citizen_messaging_enabled").notNull().default(true),
+  journalHandoffsEnabled: boolean("journal_handoffs_enabled").notNull().default(true),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({
   dataType() {
     return "bytea";

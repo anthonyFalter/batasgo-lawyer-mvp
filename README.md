@@ -95,6 +95,12 @@ See `.env.example` for the local template. Generate an encryption key with:
 node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
 ```
 
+## Separate BatasGO admin MVP
+
+The cross-app pitch and test control panel lives in the sibling `batasgo-admin-mvp` repository. See its README for local/Vercel setup. Set `ADMIN_API_SECRET` here to the same 32+ character random server-side secret configured in the admin app, then apply the feature-settings migration using the normal reviewed Drizzle migration process.
+
+The lawyer app exposes its `/api/admin/*` routes only through that bearer secret; they do not use Clerk session authentication. Keep the secret private. Admin conversation views query metadata and counts only, never message text, previews, handoff content, or attachments. Use the dedicated admin Clerk user-ID allowlist in the admin app to restrict people who may invoke these controls.
+
 ## Deploying the MVP to Vercel
 
 1. Import the GitHub repository into Vercel as a Next.js project. The project root is the repository root; the build command is `npm run build`.
