@@ -6,6 +6,8 @@ import {
   citizenApiJson,
   citizenApiOptions,
 } from "@/lib/citizen/api";
+import { logCitizenAccess } from "@/lib/citizen/audit";
+import { encryptText } from "@/lib/citizen/message-crypto";
 import { listActorConversations, listRecentIncomingMessages } from "@/lib/citizen/service";
 import { citizenConversationCreateSchema } from "@/lib/citizen/validation";
 
@@ -18,6 +20,11 @@ export async function GET(request: Request) {
   if ("response" in result) return result.response;
 
   try {
+    await logCitizenAccess({
+      actor: result.actor,
+      action: "conversation.list",
+      outcome: "allowed",
+    });
     const [conversations, recentMessages] = await Promise.all([
       listActorConversations(result.actor),
       listRecentIncomingMessages(result.actor),
@@ -33,6 +40,11 @@ export async function POST(request: Request) {
   const result = await authenticateCitizenApiRequest(request);
   if ("response" in result) return result.response;
   if (result.actor.kind !== "citizen") {
+    await logCitizenAccess({
+      actor: result.actor,
+      action: "conversation.create",
+      outcome: "denied",
+    });
     return citizenApiJson(request, { error: "Citizen authentication is required." }, { status: 403 });
   }
 
@@ -64,13 +76,20 @@ export async function POST(request: Request) {
       return citizenApiJson(request, { error: "This lawyer is not currently listed." }, { status: 404 });
     }
 
+    await logCitizenAccess({
+      actor: result.actor,
+      workspaceId: profile.workspaceId,
+      action: "conversation.create",
+      outcome: "allowed",
+    });
+
     const [created] = await db
       .insert(citizenConversations)
       .values({
         workspaceId: profile.workspaceId,
         citizenId: result.actor.citizenId,
-        citizenDisplayName: parsed.data.citizenDisplayName,
-        subject: parsed.data.subject,
+        citizenDisplayName: encryptText(parsed.data.citizenDisplayName),
+        subject: encryptText(parsed.data.subject),
       })
       .onConflictDoNothing({
         target: [citizenConversations.workspaceId, citizenConversations.citizenId],

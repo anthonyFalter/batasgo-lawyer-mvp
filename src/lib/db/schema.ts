@@ -282,7 +282,7 @@ export const citizenJournalHandoffs = pgTable(
       .references(() => workspaces.id, { onDelete: "cascade" }),
     citizenId: text("citizen_id").notNull(),
     title: text("title").notNull(),
-    entries: jsonb("entries").$type<CitizenJournalEntrySnapshot[]>().notNull(),
+    entries: jsonb("entries").$type<string>().notNull(),
     consentedAt: timestamp("consented_at", { withTimezone: true }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -330,5 +330,25 @@ export const citizenMessages = pgTable(
   (table) => [
     index("citizen_messages_conversation_created_idx").on(table.conversationId, table.createdAt),
     index("citizen_messages_handoff_idx").on(table.handoffId),
+  ],
+);
+
+export const citizenAccessAuditLogs = pgTable(
+  "citizen_access_audit_logs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    actorKind: text("actor_kind").notNull(),
+    actorId: text("actor_id").notNull(),
+    workspaceId: uuid("workspace_id"),
+    conversationId: uuid("conversation_id"),
+    resourceId: text("resource_id"),
+    action: text("action").notNull(),
+    outcome: text("outcome").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("citizen_access_audit_logs_workspace_created_idx").on(table.workspaceId, table.createdAt),
+    index("citizen_access_audit_logs_actor_created_idx").on(table.actorKind, table.actorId, table.createdAt),
+    index("citizen_access_audit_logs_conversation_created_idx").on(table.conversationId, table.createdAt),
   ],
 );

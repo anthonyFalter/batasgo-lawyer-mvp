@@ -51,12 +51,21 @@ export function citizenApiJson(
   return Response.json(body, { ...init, headers });
 }
 
+function isSecureCitizenApiRequest(request: Request) {
+  if (process.env.NODE_ENV !== "production") return true;
+  return new URL(request.url).protocol === "https:";
+}
+
 export function citizenApiOptions(request: Request) {
+  if (!isSecureCitizenApiRequest(request)) {
+    return new Response(null, { status: 426, headers: { Upgrade: "TLS/1.2" } });
+  }
   const origin = request.headers.get("origin");
   const allowedOrigins = configuredCitizenOrigins();
   if (!origin || !allowedOrigins.includes(origin)) {
     return new Response(null, { status: 403 });
   }
+
   return new Response(null, { status: 204, headers: citizenApiHeaders(request) });
 }
 
@@ -67,11 +76,22 @@ function isJwtVerificationError(error: unknown) {
 export async function authenticateCitizenApiRequest(
   request: Request,
 ): Promise<{ actor: CitizenApiActor } | { response: Response }> {
+  if (!isSecureCitizenApiRequest(request)) {
+    return {
+      response: citizenApiJson(request, { error: "This service requires an HTTPS connection." }, { status: 426 }),
+    };
+  }
+
   const authorization = request.headers.get("authorization");
   if (authorization?.startsWith("Bearer ")) {
     const token = authorization.slice("Bearer ".length).trim();
     const requestOrigin = request.headers.get("origin");
     const allowedOrigins = configuredCitizenOrigins();
+    if (process.env.NODE_ENV === "production" && allowedOrigins.some((origin) => !origin.startsWith("https://"))) {
+      return {
+        response: citizenApiJson(request, { error: "Citizen app origins must use HTTPS in production." }, { status: 503 }),
+      };
+    }
     if (!token || !requestOrigin || !allowedOrigins.includes(requestOrigin)) {
       return { response: citizenApiJson(request, { error: "Citizen app origin is not allowed." }, { status: 403 }) };
     }
@@ -85,19 +105,10 @@ export async function authenticateCitizenApiRequest(
 
     try {
       const isSecretKey = key.startsWith("sk_");
-      let result;
-      try {
-        result = await verifyToken(token, isSecretKey
-          ? { secretKey: key, authorizedParties: allowedOrigins }
-          : { jwtKey: key, authorizedParties: allowedOrigins }
-        );
-      } catch (err) {
-        if (err && typeof err === "object" && "reason" in err && err.reason === "token-invalid-authorized-parties") {
-          result = await verifyToken(token, isSecretKey ? { secretKey: key } : { jwtKey: key });
-        } else {
-          throw err;
-        }
-      }
+      const result = await verifyToken(token, isSecretKey
+        ? { secretKey: key, authorizedParties: allowedOrigins }
+        : { jwtKey: key, authorizedParties: allowedOrigins }
+      );
       const claims = z.object({ sub: z.string().min(1) }).safeParse(result);
       if (!claims.success) {
         return { response: citizenApiJson(request, { error: "Citizen authentication is required." }, { status: 401 }) };

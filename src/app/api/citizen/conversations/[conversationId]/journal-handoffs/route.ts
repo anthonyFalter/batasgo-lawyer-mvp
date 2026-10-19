@@ -13,6 +13,8 @@ import {
   citizenApiOptions,
 } from "@/lib/citizen/api";
 import { getConversationAccess } from "@/lib/citizen/service";
+import { logCitizenAccess } from "@/lib/citizen/audit";
+import { encryptBytes, encryptText } from "@/lib/citizen/message-crypto";
 import { citizenHandoffPayloadSchema } from "@/lib/citizen/validation";
 import { z } from "zod";
 
@@ -55,6 +57,13 @@ export async function POST(request: Request, { params }: RouteContext) {
   const result = await authenticateCitizenApiRequest(request);
   if ("response" in result) return result.response;
   if (result.actor.kind !== "citizen") {
+    const { conversationId } = await params;
+    await logCitizenAccess({
+      actor: result.actor,
+      conversationId,
+      action: "handoff.create",
+      outcome: "denied",
+    });
     return citizenApiJson(request, { error: "Only a citizen can share a journal handoff." }, { status: 403 });
   }
 
@@ -62,6 +71,12 @@ export async function POST(request: Request, { params }: RouteContext) {
   try {
     const conversation = await getConversationAccess(conversationId, result.actor);
     if (!conversation) {
+      await logCitizenAccess({
+        actor: result.actor,
+        conversationId,
+        action: "handoff.create",
+        outcome: "denied",
+      });
       return citizenApiJson(request, { error: "Conversation not found." }, { status: 404 });
     }
 
@@ -154,6 +169,15 @@ export async function POST(request: Request, { params }: RouteContext) {
       return citizenApiJson(request, { error: "This journal handoff has already been submitted." }, { status: 409 });
     }
 
+    await logCitizenAccess({
+      actor: result.actor,
+      workspaceId: conversation.workspaceId,
+      conversationId,
+      resourceId: parsed.data.handoffId,
+      action: "handoff.create",
+      outcome: "allowed",
+    });
+
     let handoffId: string | null = null;
     let messagePersisted = false;
     try {
@@ -164,8 +188,8 @@ export async function POST(request: Request, { params }: RouteContext) {
           conversationId,
           workspaceId: conversation.workspaceId,
           citizenId: result.actor.citizenId,
-          title: parsed.data.title,
-          entries: parsed.data.entries,
+          title: encryptText(parsed.data.title),
+          entries: encryptText(JSON.stringify(parsed.data.entries)),
           consentedAt: new Date(),
         })
         .returning();
@@ -175,11 +199,11 @@ export async function POST(request: Request, { params }: RouteContext) {
         await db.insert(citizenHandoffAttachments).values(attachments.map(({ metadata, fileName, contentType, bytes }) => ({
           handoffId: handoff.id,
           sourceEntryId: metadata.sourceEntryId,
-          fileName,
+          fileName: encryptText(fileName),
           contentType,
           sizeBytes: bytes.length,
           sha256: createHash("sha256").update(bytes).digest("hex"),
-          content: bytes,
+          content: encryptBytes(bytes),
         })));
       }
 
@@ -191,7 +215,7 @@ export async function POST(request: Request, { params }: RouteContext) {
           sender: "citizen",
           senderId: result.actor.citizenId,
           kind: "journal_handoff",
-          content: summary,
+          content: encryptText(summary),
           handoffId: handoff.id,
         })
         .returning();
@@ -200,7 +224,7 @@ export async function POST(request: Request, { params }: RouteContext) {
       await db
         .update(citizenConversations)
         .set({
-          lastMessagePreview: summary.slice(0, 240),
+          lastMessagePreview: encryptText(summary.slice(0, 240)),
           lastMessageAt: message.createdAt,
           updatedAt: message.createdAt,
         })
@@ -209,8 +233,8 @@ export async function POST(request: Request, { params }: RouteContext) {
       return citizenApiJson(request, {
         handoff: {
           id: handoff.id,
-          title: handoff.title,
-          entryCount: handoff.entries.length,
+          title: parsed.data.title,
+          entryCount: parsed.data.entries.length,
           attachmentCount: attachments.length,
           consentedAt: handoff.consentedAt.toISOString(),
         },

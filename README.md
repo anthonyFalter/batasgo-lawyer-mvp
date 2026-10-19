@@ -41,7 +41,7 @@ Apply the existing schema migration to your Neon database with:
 npm run db:migrate
 ```
 
-The schema establishes workspaces, Clerk-user memberships, and intakes. After changing the Drizzle schema, generate a new migration with `npm run db:generate`, then apply it with `npm run db:migrate`. In development, the first authenticated Case Overview load creates an isolated workspace and seeds synthetic sample intakes if that workspace has no seed data. Do not treat these examples as client records.
+The schema establishes workspaces, Clerk-user memberships, intakes, and citizen messaging/audit records. After changing the Drizzle schema, generate a new migration with `npm run db:generate`, then apply it with `npm run db:migrate`. In development, the first authenticated Case Overview load creates an isolated workspace and seeds synthetic sample intakes if that workspace has no seed data. Do not treat these examples as client records.
 
 Start the development server with:
 
@@ -91,13 +91,16 @@ The lawyer app exposes these authenticated routes to the separate citizen Clerk 
 
 Configure `CITIZEN_CLERK_JWT_KEY` with the citizen Clerk instance's PEM JWT public key and `CITIZEN_APP_ORIGINS` with the comma-separated citizen app origins. The citizen app needs its separate Clerk keys and `NEXT_PUBLIC_LAWYER_API_ORIGIN`. For local development with the citizen app on port 3000 and the lawyer app on port 3001, allow `http://localhost:3000` and set the citizen app's lawyer API origin to `http://localhost:3001`. Create the migration with `npm run db:generate`, review the SQL, and apply it with `npm run db:migrate` only after confirming the target `DATABASE_URL`.
 
-Citizen journal handoff entries and media are delivered as selected; no citizen-side AI processing occurs. This is standard authenticated messaging, not end-to-end encryption, and data is not automatically deleted. Treat handoffs as sensitive client records and confirm database access, data-region, retention, backup, and organizational policies before using real personal information. Lawyer profiles are not credential-verified.
+Set a dedicated 32-byte base64 `MESSAGE_ENCRYPTION_KEY` in the lawyer server's secret manager. Generate it with `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"`; never reuse a Clerk or database key. For an existing database, apply the audit-table migration first, stop message traffic, configure the key, and run `npm run db:encrypt-citizen-data` before deploying the encryption-enabled application. The command is idempotent and encrypts message bodies, conversation names and subjects, inbox previews, handoff titles and entries, attachment names, and attachment bytes. Keep the same key backed up securely; losing it makes these records unreadable.
+
+Citizen messages and consented journal handoff content are encrypted in transit with TLS and at rest with AES-256-GCM. The API checks each conversation against the authenticated citizen ID or lawyer workspace ID; authorized reads/writes and denied conversation, handoff, and attachment requests are audit-logged without storing message content in the log. Production citizen origins must be HTTPS, and the app sets HSTS. This is not end-to-end encryption: authorized lawyer-workspace members can read the messages. Messages are not automatically deleted. Treat handoffs as sensitive client records and confirm database access, data-region, retention, backup, and organizational policies before using real personal information. Lawyer profiles are not credential-verified.
 
 ## Security and sensitive data
 
 Manually entered intake details are persisted to Neon when saved, and citizen messages/handoffs are persisted when sent, so use synthetic data until database location, retention, access controls, and organizational approval are confirmed. Manual intake details are sent to AI only after the lawyer requests scoring. Citizen journal handoffs are not sent to an AI provider automatically; the lawyer can explicitly begin document review through “Add to intake queue” and must consent in the intake workflow before upload.
 
 - **Authorize every data operation.** Never trust client-supplied user, workspace, or matter IDs as proof of access. Keep health-check responses minimal and free of secrets or internal configuration.
+- **Protect citizen messaging.** Keep `MESSAGE_ENCRYPTION_KEY` server-only and stable; require TLS in production; run the idempotent citizen data-encryption command before rolling out encryption to a database with existing messages. Audit logs record the authenticated actor, action, resource, outcome, and timestamp, never message content.
 - **Keep keys and credentials secret.** Store them in local environment files or the deployment platform's secret manager; never commit them or put them in source code. `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is intended to be public; keep `CLERK_SECRET_KEY`, `CITIZEN_CLERK_JWT_KEY`, `DATABASE_URL`, and `GEMINI_API_KEY` server-only. The `.env*` files are ignored by Git, and `.env.example` contains placeholders only. Rotate any credential that may have been exposed.
 - **Validate and limit input.** Validate request bodies and query parameters on the server, apply appropriate size and rate limits, and return errors that do not reveal internal details.
 - **Handle client data carefully.** Collect only what the feature needs, enforce access checks for database records and uploaded files, and avoid logging message contents, documents, credentials, or other sensitive personal information.
@@ -114,6 +117,7 @@ npm run start     # Serve the production build
 npm run typecheck # Run the TypeScript type check
 npm run db:generate # Generate a database migration from schema changes
 npm run db:migrate  # Apply pending database migrations
+npm run db:encrypt-citizen-data # Encrypt existing citizen messages and handoffs
 ```
 
 ## Project structure
@@ -128,4 +132,4 @@ npm run db:migrate  # Apply pending database migrations
 
 ## Current scope
 
-This remains an MVP prototype, not a production case-management service. Intake records and decisions are persisted in Neon; development seed records are synthetic. Other displayed content is sample data. Citizen-app integration, file uploads, and AI analysis of manually entered intake data are not connected.
+This remains an MVP prototype, not a production case-management service. Intake records and decisions are persisted in Neon; development seed records are synthetic. Citizen messaging and handoffs persist in Neon with AES-256-GCM application encryption and audit logging. Other displayed content is sample data. AI analysis of manually entered intake data is only triggered by the lawyer's explicit scoring action.

@@ -8,7 +8,8 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "db:encrypt-citizen-data": "node scripts/encrypt-citizen-data.mjs"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.9.17",

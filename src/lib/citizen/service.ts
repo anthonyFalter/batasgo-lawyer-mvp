@@ -8,7 +8,9 @@ import {
   citizenJournalHandoffs,
   citizenLawyerProfiles,
   citizenMessages,
+  type CitizenJournalEntrySnapshot,
 } from "@/lib/db/schema";
+import { decryptText } from "./message-crypto";
 import type { CitizenApiActor } from "./api";
 
 export async function listRecentIncomingMessages(actor: CitizenApiActor) {
@@ -34,6 +36,9 @@ export async function listRecentIncomingMessages(actor: CitizenApiActor) {
 
   return rows.map((message) => ({
     ...message,
+    client: decryptText(message.client),
+    subject: decryptText(message.subject),
+    text: decryptText(message.text),
     createdAt: message.createdAt.toISOString(),
   }));
 }
@@ -78,9 +83,9 @@ export async function listActorConversations(actor: CitizenApiActor) {
       id: conversation.id,
       lawyer: conversation.lawyerDisplayName ?? "Lawyer profile unavailable",
       specialty: conversation.specialty ?? "",
-      client: conversation.citizenDisplayName,
-      subject: conversation.subject,
-      preview: conversation.lastMessagePreview,
+      client: decryptText(conversation.citizenDisplayName),
+      subject: decryptText(conversation.subject),
+      preview: decryptText(conversation.lastMessagePreview),
       updatedAt: conversation.lastMessageAt.toISOString(),
       verificationStatus: "not_verified" as const,
       unreadCount: 0,
@@ -104,9 +109,9 @@ export async function listActorConversations(actor: CitizenApiActor) {
     id: conversation.id,
     lawyer: "",
     specialty: "",
-    client: conversation.citizenDisplayName,
-    subject: conversation.subject,
-    preview: conversation.lastMessagePreview,
+    client: decryptText(conversation.citizenDisplayName),
+    subject: decryptText(conversation.subject),
+    preview: decryptText(conversation.lastMessagePreview),
     updatedAt: conversation.lastMessageAt.toISOString(),
     verificationStatus: "not_applicable" as const,
     unreadCount: 0,
@@ -152,13 +157,19 @@ export async function listConversationMessages(conversationId: string, actor: Ci
 
   return messages.map((message) => {
     const handoff = message.handoffId ? handoffById.get(message.handoffId) : undefined;
+    const entries = handoff
+      ? JSON.parse(decryptText(handoff.entries)) as CitizenJournalEntrySnapshot[]
+      : [];
     const metadata = handoff ? {
       id: handoff.id,
-      title: handoff.title,
-      entryCount: handoff.entries.length,
-      entries: actor.kind === "lawyer" ? handoff.entries : undefined,
+      title: decryptText(handoff.title),
+      entryCount: entries.length,
+      entries: actor.kind === "lawyer" ? entries : undefined,
       consentedAt: handoff.consentedAt.toISOString(),
-      attachments: attachmentsByHandoffId.get(handoff.id) ?? [],
+      attachments: (attachmentsByHandoffId.get(handoff.id) ?? []).map((attachment) => ({
+        ...attachment,
+        fileName: decryptText(attachment.fileName),
+      })),
     } : null;
 
     return {
@@ -166,7 +177,7 @@ export async function listConversationMessages(conversationId: string, actor: Ci
       sender: message.sender,
       senderId: message.senderId,
       kind: message.kind,
-      text: message.content,
+      text: decryptText(message.content),
       createdAt: message.createdAt.toISOString(),
       journalHandoff: metadata,
     };
