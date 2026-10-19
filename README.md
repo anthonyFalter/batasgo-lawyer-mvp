@@ -1,135 +1,116 @@
 # BatasGO
 
-BatasGO is a lawyer-facing workspace prototype for reviewing client inquiries and managing related casework. Its backend-enabled MVP workflows include a persistent intake triage queue, citizen messages/journal handoffs, and BatasBot; documents, calendar, and tasks remain local demonstrations.
+BatasGO is a lawyer-facing MVP for reviewing client inquiries and managing related casework. It is a prototype, not a production case-management or legal-advice service.
 
-This project uses Next.js. Clerk-authenticated intake records and accept/decline decisions are saved in Neon, scoped to the signed-in user's workspace. Development workspaces are seeded with clearly labeled synthetic examples. Document Assembly, Calendar, and Tasks use local sample content and are not live legal services or records.
+## Walkthrough
 
-## Technology
+Start at `/` and sign in through Clerk to open the workspace.
 
-### In use
+| Route | What to try |
+| --- | --- |
+| `/dashboard` | Review the intake queue, inspect triage details, and create or update an intake. |
+| `/batasbot` | Chat with BatasBot and review saved conversations. |
+| `/messages` | View citizen conversations and consented journal handoffs. |
+| `/documents` | Explore the document assembly demo. |
+| `/calendar` | Browse the calendar demo. |
+| `/tasks` | Explore the task demo. |
+| `/settings` | View the settings demo. |
+| `/about` | Read about the project. |
 
-- Next.js App Router
-- React
-- TypeScript
-- Clerk authentication with protected workspace routes
-- Neon Postgres and Drizzle ORM for persistent intake and workspace data
-- Zod for server-side request validation
-- Google Gemini API with optional Groq fallback for synthetic summaries and explicitly requested intake review
+Intakes, BatasBot conversations, and citizen messages/handoffs persist in Neon. Document Assembly, Calendar, and Tasks use browser-side sample data and are not saved to the server. Development workspaces may receive synthetic sample intakes; do not treat them as client records.
 
-### Planned for a backend-enabled MVP
+## Stack and project map
 
-- Citizen-app intake submission integration, document storage, and APIs for matters and tasks.
-- An object-storage service for attachments, with file metadata and access rules kept in Postgres.
-- A Next.js-compatible hosting provider such as Vercel, selected after reviewing data-region availability, privacy terms, and backup requirements.
-- Broader client-data processing only after provider data-retention/privacy review and organizational approval.
+- Next.js App Router, React, and TypeScript.
+- Clerk for lawyer-app authentication.
+- Neon Postgres with Drizzle ORM for persistent data.
+- Zod for server-side request validation.
+- Gemini and optional Groq for AI features.
 
-Hosting and dedicated object storage remain undecided. Citizen integration is currently limited to messages and consented journal handoffs; citizen intake submission is not connected.
+```text
+src/
+  app/                 Routes, layouts, API endpoints, and error pages
+  features/            Workspace UI by feature (triage, messages, BatasBot, etc.)
+  lib/
+    db/                Database client, schema, and workspace helpers
+    citizen/           Citizen API, messaging, audit, and encryption
+    intakes/            Intake services, validation, and triage
+    chat/              BatasBot session persistence
+  hooks/                Shared React hooks
+drizzle/                PostgreSQL schema migrations
+```
 
-## Getting started
+The API routes live under `src/app/api/`. They authenticate requests and enforce workspace or conversation access on the server; do not rely on client-supplied IDs as authorization.
 
-You'll need Node.js and npm installed.
+## Local development
+
+Requirements: Node.js and npm.
 
 ```bash
 npm ci
 ```
 
-For a fresh local setup, run `npx -y clerk@latest init` to configure Clerk and create local development credentials in `.env.local`. Keep that file private and do not overwrite the generated Clerk values. Set `DATABASE_URL` in `.env.local` to your Neon connection string and `GEMINI_API_KEY` to your Gemini key. Gemini defaults to `gemini-3.8-flash`; set `GEMINI_MODEL` to override it. Optionally set `GROQ_API_KEY` to enable Groq; manual scoring tries Groq first, while document extraction uses Gemini first for image support and then Groq for text-only fallback. Intake reviews default to `openai/gpt-oss-20b` (overridable with `GROQ_MODEL`), and BatasBot defaults to `openai/gpt-oss-20b` (overridable with `GROQ_CHAT_MODEL`). Never commit or share `.env.local`. If you need to create `.env.local` manually, copy `.env.example` first and configure Clerk keys through your Clerk account.
-
-Apply the existing schema migration to your Neon database with:
+Copy `.env.example` to `.env.local` and configure the values described below. Keep `.env.local` private; it is ignored by Git.
 
 ```bash
 npm run db:migrate
-```
-
-The schema establishes workspaces, Clerk-user memberships, intakes, and citizen messaging/audit records. After changing the Drizzle schema, generate a new migration with `npm run db:generate`, then apply it with `npm run db:migrate`. In development, the first authenticated Case Overview load creates an isolated workspace and seeds synthetic sample intakes if that workspace has no seed data. Do not treat these examples as client records.
-
-Start the development server with:
-
-```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) for the BatasGO intro and workspace sign-in link. Opening a workspace route while signed out redirects to Clerk sign-in.
-
-## Workspace pages
-
-| Route | Page |
-| --- | --- |
-| `/dashboard` | Case Overview: search, filter, sort, persist intake decisions, undo, and create intakes. |
-| `/batasbot` | BatasBot: AI chat with persisted conversation sessions and links to workspace screens. |
-| `/documents` | Document Assembly: edit a draft, review it, and export an HTML review copy. |
-| `/calendar` | Calendar: browse months, select dates, and search appointments. |
-| `/messages` | Messages: receive and reply to citizen conversations, opt in to the unverified citizen directory, and inspect consented journal handoffs. |
-| `/tasks` | Tasks: search, filter, sort, and try creating and updating tasks. |
-| `/settings` | Settings workspace demo. |
-| `/about` | About BatasGO (public). |
-| `/sign-in` | Clerk sign-in page. |
-| `/sign-up` | Clerk sign-up page. |
-
-Case Overview intake records and decisions, BatasBot conversation sessions, and citizen conversations/messages/handoffs persist in Neon; BatasBot sessions can be deleted from the session list. Document Assembly, Calendar, and Tasks use demo data in the browser and are not saved to a server. Citizen handoff files are stored as binary data in Postgres and are accessible only to the participating citizen and lawyer workspace. Opening a journal in BatasBot or choosing “Add to intake queue” creates a named `.txt` file from its shared entries. The intake action opens the New intake document-review path with that file selected; the lawyer must explicitly consent before it is uploaded for AI extraction. File contents are processed in memory, not retained as a file. The generated BatasBot review summary and file name are saved in the BatasBot conversation. Saved intakes retain structured deadline, stage, and urgency details plus selected document names, but not file contents. Triage signal summaries are consistently derived from those saved fields. Readable text can be pseudonymized before provider transmission, but masking is partial and cannot be reliably applied to scans or images. AI providers receive content needed for the requested output and apply their own handling and retention terms.
-
-## Intake API
-
-- `GET /api/intakes` — list intakes for the authenticated user's workspace.
-- `POST /api/intakes` — create a workspace intake; its validated local or explicitly AI-reviewed priority is saved with the matter. Unscored intakes stay unassessed rather than receiving a fabricated default score.
-- `POST /api/intakes/review` — generate title, description, practice-area suggestions, structured dates/stage/urgency facts with best-effort source references, an AI-assisted summary, and an explained priority score from explicitly submitted details and consented supported documents.
-- `PATCH /api/intakes/:intakeId` — update an intake's status (`pending`, `accepted`, or `declined`).
-- `POST /api/intakes/:intakeId/summary` — generate and save an AI summary **only for synthetic sample records**. It tries Gemini first, then Groq when `GROQ_API_KEY` is configured and Gemini fails.
-
-Persistent intake endpoints require Clerk authentication and resolve workspace membership server-side; callers cannot select another workspace by sending an ID. The AI review endpoint also requires Clerk authentication and a same-origin request. AI provider keys stay server-side. The sample-summary endpoint remains synthetic-only.
-
-## Citizen messaging and journal handoffs
-
-The lawyer app exposes these authenticated routes to the separate citizen Clerk instance:
-
-- `GET /api/citizen/lawyers` — opted-in lawyer directory; every profile is marked not verified.
-- `GET|PUT /api/citizen/directory-profile` — manage the signed-in lawyer's optional citizen-directory profile.
-- `GET|POST /api/citizen/conversations` — list workspace conversations or start one with a listed lawyer.
-- `GET|POST /api/citizen/conversations/:conversationId/messages` — read or send text messages, scoped to the citizen or lawyer workspace.
-- `POST /api/citizen/conversations/:conversationId/journal-handoffs` — accept an explicitly consented set of selected journal entries and file attachments (8 MB per file, 20 MB combined).
-- `GET /api/citizen/attachments/:attachmentId` — download an attachment after checking the requesting citizen or lawyer workspace.
-
-Configure `CITIZEN_CLERK_JWT_KEY` with the citizen Clerk instance's PEM JWT public key and `CITIZEN_APP_ORIGINS` with the comma-separated citizen app origins. The citizen app needs its separate Clerk keys and `NEXT_PUBLIC_LAWYER_API_ORIGIN`. For local development with the citizen app on port 3000 and the lawyer app on port 3001, allow `http://localhost:3000` and set the citizen app's lawyer API origin to `http://localhost:3001`. Create the migration with `npm run db:generate`, review the SQL, and apply it with `npm run db:migrate` only after confirming the target `DATABASE_URL`.
-
-Set a dedicated 32-byte base64 `MESSAGE_ENCRYPTION_KEY` in the lawyer server's secret manager. Generate it with `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"`; never reuse a Clerk or database key. For an existing database, apply the audit-table migration first, stop message traffic, configure the key, and run `npm run db:encrypt-citizen-data` before deploying the encryption-enabled application. The command is idempotent and encrypts message bodies, conversation names and subjects, inbox previews, handoff titles and entries, attachment names, and attachment bytes. Keep the same key backed up securely; losing it makes these records unreadable.
-
-Citizen messages and consented journal handoff content are encrypted in transit with TLS and at rest with AES-256-GCM. The API checks each conversation against the authenticated citizen ID or lawyer workspace ID; authorized reads/writes and denied conversation, handoff, and attachment requests are audit-logged without storing message content in the log. Production citizen origins must be HTTPS, and the app sets HSTS. This is not end-to-end encryption: authorized lawyer-workspace members can read the messages. Messages are not automatically deleted. Treat handoffs as sensitive client records and confirm database access, data-region, retention, backup, and organizational policies before using real personal information. Lawyer profiles are not credential-verified.
-
-## Security and sensitive data
-
-Manually entered intake details are persisted to Neon when saved, and citizen messages/handoffs are persisted when sent, so use synthetic data until database location, retention, access controls, and organizational approval are confirmed. Manual intake details are sent to AI only after the lawyer requests scoring. Citizen journal handoffs are not sent to an AI provider automatically; the lawyer can explicitly begin document review through “Add to intake queue” and must consent in the intake workflow before upload.
-
-- **Authorize every data operation.** Never trust client-supplied user, workspace, or matter IDs as proof of access. Keep health-check responses minimal and free of secrets or internal configuration.
-- **Protect citizen messaging.** Keep `MESSAGE_ENCRYPTION_KEY` server-only and stable; require TLS in production; run the idempotent citizen data-encryption command before rolling out encryption to a database with existing messages. Audit logs record the authenticated actor, action, resource, outcome, and timestamp, never message content.
-- **Keep keys and credentials secret.** Store them in local environment files or the deployment platform's secret manager; never commit them or put them in source code. `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is intended to be public; keep `CLERK_SECRET_KEY`, `CITIZEN_CLERK_JWT_KEY`, `DATABASE_URL`, and `GEMINI_API_KEY` server-only. The `.env*` files are ignored by Git, and `.env.example` contains placeholders only. Rotate any credential that may have been exposed.
-- **Validate and limit input.** Validate request bodies and query parameters on the server, apply appropriate size and rate limits, and return errors that do not reveal internal details.
-- **Handle client data carefully.** Collect only what the feature needs, enforce access checks for database records and uploaded files, and avoid logging message contents, documents, credentials, or other sensitive personal information.
-- **Review third-party services.** Before sending client data to AI, hosting, storage, or other providers, review their security, privacy, retention, and data-location practices.
-
-The sample-summary route checks the database `isSample` flag and does not accept intake text from the browser. The intake flow discloses that supported PDF, DOCX, TXT, JPG, and PNG contents are sent to configured AI providers for extraction. Identifier masking is best-effort text pseudonymization and is not anonymization; scanned/image review requires the lawyer to turn masking off because identifiers cannot be reliably removed from pixels. Review providers' privacy, retention, and data-location terms before using real client information. Urgency scoring is calculated locally and deterministically from confirmed details: temporal deadlines (0–50), case risk and impact (0–30), procedural status (0–20), and a combined urgency bonus (0–10), capped at 100. Scores are categorized as Critical (80–100), High (60–79), Medium (30–59), and Low (0–29). Each component's rationale is shown for lawyer verification, and the lawyer can override the final score. Editing confirmed details recalculates the score locally; it does not call an AI provider. The score supports prioritization and is not legal advice. Provider availability and free-tier quotas are not guaranteed for document extraction.
-
-## Available commands
+Open `http://localhost:3000`. For code changes, use:
 
 ```bash
-npm run dev       # Start the local development server
-npm run build     # Create a production build
-npm run start     # Serve the production build
-npm run typecheck # Run the TypeScript type check
-npm run db:generate # Generate a database migration from schema changes
-npm run db:migrate  # Apply pending database migrations
-npm run db:encrypt-citizen-data # Encrypt existing citizen messages and handoffs
+npm run typecheck
+npm run build
 ```
 
-## Project structure
+After changing `src/lib/db/schema.ts`, generate and review a migration, then apply it to the intended database:
 
-- `src/app/` — App Router pages, layouts, styles, error pages, and the health API route.
-- `src/features/` — Feature workspaces, including triage, documents, messages, calendar, tasks, and BatasBot.
-- `src/components/` — Shared UI components.
-- `src/lib/`, `src/hooks/`, `src/types/` — Shared utilities, hooks, and types.
-- `drizzle/` and `drizzle.config.ts` — Generated Postgres migrations and Drizzle Kit configuration.
-- `assets/` — Source assets, including the BatasGO logo.
-- `public/` — Static files served by the app.
+```bash
+npm run db:generate
+npm run db:migrate
+```
 
-## Current scope
+Never run a migration against production until you have verified `DATABASE_URL` and reviewed the generated SQL.
 
-This remains an MVP prototype, not a production case-management service. Intake records and decisions are persisted in Neon; development seed records are synthetic. Citizen messaging and handoffs persist in Neon with AES-256-GCM application encryption and audit logging. Other displayed content is sample data. AI analysis of manually entered intake data is only triggered by the lawyer's explicit scoring action.
+## Environment variables
+
+Set secrets in the hosting provider's environment-variable manager, not in source code or client-side code.
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `DATABASE_URL` | Yes | Neon PostgreSQL connection string. |
+| `MESSAGE_ENCRYPTION_KEY` | For citizen messages | Base64-encoded 32-byte key for AES-256-GCM message and handoff encryption. Keep it stable and backed up; losing it makes encrypted records unreadable. |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Yes | Clerk publishable key; this is intended to be public. |
+| `CLERK_SECRET_KEY` | Yes | Clerk server-side secret key. |
+| `GEMINI_API_KEY` | For Gemini features | Server-side Gemini API key. |
+| `GROQ_API_KEY` | Optional | Enables Groq provider/fallback features. |
+| `CITIZEN_CLERK_JWT_KEY` | For citizen integration | Citizen Clerk instance's PEM JWT public key. |
+| `CITIZEN_APP_ORIGINS` | For citizen integration | Comma-separated exact citizen-app origins; production origins must use HTTPS. |
+| `GEMINI_MODEL`, `GROQ_MODEL`, `GROQ_CHAT_MODEL` | Optional | AI model overrides. |
+
+See `.env.example` for the local template. Generate an encryption key with:
+
+```bash
+node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
+```
+
+## Deploying the MVP to Vercel
+
+1. Import the GitHub repository into Vercel as a Next.js project. The project root is the repository root; the build command is `npm run build`.
+2. Create a Neon database for the deployment. Use a separate database or branch for previews; do not let preview deployments access production data.
+3. In **Vercel → Project → Settings → Environment Variables**, add the required values above for the appropriate environments. If testing on a Vercel `vercel.app` URL without a custom domain, the app can use Clerk development-instance keys temporarily; this is a limited test setup, not a production Clerk configuration.
+4. Apply the Drizzle migrations once to the intended database by setting its `DATABASE_URL` locally and running `npm run db:migrate`. Verify the database target before running the command. Do not run migrations automatically during every Vercel build or preview deployment.
+5. Deploy, then test sign-in, workspace isolation, messaging, and any AI features you enabled. Check Vercel function logs for configuration or runtime errors.
+6. When environment variables change, redeploy so the new deployment receives them. Before wider production use, configure a Clerk production instance and domain, backups, access monitoring, and provider data-handling policies.
+
+## Data and MVP limitations
+
+- Keep this deployment limited to testing with synthetic data until database location, retention, backups, access controls, and organizational approval are confirmed.
+- Intake details are saved to Neon. Requested AI reviews send relevant information to the configured AI provider; identifier masking is best-effort and is not anonymization.
+- Citizen message and handoff content is encrypted at rest with the server-side `MESSAGE_ENCRYPTION_KEY`; it is not end-to-end encrypted. Existing plaintext citizen data must be encrypted before enabling the encryption-required flows. See `npm run db:encrypt-citizen-data` and the migration history before using this with existing records.
+- There is currently no server-side rate limiting for messaging or AI requests. Keep access limited and monitor provider usage and spend.
+- Lawyer directory profiles are not credential-verified. AI output is an aid and must be checked by a qualified professional.
+- Document Assembly, Calendar, and Tasks are demos, not live records or services.
+
+Review AI-provider retention and data-location terms before sending sensitive information. Never log or share API keys, database credentials, encryption keys, or client content.
