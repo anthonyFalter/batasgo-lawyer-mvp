@@ -23,12 +23,20 @@
 }
 
 .launch-screen-notice {
-  max-width: 34ch;
+  max-width: 48ch;
   margin: 28px 0 20px;
   color: #697991;
   font-size: 16px;
   font-weight: 550;
   line-height: 1.55;
+  text-align: center;
+}
+
+.launch-screen-session-note {
+  margin: 14px 0 0;
+  color: #596477;
+  font-size: 12px;
+  line-height: 1.5;
   text-align: center;
 }
 
