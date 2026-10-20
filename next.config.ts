@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   devIndicators: false,
+  // pdf-parse (pdfjs-dist + @napi-rs/canvas) loads a worker file and native
+  // binaries at runtime; bundling breaks those paths on Vercel serverless.
+  serverExternalPackages: ["pdf-parse"],
   async headers() {
     return [
       {
