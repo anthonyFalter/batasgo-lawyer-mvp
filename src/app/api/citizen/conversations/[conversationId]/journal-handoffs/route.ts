@@ -17,6 +17,7 @@ import { logCitizenAccess } from "@/lib/citizen/audit";
 import { encryptBytes, encryptText } from "@/lib/citizen/message-crypto";
 import { citizenHandoffPayloadSchema } from "@/lib/citizen/validation";
 import { z } from "zod";
+import { assertCitizenFeatureEnabled } from "@/lib/admin/features";
 
 const MAX_FILE_SIZE = 8 * 1024 * 1024;
 const MAX_TOTAL_FILE_SIZE = 20 * 1024 * 1024;
@@ -56,6 +57,8 @@ export async function OPTIONS(request: Request) {
 export async function POST(request: Request, { params }: RouteContext) {
   const result = await authenticateCitizenApiRequest(request);
   if ("response" in result) return result.response;
+  const featureDisabled = await assertCitizenFeatureEnabled(request, "journalHandoffsEnabled");
+  if (featureDisabled) return featureDisabled;
   if (result.actor.kind !== "citizen") {
     const { conversationId } = await params;
     await logCitizenAccess({

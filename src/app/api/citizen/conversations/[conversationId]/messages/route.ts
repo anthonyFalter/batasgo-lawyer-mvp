@@ -11,6 +11,7 @@ import { getConversationAccess, listConversationMessages } from "@/lib/citizen/s
 import { encryptText } from "@/lib/citizen/message-crypto";
 import { citizenMessageCreateSchema } from "@/lib/citizen/validation";
 import { isSameOriginRequest } from "@/lib/intakes/validation";
+import { assertCitizenFeatureEnabled } from "@/lib/admin/features";
 
 type RouteContext = { params: Promise<{ conversationId: string }> };
 
@@ -21,6 +22,8 @@ export async function OPTIONS(request: Request) {
 export async function GET(request: Request, { params }: RouteContext) {
   const result = await authenticateCitizenApiRequest(request);
   if ("response" in result) return result.response;
+  const featureDisabled = await assertCitizenFeatureEnabled(request, "citizenMessagingEnabled");
+  if (featureDisabled) return featureDisabled;
 
   const { conversationId } = await params;
   try {
@@ -55,6 +58,8 @@ export async function GET(request: Request, { params }: RouteContext) {
 export async function POST(request: Request, { params }: RouteContext) {
   const result = await authenticateCitizenApiRequest(request);
   if ("response" in result) return result.response;
+  const featureDisabled = await assertCitizenFeatureEnabled(request, "citizenMessagingEnabled");
+  if (featureDisabled) return featureDisabled;
   if (result.actor.kind === "lawyer" && !isSameOriginRequest(request)) {
     const { conversationId } = await params;
     await logCitizenAccess({

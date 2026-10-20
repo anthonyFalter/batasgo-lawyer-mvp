@@ -10,6 +10,7 @@ import { logCitizenAccess } from "@/lib/citizen/audit";
 import { encryptText } from "@/lib/citizen/message-crypto";
 import { listActorConversations, listRecentIncomingMessages } from "@/lib/citizen/service";
 import { citizenConversationCreateSchema } from "@/lib/citizen/validation";
+import { assertCitizenFeatureEnabled } from "@/lib/admin/features";
 
 export async function OPTIONS(request: Request) {
   return citizenApiOptions(request);
@@ -18,6 +19,8 @@ export async function OPTIONS(request: Request) {
 export async function GET(request: Request) {
   const result = await authenticateCitizenApiRequest(request);
   if ("response" in result) return result.response;
+  const featureDisabled = await assertCitizenFeatureEnabled(request, "citizenMessagingEnabled");
+  if (featureDisabled) return featureDisabled;
 
   try {
     await logCitizenAccess({
@@ -39,6 +42,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const result = await authenticateCitizenApiRequest(request);
   if ("response" in result) return result.response;
+  const featureDisabled = await assertCitizenFeatureEnabled(request, "citizenMessagingEnabled");
+  if (featureDisabled) return featureDisabled;
   if (result.actor.kind !== "citizen") {
     await logCitizenAccess({
       actor: result.actor,

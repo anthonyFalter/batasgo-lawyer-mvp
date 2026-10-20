@@ -1,6 +1,7 @@
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { citizenLawyerProfiles } from "@/lib/db/schema";
+import { assertCitizenFeatureEnabled } from "@/lib/admin/features";
 import {
   authenticateCitizenApiRequest,
   citizenApiJson,
@@ -14,6 +15,8 @@ export async function OPTIONS(request: Request) {
 export async function GET(request: Request) {
   const result = await authenticateCitizenApiRequest(request);
   if ("response" in result) return result.response;
+  const featureDisabled = await assertCitizenFeatureEnabled(request, "citizenDirectoryEnabled");
+  if (featureDisabled) return featureDisabled;
   if (result.actor.kind !== "citizen") {
     return citizenApiJson(request, { error: "Citizen authentication is required." }, { status: 403 });
   }
