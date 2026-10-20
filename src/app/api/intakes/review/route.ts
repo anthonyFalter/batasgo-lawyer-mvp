@@ -1,6 +1,9 @@
 import { GoogleGenAI } from "@google/genai";
 import { auth } from "@clerk/nextjs/server";
 import { inflateRawSync } from "node:zlib";
+// Must be imported before "pdf-parse" so the pdf.js worker and Node polyfills
+// (DOMMatrix, etc.) are registered in serverless runtimes such as Vercel.
+import "pdf-parse/worker";
 import { PDFParse } from "pdf-parse";
 import { z } from "zod";
 import { getRiskFromScore } from "@/lib/intakes/triage";
